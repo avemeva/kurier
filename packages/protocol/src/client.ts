@@ -1,0 +1,177 @@
+import type { Invoke, Update } from 'tdlib-types';
+import { type AuthState, type DaemonResponse, TelegramError } from './types';
+
+export interface TelegramClientOptions {
+  /** Base URL of the proxy, e.g. "http://localhost:7312" */
+  baseUrl: string;
+}
+
+type UpdateHandler = (update: Update) => void;
+
+export class TelegramClient {
+  private baseUrl: string;
+  private handlers = new Set<UpdateHandler>();
+  private abortController: AbortController | null = null;
+  private sseConnected = false;
+
+  constructor(opts: TelegramClientOptions | string) {
+    this.baseUrl = typeof opts === 'string' ? opts : opts.baseUrl;
+    // Strip trailing slash
+    if (this.baseUrl.endsWith('/')) {
+      this.baseUrl = this.baseUrl.slice(0, -1);
+    }
+  }
+
+  /**
+   * Invoke a TDLib method. Fully typed via tdlib-types Invoke signature.
+   *
+   *   const me = await client.invoke({ _: 'getMe' })
+   *   // me is typed as `user`
+   */
+  invoke = (async (params: Record<string, unknown>) => {
+    const res = await fetch(`${this.baseUrl}/api/tg/invoke`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+
+    const json = (await res.json()) as DaemonResponse<unknown>;
+    if (!json.ok) {
+      throw new TelegramError(json.error);
+    }
+    return json.data;
+  }) as unknown as Invoke;
+
+  /** Subscribe to raw TDLib updates via SSE. Starts the SSE connection on first call. */
+  on(event: 'update', handler: UpdateHandler): void {
+    if (event !== 'update') return;
+    this.handlers.add(handler);
+    if (!this.sseConnected) {
+      this.connectSSE();
+    }
+  }
+
+  /** Unsubscribe from updates. Closes SSE if no handlers remain. */
+  off(event: 'update', handler: UpdateHandler): void {
+    if (event !== 'update') return;
+    this.handlers.delete(handler);
+    if (this.handlers.size === 0) {
+      this.disconnectSSE();
+    }
+  }
+
+  // --- Auth helpers ---
+
+  async getAuthState(): Promise<AuthState> {
+    const res = await fetch(`${this.baseUrl}/api/tg/auth/state`);
+    const json = (await res.json()) as DaemonResponse<AuthState>;
+    if (!json.ok) throw new TelegramError(json.error);
+    return json.data;
+  }
+
+  async submitPhone(phone: string): Promise<AuthState> {
+    const res = await fetch(`${this.baseUrl}/api/tg/auth/phone`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone }),
+    });
+    const json = (await res.json()) as DaemonResponse<AuthState>;
+    if (!json.ok) throw new TelegramError(json.error);
+    return json.data;
+  }
+
+  async submitCode(code: string): Promise<AuthState> {
+    const res = await fetch(`${this.baseUrl}/api/tg/auth/code`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code }),
+    });
+    const json = (await res.json()) as DaemonResponse<AuthState>;
+    if (!json.ok) throw new TelegramError(json.error);
+    return json.data;
+  }
+
+  async submitPassword(password: string): Promise<AuthState> {
+    const res = await fetch(`${this.baseUrl}/api/tg/auth/password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const json = (await res.json()) as DaemonResponse<AuthState>;
+    if (!json.ok) throw new TelegramError(json.error);
+    return json.data;
+  }
+
+  /** Close SSE connection and clean up. */
+  close(): void {
+    this.disconnectSSE();
+    this.handlers.clear();
+  }
+
+  // --- SSE internals ---
+
+  private connectSSE(): void {
+    this.sseConnected = true;
+    this.abortController = new AbortController();
+
+    const connect = async () => {
+      try {
+        const res = await fetch(`${this.baseUrl}/api/tg/updates`, {
+          signal: this.abortController?.signal,
+        });
+
+        if (!res.ok || !res.body) {
+          this.sseConnected = false;
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            try {
+              const update = JSON.parse(line.slice(6)) as Update;
+              for (const handler of this.handlers) {
+                try {
+                  handler(update);
+                } catch {
+                  // Don't break iteration on handler errors
+                }
+              }
+            } catch {
+              // Skip malformed JSON
+            }
+          }
+        }
+      } catch (e: unknown) {
+        if ((e as Error)?.name === 'AbortError') return;
+        // Reconnect after 1 second on unexpected disconnect
+        if (this.sseConnected && this.handlers.size > 0) {
+          setTimeout(() => connect(), 1000);
+        }
+      }
+    };
+
+    connect();
+  }
+
+  private disconnectSSE(): void {
+    this.sseConnected = false;
+    this.abortController?.abort();
+    this.abortController = null;
+  }
+}

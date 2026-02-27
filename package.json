@@ -1,0 +1,25 @@
+{
+  "name": "telegram-ai-v2",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:daemon": "bun --filter @tg/daemon dev",
+    "dev:cli": "bun --filter @tg/cli dev",
+    "dev:web": "bun --filter @tg/web dev",
+    "dev:app": "bun --filter @tg/app dev",
+    "build": "bun --filter './packages/*' build && bun --filter './apps/*' build",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "test": "bun --filter '*' test",
+    "typecheck": "bun --filter '*' typecheck",
+    "postinstall": "git config core.hooksPath .githooks"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.4",
+    "typescript": "^5.7.2"
+  }
+}
