@@ -1,169 +1,307 @@
-import { TelegramClient } from '@tg/protocol';
+/**
+ * CLI entry point — Telegram CLI optimized for AI agents.
+ *
+ * Usage: bun tg <command> [args] [--flags]
+ *
+ * stdout: JSON only — { ok, data } or { ok, error, code }
+ * stderr: help text, warnings
+ * Entity arguments accept: numeric ID, @username, phone, "me"/"self"
+ *
+ * Always uses the daemon (auto-started if needed). No direct TDLib fallback.
+ */
 
-const PROXY_URL = process.env.TG_PROXY_URL ?? 'http://localhost:7312';
-const client = new TelegramClient(PROXY_URL);
+import { existsSync, readFileSync } from 'node:fs';
+import { TelegramClient, TelegramError } from '@tg/protocol';
+import { type Command, commands, getCommand } from './commands';
+import { ensureDaemon, getDaemonPid, LOG_FILE, spawnDaemon } from './daemon';
+import { CliError, fail, mapErrorCode, setPretty, success, warn } from './output';
+import { parseArgs } from './parse';
 
-const [command, ...args] = process.argv.slice(2);
+const MAX_FLOOD_WAIT_SEC = 30;
 
-async function main() {
-  // Check proxy is reachable
-  try {
-    const res = await fetch(`${PROXY_URL}/health`);
-    if (!res.ok) throw new Error();
-  } catch {
-    console.error(`Cannot reach proxy at ${PROXY_URL}`);
-    console.error('Start the daemon first: bun run dev:daemon');
-    process.exit(1);
-  }
+// --- Help (all to stderr — never pollutes JSON stdout) ---
 
-  switch (command) {
-    case 'me':
-      return cmdMe();
-    case 'chats':
-      return cmdChats();
-    case 'messages':
-      return cmdMessages();
-    case 'send':
-      return cmdSend();
-    case 'listen':
-      return cmdListen();
-    default:
-      printUsage();
-      process.exit(command ? 1 : 0);
-  }
-}
+const COMMAND_GROUPS: [string, string[]][] = [
+  ['Identity', ['me', 'resolve']],
+  ['Chats', ['dialogs', 'unread', 'chat']],
+  ['Messages', ['message', 'messages', 'search', 'send', 'edit']],
+  ['Actions', ['read', 'delete', 'forward', 'pin', 'unpin', 'react']],
+  ['Real-time', ['listen']],
+  ['Media', ['download', 'photo', 'contacts', 'members']],
+  ['Advanced', ['eval', 'list']],
+];
 
-async function cmdMe() {
-  const me = await client.invoke({ _: 'getMe' });
-  console.log(JSON.stringify(me, null, 2));
-}
+function printHelp(): void {
+  const cmdMap = new Map(commands.map((c) => [c.name, c]));
+  const lines = [
+    'tg — Telegram CLI for AI agents',
+    '',
+    'Usage: bun tg <command> [args] [--flags]',
+    '',
+    'stdout: JSON { ok, data } | { ok, error, code }',
+    'stderr: help, warnings',
+    'Entities: numeric ID | @username | +phone | t.me/link | "me"',
+    '',
+    'Global flags:',
+    '  --pretty      Pretty-print JSON output',
+    '  --timeout N   Timeout in seconds',
+    '',
+  ];
 
-async function cmdChats() {
-  const limit = Number(args[0]) || 20;
-  // First ensure chat list is loaded
-  const chatList = await client.invoke({
-    _: 'getChats',
-    chat_list: { _: 'chatListMain' },
-    limit,
-  });
-
-  // Fetch full chat objects
-  for (const chatId of chatList.chat_ids) {
-    const chat = await client.invoke({ _: 'getChat', chat_id: chatId });
-    const lastMsg = chat.last_message;
-    const preview =
-      lastMsg?.content?._ === 'messageText'
-        ? lastMsg.content.text.text.slice(0, 60)
-        : (lastMsg?.content?._ ?? '');
-    console.log(`${chat.id}  ${chat.title}  ${preview}`);
-  }
-}
-
-async function cmdMessages() {
-  const chatId = Number(args[0]);
-  if (!chatId) {
-    console.error('Usage: messages <chat_id> [limit]');
-    process.exit(1);
-  }
-  const limit = Number(args[1]) || 20;
-
-  const messages = await client.invoke({
-    _: 'getChatHistory',
-    chat_id: chatId,
-    from_message_id: 0,
-    offset: 0,
-    limit,
-    only_local: false,
-  });
-
-  for (const msg of messages.messages ?? []) {
-    if (!msg) continue;
-    const text = msg.content?._ === 'messageText' ? msg.content.text.text : `[${msg.content?._}]`;
-    const date = new Date(msg.date * 1000).toLocaleString();
-    console.log(
-      `[${date}] ${msg.sender_id?._}:${JSON.stringify(msg.sender_id).replace(/[{}"_:]/g, '')} ${text}`,
-    );
-  }
-}
-
-async function cmdSend() {
-  const chatId = Number(args[0]);
-  const text = args.slice(1).join(' ');
-  if (!chatId || !text) {
-    console.error('Usage: send <chat_id> <text>');
-    process.exit(1);
-  }
-
-  const msg = await client.invoke({
-    _: 'sendMessage',
-    chat_id: chatId,
-    input_message_content: {
-      _: 'inputMessageText',
-      text: { _: 'formattedText', text, entities: [] },
-    },
-  });
-
-  console.log(`Sent message ${msg.id} to chat ${chatId}`);
-}
-
-function cmdListen() {
-  console.log('Listening for updates... (Ctrl+C to stop)');
-  client.on('update', (update) => {
-    // Only show interesting updates, not the firehose
-    switch (update._) {
-      case 'updateNewMessage': {
-        const msg = update.message;
-        const text =
-          msg.content?._ === 'messageText'
-            ? msg.content.text.text.slice(0, 80)
-            : `[${msg.content?._}]`;
-        console.log(`[new] chat:${msg.chat_id} ${text}`);
-        break;
-      }
-      case 'updateMessageEdited':
-        console.log(`[edit] chat:${update.chat_id} msg:${update.message_id}`);
-        break;
-      case 'updateDeleteMessages':
-        if (update.is_permanent) {
-          console.log(`[delete] chat:${update.chat_id} msgs:${update.message_ids.join(',')}`);
-        }
-        break;
-      case 'updateChatLastMessage':
-        // Skip — too noisy
-        break;
-      default:
-        // Log update type only for other updates
-        if (
-          update._.startsWith('updateNew') ||
-          update._.startsWith('updateMessage') ||
-          update._.startsWith('updateDelete')
-        ) {
-          console.log(`[${update._}]`);
-        }
+  for (const [group, names] of COMMAND_GROUPS) {
+    lines.push(`${group}:`);
+    const maxLen = Math.max(...names.map((n) => n.length));
+    for (const name of names) {
+      const cmd = cmdMap.get(name);
+      if (cmd) lines.push(`  ${name.padEnd(maxLen + 2)}${cmd.description}`);
     }
-  });
+    lines.push('');
+  }
 
-  // Keep process alive
-  return new Promise<void>(() => {
-    process.on('SIGINT', () => {
-      client.close();
-      process.exit(0);
-    });
-  });
+  lines.push(
+    'Daemon:',
+    '  daemon start  Start the background daemon',
+    '  daemon stop   Stop the background daemon',
+    '  daemon status Check if daemon is running',
+    '  daemon log    Show last 20 lines of daemon log',
+    '',
+    "Run 'bun tg <command> --help' for command-specific usage.",
+  );
+  console.error(lines.join('\n'));
 }
 
-function printUsage() {
-  console.log(`Usage: bun run apps/cli/src/index.ts <command> [args]
-
-Commands:
-  me                      Get current user info
-  chats [limit]           List chats (default: 20)
-  messages <chat_id> [n]  Get message history
-  send <chat_id> <text>   Send a text message
-  listen                  Stream live updates`);
+function printCommandHelp(cmd: Command): void {
+  const lines = [`${cmd.name} — ${cmd.description}`, '', cmd.usage];
+  if (cmd.flags) {
+    lines.push('', 'Flags:');
+    const maxLen = Math.max(...Object.keys(cmd.flags).map((k) => k.length));
+    for (const [flag, desc] of Object.entries(cmd.flags)) {
+      lines.push(`  ${flag.padEnd(maxLen + 2)}${desc}`);
+    }
+  }
+  console.error(lines.join('\n'));
 }
 
-main().catch((e) => {
-  console.error(e.message ?? e);
-  process.exit(1);
-});
+// --- Daemon subcommands ---
+
+async function handleDaemonSubcommand(sub: string): Promise<never> {
+  if (sub === 'start') {
+    const existingPid = getDaemonPid();
+    if (existingPid) {
+      success({ already_running: true, pid: existingPid });
+    } else {
+      spawnDaemon();
+      const { url } = await ensureDaemon();
+      const pid = getDaemonPid();
+      if (url && pid) {
+        success({ started: true, pid });
+      } else {
+        fail('Failed to start daemon', 'UNKNOWN');
+      }
+    }
+  } else if (sub === 'stop') {
+    const pid = getDaemonPid();
+    if (pid) {
+      process.kill(pid, 'SIGTERM');
+      success({ stopped: true, pid });
+    } else {
+      fail('Daemon not running', 'NOT_FOUND');
+    }
+  } else if (sub === 'status') {
+    const pid = getDaemonPid();
+    if (pid) {
+      success({ running: true, pid });
+    } else {
+      success({ running: false });
+    }
+  } else if (sub === 'log') {
+    if (existsSync(LOG_FILE)) {
+      const log = readFileSync(LOG_FILE, 'utf-8');
+      const lines = log.trim().split('\n');
+      // Logs are inherently unstructured — output as plain text on stdout
+      if ('--json' in flags) {
+        success({ lines: lines.slice(-20) });
+      } else {
+        process.stdout.write(`${lines.slice(-20).join('\n')}\n`);
+      }
+    } else {
+      fail('No daemon log file', 'NOT_FOUND');
+    }
+  } else {
+    fail('Usage: bun tg daemon <start|stop|status|log>', 'INVALID_ARGS');
+  }
+  process.exit(0);
+}
+
+// --- Main ---
+
+const [cmdName, ...rest] = process.argv.slice(2);
+const { positional, flags } = parseArgs(rest ?? []);
+
+// Apply global flags early
+if ('--pretty' in flags) setPretty(true);
+
+// Help (no connect needed)
+if (!cmdName || cmdName === 'help' || cmdName === '--help') {
+  printHelp();
+  process.exit(0);
+}
+
+// Version (no connect needed)
+if (cmdName === 'version' || cmdName === '--version') {
+  const pkg = await Bun.file(new URL('../../package.json', import.meta.url)).json();
+  console.error(`tg ${pkg.version}`);
+  process.exit(0);
+}
+
+// Daemon subcommands (no connect needed)
+if (cmdName === 'daemon') {
+  try {
+    await handleDaemonSubcommand(positional[0] ?? '');
+  } catch (e) {
+    if (e instanceof CliError) {
+      process.exitCode = 1;
+    } else {
+      const msg = e instanceof Error ? e.message : String(e);
+      try {
+        fail(msg, 'UNKNOWN');
+      } catch {
+        process.exitCode = 1;
+      }
+    }
+    process.exit();
+  }
+}
+
+// --- Run command (wrapped to catch CliError at every stage) ---
+
+async function run(): Promise<void> {
+  // Resolve command
+  const cmd = getCommand(cmdName as string);
+  if (!cmd)
+    fail(
+      `Unknown command: "${cmdName}". Run 'bun tg --help' for available commands.`,
+      'INVALID_ARGS',
+    );
+
+  if ('--help' in flags) {
+    printCommandHelp(cmd);
+    process.exit(0);
+  }
+
+  // Handle --stdin: read text from stdin and append as positional arg
+  if ('--stdin' in flags) {
+    if (process.stdin.isTTY) {
+      fail(
+        "--stdin requires piped input (e.g., echo 'text' | bun tg send me --stdin --html)",
+        'INVALID_ARGS',
+      );
+    }
+    const chunks: Buffer[] = [];
+    for await (const chunk of process.stdin) {
+      chunks.push(chunk as Buffer);
+    }
+    const text = Buffer.concat(chunks).toString('utf-8').replace(/\n$/, '');
+    if (!text) fail('No input received from stdin', 'INVALID_ARGS');
+    positional.push(text);
+    delete flags['--stdin'];
+  }
+
+  // Handle --file: read text from file and append as positional arg
+  if (flags['--file']) {
+    const filePath = flags['--file'];
+    if (!existsSync(filePath)) fail(`File not found: ${filePath}`, 'INVALID_ARGS');
+    const text = readFileSync(filePath, 'utf-8');
+    if (!text) fail(`File is empty: ${filePath}`, 'INVALID_ARGS');
+    positional.push(text);
+    delete flags['--file'];
+  }
+
+  // Validate required args BEFORE connecting (saves time on typos)
+  if (cmd.minArgs && positional.length < cmd.minArgs) {
+    fail(`Missing required arguments. Usage: ${cmd.usage}`, 'INVALID_ARGS');
+  }
+
+  // Warn on unknown flags
+  const GLOBAL_FLAGS = new Set(['--pretty', '--timeout', '--help', '--file', '--stdin']);
+  const knownFlags = new Set([...GLOBAL_FLAGS, ...Object.keys(cmd.flags ?? {})]);
+  for (const flag of Object.keys(flags)) {
+    if (!knownFlags.has(flag)) {
+      warn(`Unknown flag: ${flag}`);
+    }
+  }
+
+  // --- Ensure daemon is running and create client ---
+
+  const { url } = await ensureDaemon();
+  const client = new TelegramClient(url);
+
+  // --- Execute command ---
+
+  async function execute(): Promise<void> {
+    const timeoutSec = flags['--timeout'] ? Number(flags['--timeout']) : 0;
+
+    // Streaming commands handle their own lifecycle (never-resolving promise + signal handlers)
+    if (cmd?.streaming) {
+      await cmd.run(client, positional, flags);
+      return;
+    }
+
+    const runner = () => cmd?.run(client, positional, flags);
+
+    if (timeoutSec > 0) {
+      await Promise.race([
+        runner(),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`Command timed out after ${timeoutSec}s`)),
+            timeoutSec * 1000,
+          ),
+        ),
+      ]);
+    } else {
+      await runner();
+    }
+  }
+
+  try {
+    await execute();
+  } catch (e: unknown) {
+    // CliError means fail() already wrote JSON to stdout — don't write again
+    if (e instanceof CliError) throw e;
+    if (e instanceof TelegramError && e.code === 429) {
+      // TelegramError with code 429 = flood wait
+      const match = e.message.match(/retry after (\d+)/);
+      const waitSecs = match ? Number(match[1]) : 5;
+      if (waitSecs <= MAX_FLOOD_WAIT_SEC) {
+        warn(`Rate limited. Waiting ${waitSecs}s before retry...`);
+        await new Promise((r) => setTimeout(r, waitSecs * 1000));
+        await execute();
+      } else {
+        fail(`Rate limited. Retry after ${waitSecs}s`, 'FLOOD_WAIT');
+      }
+    } else {
+      const err = e instanceof Error ? e : new Error(String(e));
+      fail(err.message, mapErrorCode(err.message));
+    }
+  } finally {
+    client.close();
+  }
+}
+
+try {
+  await run();
+} catch (e) {
+  // CliError means fail() already wrote JSON to stdout — just set exit code
+  if (e instanceof CliError) {
+    process.exitCode = 1;
+  } else {
+    // Unexpected error — write JSON and set exit code
+    try {
+      fail(e instanceof Error ? e.message : String(e), 'UNKNOWN');
+    } catch {
+      /* CliError */
+    }
+    process.exitCode = 1;
+  }
+}
