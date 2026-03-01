@@ -49,6 +49,10 @@ If a behavior could live in the client, it belongs in the client. The daemon sta
 | `app` | Electrobun desktop app |
 | `web` | Vite web app |
 
+## Commits
+
+When lint/type/test errors block a commit: understand the root cause, fix it properly. No `// @ts-ignore`, no `any` casts, no disabling lint rules, no skipping tests to unblock a commit.
+
 ## Conventions
 
 - **Runtime:** Bun
