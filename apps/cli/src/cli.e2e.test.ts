@@ -812,16 +812,6 @@ describe('contacts', () => {
   );
 
   it(
-    '--search filters contacts',
-    async () => {
-      const r = await tg('contacts', '--search', 'a');
-      expect(r.ok).toBe(true);
-      expect(Array.isArray(r.data)).toBe(true);
-    },
-    TIMEOUT,
-  );
-
-  it(
     'pagination with --offset',
     async () => {
       const r1 = await tg('contacts', '--limit', '3');

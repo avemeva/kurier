@@ -1599,12 +1599,10 @@ export const commands: Command[] = [
   // --- Contacts ---
   {
     name: 'contacts',
-    description: 'List, search saved contacts, or search globally',
-    usage:
-      'tg contacts [--limit N] [--search query] [--offset N]\ntg contacts search "<query>" [--limit N]',
+    description: 'List saved contacts, or search globally',
+    usage: 'tg contacts [--limit N] [--offset N]\ntg contacts search "<query>" [--limit N]',
     flags: {
       '--limit': 'Max contacts to return (default: 100)',
-      '--search': 'Search contacts by name',
       '--offset': 'Start from this index (for pagination)',
     },
     run: async (client, args, flags) => {
@@ -1645,40 +1643,23 @@ export const commands: Command[] = [
       const limit = parseLimit(flags, 100);
       const offset = flags['--offset'] ? Number(flags['--offset']) : 0;
 
-      if (flags['--search']) {
-        const result = await client.invoke({
-          _: 'searchContacts',
-          query: flags['--search'],
-          limit,
+      const result = await client.invoke({
+        _: 'getContacts',
+      });
+      const sliced = result.user_ids.slice(offset, offset + limit);
+      const hasMore = result.user_ids.length > offset + limit;
+      const userList: Td.user[] = [];
+      for (const userId of sliced) {
+        const user = await client.invoke({
+          _: 'getUser',
+          user_id: userId,
         });
-        const userList: Td.user[] = [];
-        for (const userId of result.user_ids) {
-          const user = await client.invoke({
-            _: 'getUser',
-            user_id: userId,
-          });
-          userList.push(user);
-        }
-        success(strip(slimUsers(userList)), { hasMore: false });
-      } else {
-        const result = await client.invoke({
-          _: 'getContacts',
-        });
-        const sliced = result.user_ids.slice(offset, offset + limit);
-        const hasMore = result.user_ids.length > offset + limit;
-        const userList: Td.user[] = [];
-        for (const userId of sliced) {
-          const user = await client.invoke({
-            _: 'getUser',
-            user_id: userId,
-          });
-          userList.push(user);
-        }
-        success(strip(slimUsers(userList)), {
-          hasMore,
-          nextOffset: hasMore ? offset + limit : undefined,
-        });
+        userList.push(user);
       }
+      success(strip(slimUsers(userList)), {
+        hasMore,
+        nextOffset: hasMore ? offset + limit : undefined,
+      });
     },
   },
 
