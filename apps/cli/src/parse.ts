@@ -20,6 +20,7 @@ export const BOOLEAN_FLAGS = new Set([
   '--incoming',
   '--download-media',
   '--full',
+  '--unread',
 ]);
 
 export function parseArgs(raw: string[]): {
@@ -43,12 +44,19 @@ export function parseArgs(raw: string[]): {
     if (arg === '--help') {
       flags['--help'] = 'true';
     } else if (arg.startsWith('--')) {
-      const next = raw[i + 1];
-      if (BOOLEAN_FLAGS.has(arg) || i + 1 >= raw.length || next?.startsWith('--')) {
-        flags[arg] = 'true';
+      // Support --flag=value syntax
+      const eqIdx = arg.indexOf('=');
+      if (eqIdx !== -1) {
+        const key = arg.slice(0, eqIdx);
+        flags[key] = arg.slice(eqIdx + 1);
       } else {
-        flags[arg] = next as string;
-        i++;
+        const next = raw[i + 1];
+        if (BOOLEAN_FLAGS.has(arg) || i + 1 >= raw.length || next?.startsWith('--')) {
+          flags[arg] = 'true';
+        } else {
+          flags[arg] = next as string;
+          i++;
+        }
       }
     } else {
       positional.push(arg);

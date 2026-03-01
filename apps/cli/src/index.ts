@@ -22,12 +22,12 @@ const MAX_FLOOD_WAIT_SEC = 30;
 // --- Help (all to stderr — never pollutes JSON stdout) ---
 
 const COMMAND_GROUPS: [string, string[]][] = [
-  ['Identity', ['me', 'resolve']],
-  ['Chats', ['dialogs', 'unread', 'chat']],
+  ['Identity', ['me', 'resolve', 'contacts']],
+  ['Chats', ['dialogs', 'unread', 'chat', 'members']],
   ['Messages', ['message', 'messages', 'search', 'send', 'edit']],
   ['Actions', ['read', 'delete', 'forward', 'pin', 'unpin', 'react']],
   ['Real-time', ['listen']],
-  ['Media', ['download', 'photo', 'contacts', 'members']],
+  ['Media', ['download', 'transcribe']],
   ['Advanced', ['eval', 'list']],
 ];
 
@@ -39,7 +39,7 @@ function printHelp(): void {
     'Usage: bun tg <command> [args] [--flags]',
     '',
     'stdout: JSON { ok, data } | { ok, error, code }',
-    'stderr: help, warnings',
+    'stderr: warnings',
     'Entities: numeric ID | @username | +phone | t.me/link | "me"',
     '',
     'Global flags:',
@@ -67,7 +67,7 @@ function printHelp(): void {
     '',
     "Run 'bun tg <command> --help' for command-specific usage.",
   );
-  console.error(lines.join('\n'));
+  process.stdout.write(`${lines.join('\n')}\n`);
 }
 
 function printCommandHelp(cmd: Command): void {
@@ -79,7 +79,7 @@ function printCommandHelp(cmd: Command): void {
       lines.push(`  ${flag.padEnd(maxLen + 2)}${desc}`);
     }
   }
-  console.error(lines.join('\n'));
+  process.stdout.write(`${lines.join('\n')}\n`);
 }
 
 // --- Daemon subcommands ---
@@ -219,16 +219,21 @@ async function run(): Promise<void> {
 
   // Validate required args BEFORE connecting (saves time on typos)
   if (cmd.minArgs && positional.length < cmd.minArgs) {
-    fail(`Missing required arguments. Usage: ${cmd.usage}`, 'INVALID_ARGS');
+    fail(
+      `"${cmd.name}" requires at least ${cmd.minArgs} argument${cmd.minArgs > 1 ? 's' : ''}. Run 'tg ${cmd.name} --help' for usage.`,
+      'INVALID_ARGS',
+    );
   }
 
-  // Warn on unknown flags
+  // Reject unknown flags
   const GLOBAL_FLAGS = new Set(['--pretty', '--timeout', '--help', '--file', '--stdin']);
   const knownFlags = new Set([...GLOBAL_FLAGS, ...Object.keys(cmd.flags ?? {})]);
-  for (const flag of Object.keys(flags)) {
-    if (!knownFlags.has(flag)) {
-      warn(`Unknown flag: ${flag}`);
-    }
+  const unknownFlags = Object.keys(flags).filter((f) => !knownFlags.has(f));
+  if (unknownFlags.length > 0) {
+    fail(
+      `Unknown flag${unknownFlags.length > 1 ? 's' : ''}: ${unknownFlags.join(', ')}. Run 'tg ${cmd.name} --help' for usage.`,
+      'INVALID_ARGS',
+    );
   }
 
   // --- Ensure daemon is running and create client ---

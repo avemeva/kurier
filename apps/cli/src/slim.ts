@@ -115,7 +115,11 @@ export function extractPreview(m: Td.message, maxLength = 150): string | undefin
       text = c.caption.text || undefined;
       break;
     case 'messageVoiceNote':
-      text = c.caption.text || undefined;
+      text =
+        c.caption.text ||
+        (c.voice_note.speech_recognition_result?._ === 'speechRecognitionResultText'
+          ? c.voice_note.speech_recognition_result.text
+          : undefined);
       break;
     case 'messageSticker':
       text = c.sticker.emoji;
@@ -155,10 +159,11 @@ type SlimChat = {
   last_message?: { id: number; date: number; text?: string };
 };
 
-type SlimMessage = {
+export type SlimMessage = {
   id: number;
   sender_type: 'user' | 'chat';
   sender_id: number;
+  sender_name?: string;
   chat_id: number;
   is_outgoing: boolean;
   date: number;
@@ -230,11 +235,19 @@ type SlimContent =
   | {
       type: 'messageVoiceNote';
       caption?: string;
+      transcript?: string;
       duration: number;
       mime_type: string;
       file: SlimFile;
     }
-  | { type: 'messageVideoNote'; duration: number; width: number; height: number; file: SlimFile }
+  | {
+      type: 'messageVideoNote';
+      transcript?: string;
+      duration: number;
+      width: number;
+      height: number;
+      file: SlimFile;
+    }
   | { type: 'messageSticker'; emoji: string }
   | { type: 'messageLocation'; location: Td.location }
   | { type: 'messageContact'; contact: Td.contact }
@@ -395,22 +408,32 @@ function slimContent(c: Td.MessageContent): SlimContent {
         height: c.animation.height,
         file: slimFile(c.animation.animation),
       };
-    case 'messageVoiceNote':
+    case 'messageVoiceNote': {
+      const vnTranscript = c.voice_note.speech_recognition_result;
       return {
         type: 'messageVoiceNote',
         ...slimCaption(c.caption),
+        ...(vnTranscript?._ === 'speechRecognitionResultText'
+          ? { transcript: vnTranscript.text }
+          : {}),
         duration: c.voice_note.duration,
         mime_type: c.voice_note.mime_type,
         file: slimFile(c.voice_note.voice),
       };
-    case 'messageVideoNote':
+    }
+    case 'messageVideoNote': {
+      const vidTranscript = c.video_note.speech_recognition_result;
       return {
         type: 'messageVideoNote',
+        ...(vidTranscript?._ === 'speechRecognitionResultText'
+          ? { transcript: vidTranscript.text }
+          : {}),
         duration: c.video_note.duration,
         width: c.video_note.length,
         height: c.video_note.length,
         file: slimFile(c.video_note.video),
       };
+    }
     case 'messageSticker':
       return { type: 'messageSticker', emoji: c.sticker.emoji };
     case 'messageLocation':

@@ -6,13 +6,13 @@
  */
 
 import { copyFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { TelegramClient } from '@tg/protocol';
 import type * as Td from 'tdlib-types';
 import { fail, strip, success, warn } from './output';
 import { resolveChatId, resolveEntity } from './resolve';
 import {
+  type SlimMessage,
   slimChat,
   slimChats,
   slimMembers,
@@ -51,6 +51,42 @@ export interface Command {
 }
 
 // --- TDLib helper: get chat type string (used for --type filtering) ---
+
+// --- Helper: enrich slim messages with sender names ---
+
+async function addSenderNames(client: TelegramClient, msgs: SlimMessage[]): Promise<void> {
+  const cache = new Map<string, string>();
+  for (const m of msgs) {
+    const key = `${m.sender_type}:${m.sender_id}`;
+    if (cache.has(key)) {
+      m.sender_name = cache.get(key);
+      continue;
+    }
+    try {
+      if (m.sender_type === 'user') {
+        const user = await client.invoke({ _: 'getUser', user_id: m.sender_id });
+        const name = [user.first_name, user.last_name].filter(Boolean).join(' ');
+        cache.set(key, name);
+        m.sender_name = name;
+      } else {
+        const chat = await client.invoke({ _: 'getChat', chat_id: m.sender_id });
+        cache.set(key, chat.title);
+        m.sender_name = chat.title;
+      }
+    } catch {
+      // skip if we can't resolve
+    }
+  }
+}
+
+async function slimMessagesWithNames(
+  client: TelegramClient,
+  msgs: Td.message[],
+): Promise<SlimMessage[]> {
+  const slim = slimMessages(msgs);
+  await addSenderNames(client, slim);
+  return slim;
+}
 
 function getChatType(chat: Td.chat): 'user' | 'group' | 'channel' | 'unknown' {
   switch (chat.type._) {
@@ -329,10 +365,11 @@ export const commands: Command[] = [
     name: 'dialogs',
     description: 'List chats and conversations',
     usage:
-      'tg dialogs [--limit N] [--archived] [--type user|group|channel] [--search text] [--offset-date N]',
+      'tg dialogs [--limit N] [--archived] [--unread] [--type user|group|channel] [--search text] [--offset-date N]',
     flags: {
       '--limit': 'Max chats to return (default: 40)',
       '--archived': 'Show archived chats',
+      '--unread': 'Only show chats with unread messages',
       '--type': 'Filter by chat type: user, group, or channel',
       '--search': 'Filter by chat title (client-side substring match)',
       '--offset-date': "Paginate: unix timestamp from previous response's nextOffset",
@@ -341,6 +378,7 @@ export const commands: Command[] = [
       const limit = parseLimit(flags, 40);
       const archived = '--archived' in flags;
       const typeFilter = flags['--type'];
+      const unreadOnly = '--unread' in flags;
       const searchQuery = flags['--search']?.toLowerCase();
       const offsetDate = flags['--offset-date'] ? Number(flags['--offset-date']) : undefined;
       if (offsetDate !== undefined && (!Number.isFinite(offsetDate) || offsetDate < 0)) {
@@ -350,7 +388,7 @@ export const commands: Command[] = [
         fail(`Invalid --type "${typeFilter}". Expected: user, group, or channel`, 'INVALID_ARGS');
       }
       const chatList: Td.ChatList = archived ? { _: 'chatListArchive' } : { _: 'chatListMain' };
-      const isFiltered = !!(typeFilter || searchQuery || offsetDate);
+      const isFiltered = !!(typeFilter || unreadOnly || searchQuery || offsetDate);
 
       if (isFiltered) {
         // Iterative fetch: keep loading batches until we have enough matching chats
@@ -392,6 +430,7 @@ export const commands: Command[] = [
               let passes = true;
               // offset-date: skip chats whose last message is at or after the offset
               if (offsetDate && (chat.last_message?.date ?? 0) >= offsetDate) passes = false;
+              if (passes && unreadOnly && chat.unread_count === 0) passes = false;
               if (passes && typeFilter && getChatType(chat) !== typeFilter) passes = false;
               if (passes && searchQuery && !chat.title.toLowerCase().includes(searchQuery))
                 passes = false;
@@ -589,43 +628,75 @@ export const commands: Command[] = [
           }
         }
 
-        const result = await client.invoke({
-          _: 'searchChatMessages',
-          chat_id: chatId,
-          query,
-          sender_id: senderOption,
-          from_message_id: flags['--offset-id'] ? Number(flags['--offset-id']) : 0,
-          offset: 0,
-          limit,
-          filter,
-          message_thread_id: 0,
-        } as Td.searchChatMessages);
+        const since = flags['--since'] ? Number(flags['--since']) : undefined;
+        const BATCH = 50;
+        const MAX_SCAN = 500;
+        const matched: Td.message[] = [];
+        let cursor = flags['--offset-id'] ? Number(flags['--offset-id']) : 0;
+        let scanned = 0;
 
-        let messages = result.messages.filter(
-          (m: Td.message | null): m is Td.message => m !== null,
-        );
-        // Client-side date filter
-        if (flags['--since']) {
-          const since = Number(flags['--since']);
-          messages = messages.filter((m: Td.message) => m.date >= since);
+        while (matched.length < limit && scanned < MAX_SCAN) {
+          const result = await client.invoke({
+            _: 'searchChatMessages',
+            chat_id: chatId,
+            query,
+            sender_id: senderOption,
+            from_message_id: cursor,
+            offset: 0,
+            limit: since ? BATCH : limit,
+            filter,
+            message_thread_id: 0,
+          } as Td.searchChatMessages);
+
+          const batch = result.messages.filter(
+            (m: Td.message | null): m is Td.message => m !== null,
+          );
+          if (batch.length === 0) break;
+          scanned += batch.length;
+          for (const m of batch) {
+            if (since && m.date < since) continue;
+            matched.push(m);
+            if (matched.length >= limit) break;
+          }
+          cursor = (batch.at(-1) as Td.message).id;
+          if (!since) break;
         }
 
-        await autoDownloadSmall(client, messages);
+        await autoDownloadSmall(client, matched);
         if ('--download-media' in flags) {
-          await autoDownloadMessages(client, messages);
+          await autoDownloadMessages(client, matched);
         }
-        const hasMore = result.total_count > messages.length;
-        success(strip(slimMessages(messages)), {
+        const hasMore = matched.length >= limit;
+        success(strip(await slimMessagesWithNames(client, matched)), {
           hasMore,
-          ...(hasMore && messages.length > 0
-            ? { nextOffset: messages[messages.length - 1]?.id }
-            : {}),
+          ...(hasMore && matched.length > 0 ? { nextOffset: matched[matched.length - 1]?.id } : {}),
         });
         return;
       }
 
       // Standard history mode
-      const fromMessageId = flags['--offset-id'] ? Number(flags['--offset-id']) : 0;
+      let fromMessageId = flags['--offset-id'] ? Number(flags['--offset-id']) : 0;
+
+      // Build client-side filter predicate
+      const minId = flags['--min-id'] ? Number(flags['--min-id']) : undefined;
+      const maxId = flags['--max-id'] ? Number(flags['--max-id']) : undefined;
+      const fromEntity = flags['--from'] ? await resolveEntity(client, flags['--from']) : undefined;
+      const hasClientFilter = !!(minId || maxId || fromEntity);
+
+      const clientFilter = (m: Td.message): boolean => {
+        if (minId && m.id <= minId) return false;
+        if (maxId && m.id >= maxId) return false;
+        if (fromEntity) {
+          const senderId =
+            m.sender_id._ === 'messageSenderUser'
+              ? m.sender_id.user_id
+              : m.sender_id._ === 'messageSenderChat'
+                ? m.sender_id.chat_id
+                : 0;
+          if (senderId !== fromEntity) return false;
+        }
+        return true;
+      };
 
       // Media filter in history mode
       if (flags['--filter']) {
@@ -645,89 +716,93 @@ export const commands: Command[] = [
             'INVALID_ARGS',
           );
 
-        const result = await client.invoke({
-          _: 'searchChatMessages',
-          chat_id: chatId,
-          query: '',
-          from_message_id: fromMessageId,
-          offset: 0,
-          limit,
-          filter: f,
-          message_thread_id: 0,
-        } as Td.searchChatMessages);
+        const BATCH = 50;
+        const MAX_SCAN = 500;
+        const matched: Td.message[] = [];
+        let cursor = fromMessageId;
+        let scanned = 0;
 
-        let messages = result.messages.filter(
-          (m: Td.message | null): m is Td.message => m !== null,
-        );
-        // Client-side filters
-        if (flags['--min-id'])
-          messages = messages.filter((m: Td.message) => m.id > Number(flags['--min-id']));
-        if (flags['--max-id'])
-          messages = messages.filter((m: Td.message) => m.id < Number(flags['--max-id']));
-        if (flags['--from']) {
-          const fromEntity = await resolveEntity(client, flags['--from']);
-          messages = messages.filter((m: Td.message) =>
-            m.sender_id._ === 'messageSenderUser'
-              ? m.sender_id.user_id === fromEntity
-              : m.sender_id._ === 'messageSenderChat'
-                ? m.sender_id.chat_id === fromEntity
-                : false,
+        while (matched.length < limit && scanned < MAX_SCAN) {
+          const result = await client.invoke({
+            _: 'searchChatMessages',
+            chat_id: chatId,
+            query: ' ',
+            from_message_id: cursor,
+            offset: 0,
+            limit: hasClientFilter ? BATCH : limit,
+            filter: f,
+            message_thread_id: 0,
+          } as Td.searchChatMessages);
+
+          const batch = result.messages.filter(
+            (m: Td.message | null): m is Td.message => m !== null,
           );
+          if (batch.length === 0) break;
+          scanned += batch.length;
+          for (const m of batch) {
+            if (clientFilter(m)) {
+              matched.push(m);
+              if (matched.length >= limit) break;
+            }
+          }
+          cursor = (batch.at(-1) as Td.message).id;
+          if (!hasClientFilter) break;
         }
 
-        await autoDownloadSmall(client, messages);
+        await autoDownloadSmall(client, matched);
         if ('--download-media' in flags) {
-          await autoDownloadMessages(client, messages);
+          await autoDownloadMessages(client, matched);
         }
-        const hasMore = messages.length >= limit;
-        success(strip(slimMessages(messages)), {
+        const hasMore = matched.length >= limit;
+        success(strip(await slimMessagesWithNames(client, matched)), {
           hasMore,
-          ...(hasMore && messages.length > 0
-            ? { nextOffset: messages[messages.length - 1]?.id }
-            : {}),
+          ...(hasMore && matched.length > 0 ? { nextOffset: matched[matched.length - 1]?.id } : {}),
         });
         return;
       }
 
-      const result = await client.invoke({
-        _: 'getChatHistory',
-        chat_id: chatId,
-        from_message_id: fromMessageId,
-        offset: 0,
-        limit,
-        only_local: false,
-      });
+      // Plain history mode
+      const BATCH = 50;
+      const MAX_SCAN = 500;
+      const matched: Td.message[] = [];
+      let scanned = 0;
 
-      let messages = result.messages.filter((m): m is Td.message => m != null);
+      while (matched.length < limit && scanned < MAX_SCAN) {
+        const result = await client.invoke({
+          _: 'getChatHistory',
+          chat_id: chatId,
+          from_message_id: fromMessageId,
+          offset: 0,
+          limit: hasClientFilter ? BATCH : limit,
+          only_local: false,
+        });
 
-      // Client-side filters
-      if (flags['--min-id'])
-        messages = messages.filter((m: Td.message) => m.id > Number(flags['--min-id']));
-      if (flags['--max-id'])
-        messages = messages.filter((m: Td.message) => m.id < Number(flags['--max-id']));
-      if (flags['--from']) {
-        const fromEntity = await resolveEntity(client, flags['--from']);
-        messages = messages.filter((m: Td.message) =>
-          m.sender_id._ === 'messageSenderUser'
-            ? m.sender_id.user_id === fromEntity
-            : m.sender_id._ === 'messageSenderChat'
-              ? m.sender_id.chat_id === fromEntity
-              : false,
-        );
+        const batch = result.messages.filter((m): m is Td.message => m != null);
+        if (batch.length === 0) break;
+        scanned += batch.length;
+        for (const m of batch) {
+          if (clientFilter(m)) {
+            matched.push(m);
+            if (matched.length >= limit) break;
+          }
+        }
+        fromMessageId = (batch.at(-1) as Td.message).id;
+        if (!hasClientFilter) break;
       }
+
       const isReverse = '--reverse' in flags;
-      if (isReverse) messages.reverse();
+      if (isReverse) matched.reverse();
 
-      await autoDownloadSmall(client, messages);
+      await autoDownloadSmall(client, matched);
       if ('--download-media' in flags) {
-        await autoDownloadMessages(client, messages);
+        await autoDownloadMessages(client, matched);
       }
-      const hasMore = messages.length >= limit;
+      const hasMore = matched.length >= limit;
       // When reversed, messages are [oldest...newest]. The next page needs messages
       // older than the oldest in this batch, so nextOffset = messages[0].id (the oldest).
       // When not reversed, messages are [newest...oldest], so nextOffset = last element.
-      const nextOffsetMsg = isReverse ? messages[0] : messages[messages.length - 1];
-      success(strip(slimMessages(messages)), {
+      const nextOffsetMsg = isReverse ? matched[0] : matched[matched.length - 1];
+      success(strip(await slimMessagesWithNames(client, matched)), {
         hasMore,
         ...(hasMore && nextOffsetMsg ? { nextOffset: nextOffsetMsg.id } : {}),
       });
@@ -749,7 +824,9 @@ export const commands: Command[] = [
         message_id: messageId,
       });
       await autoDownloadSmall(client, [msg]);
-      success(strip(slimMessage(msg)));
+      const slim = slimMessage(msg);
+      await addSenderNames(client, [slim]);
+      success(strip(slim));
     },
   },
 
@@ -902,10 +979,10 @@ export const commands: Command[] = [
       '--offset-cursor': 'Alias for --offset',
       '--full': 'Return full message text (default: truncated to 500 chars)',
     },
-    minArgs: 1,
     run: async (client, args, flags) => {
-      if (!args[0]) fail('Missing required argument: <query>', 'INVALID_ARGS');
-      const query = args[0];
+      if (!args[0] && !flags['--filter'])
+        fail('Missing <query>. Or use --filter to search by media type.', 'INVALID_ARGS');
+      const query = args[0] ?? ' ';
       const limit = parseLimit(flags, 20);
       const contextN = flags['--context'] ? Number(flags['--context']) : 0;
       if (
@@ -951,31 +1028,48 @@ export const commands: Command[] = [
           searchFilter = f;
         }
 
-        const result = await client.invoke({
-          _: 'searchChatMessages',
-          chat_id: chatId,
-          query,
-          sender_id: senderOption ?? null,
-          from_message_id: flags['--offset-id'] ? Number(flags['--offset-id']) : 0,
-          offset: 0,
-          limit,
-          filter: searchFilter,
-          message_thread_id: 0,
-        } as Td.searchChatMessages);
+        const since = flags['--since'] ? Number(flags['--since']) : undefined;
+        const BATCH = 50;
+        const MAX_SCAN = 500;
+        const matched: Td.message[] = [];
+        let cursor = flags['--offset-id'] ? Number(flags['--offset-id']) : 0;
+        let scanned = 0;
 
-        let messages = result.messages.filter((m): m is Td.message => m !== null);
-        if (flags['--since']) {
-          const since = Number(flags['--since']);
-          messages = messages.filter((m) => m.date >= since);
+        while (matched.length < limit && scanned < MAX_SCAN) {
+          const result = await client.invoke({
+            _: 'searchChatMessages',
+            chat_id: chatId,
+            query,
+            sender_id: senderOption ?? null,
+            from_message_id: cursor,
+            offset: 0,
+            limit: since ? BATCH : limit,
+            filter: searchFilter,
+            message_thread_id: 0,
+          } as Td.searchChatMessages);
+
+          const batch = result.messages.filter((m): m is Td.message => m !== null);
+          if (batch.length === 0) break;
+          scanned += batch.length;
+          for (const m of batch) {
+            if (since && m.date < since) continue;
+            matched.push(m);
+            if (matched.length >= limit) break;
+          }
+          cursor = (batch.at(-1) as Td.message).id;
+          if (!since) break;
         }
+        const messages = matched;
 
         const full = '--full' in flags;
-        let results: Record<string, unknown>[] = messages.map((m) => {
-          const slim = {
-            ...(strip(slimMessage(m)) as Record<string, unknown>),
-            chat_id: m.chat_id,
+        const slimMsgs = slimMessages(messages);
+        await addSenderNames(client, slimMsgs);
+        let results: Record<string, unknown>[] = slimMsgs.map((sm) => {
+          const obj = {
+            ...(strip(sm) as Record<string, unknown>),
+            chat_id: sm.chat_id,
           };
-          return full ? slim : truncateContent(slim);
+          return full ? obj : truncateContent(obj);
         });
 
         if (contextN > 0) {
@@ -1002,58 +1096,65 @@ export const commands: Command[] = [
           fail(`Invalid --type "${typeFilter}". Expected: user, group, or channel`, 'INVALID_ARGS');
         }
 
-        const cursor = flags['--offset'] ?? flags['--offset-cursor'] ?? '';
+        let offsetCursor = flags['--offset'] ?? flags['--offset-cursor'] ?? '';
+        const BATCH = 50;
+        const MAX_SCAN = 500;
+        const matched: Td.message[] = [];
+        let scanned = 0;
 
-        const result = await client.invoke({
-          _: 'searchMessages',
-          chat_list: undefined,
-          query,
-          offset: cursor,
-          limit,
-          filter: undefined,
-          min_date: flags['--since'] ? Number(flags['--since']) : 0,
-          max_date: 0,
-        } as Td.searchMessages);
+        while (matched.length < limit && scanned < MAX_SCAN) {
+          const result = await client.invoke({
+            _: 'searchMessages',
+            chat_list: undefined,
+            query,
+            offset: offsetCursor,
+            limit: typeFilter ? BATCH : limit,
+            filter: undefined,
+            min_date: flags['--since'] ? Number(flags['--since']) : 0,
+            max_date: 0,
+          } as Td.searchMessages);
 
-        let messages = result.messages.filter((m): m is Td.message => m !== null);
+          const batch = result.messages.filter((m): m is Td.message => m !== null);
+          if (batch.length === 0) break;
+          scanned += batch.length;
 
-        // Filter by chat type — need on-demand chat lookups
-        if (typeFilter) {
-          const filtered: Td.message[] = [];
-          for (const m of messages) {
-            try {
-              const chat = await client.invoke({
-                _: 'getChat',
-                chat_id: m.chat_id,
-              });
-              if (getChatType(chat) === typeFilter) {
-                filtered.push(m);
+          for (const m of batch) {
+            if (typeFilter) {
+              try {
+                const chat = await client.invoke({ _: 'getChat', chat_id: m.chat_id });
+                if (getChatType(chat) !== typeFilter) continue;
+              } catch {
+                continue;
               }
-            } catch {
-              // skip messages from chats we can't resolve
             }
+            matched.push(m);
+            if (matched.length >= limit) break;
           }
-          messages = filtered;
+          offsetCursor = result.next_offset;
+          if (!typeFilter || !offsetCursor) break;
         }
+        const messages = matched;
 
         const full = '--full' in flags;
-        const formattedPromises = messages.map(async (m) => {
+        const slimMsgs = slimMessages(messages);
+        await addSenderNames(client, slimMsgs);
+        const formattedPromises = slimMsgs.map(async (sm, _i) => {
           let chatTitle = '';
           try {
             const chat = await client.invoke({
               _: 'getChat',
-              chat_id: m.chat_id,
+              chat_id: sm.chat_id,
             });
             chatTitle = chat.title;
           } catch {
             // skip
           }
-          const slim = {
-            ...(strip(slimMessage(m)) as Record<string, unknown>),
-            chat_id: m.chat_id,
+          const obj = {
+            ...(strip(sm) as Record<string, unknown>),
+            chat_id: sm.chat_id,
             chat_title: chatTitle,
           };
-          return full ? slim : truncateContent(slim);
+          return full ? obj : truncateContent(obj);
         });
         let formatted = await Promise.all(formattedPromises);
 
@@ -1097,70 +1198,9 @@ export const commands: Command[] = [
         const hasMore = messages.length >= limit;
         success(formatted, {
           hasMore,
-          ...(hasMore && result.next_offset ? { nextOffset: result.next_offset } : {}),
+          ...(hasMore && offsetCursor ? { nextOffset: offsetCursor } : {}),
         });
       }
-    },
-  },
-
-  // --- Search Global (alias) ---
-  {
-    name: 'search-global',
-    description: 'Search messages globally (alias for search without --chat)',
-    usage:
-      'tg search-global "<query>" [--limit N] [--since N] [--type user|group|channel] [--offset "cursor"]',
-    flags: {
-      '--limit': 'Max results (default: 20)',
-      '--since': 'Only messages after this unix timestamp',
-      '--type': 'Filter by chat type: user, group, or channel',
-      '--offset': 'Paginate: cursor from previous nextOffset',
-    },
-    minArgs: 1,
-    run: async (client, args, flags) => {
-      // Delegate to search command (global mode = no --chat)
-      const searchCmd = commands.find((c) => c.name === 'search');
-      if (!searchCmd) fail('Internal error: search command not found', 'UNKNOWN');
-      // Remove --chat if accidentally passed
-      const cleanFlags = { ...flags };
-      delete cleanFlags['--chat'];
-      await searchCmd.run(client, args, cleanFlags);
-    },
-  },
-
-  // --- Search Contacts ---
-  {
-    name: 'search-contacts',
-    description: 'Search contacts and global users',
-    usage: 'tg search-contacts "<query>" [--limit N]',
-    flags: {
-      '--limit': 'Max results (default: 50)',
-    },
-    minArgs: 1,
-    run: async (client, args, flags) => {
-      if (!args[0]) fail('Missing required argument: <query>', 'INVALID_ARGS');
-      const query = args[0];
-      const limit = parseLimit(flags, 50);
-
-      const result = await client.invoke({
-        _: 'searchContacts',
-        query,
-        limit,
-      });
-
-      const myResults: Td.user[] = [];
-      const globalResults: Td.user[] = [];
-
-      for (const userId of result.user_ids) {
-        const user = await client.invoke({ _: 'getUser', user_id: userId });
-        // Contacts with phone numbers are "my" contacts
-        if (user.phone_number) {
-          myResults.push(user);
-        } else {
-          globalResults.push(user);
-        }
-      }
-
-      success(strip({ myResults: slimUsers(myResults), globalResults: slimUsers(globalResults) }));
     },
   },
 
@@ -1443,23 +1483,35 @@ export const commands: Command[] = [
   // --- Download ---
   {
     name: 'download',
-    description: 'Download media from a message',
-    usage: 'tg download <chat> <msgId> [--output path]',
+    description: 'Download media from a message or by file ID',
+    usage: 'tg download <chat> <msgId> [--output path] | tg download --file-id <id>',
     flags: {
       '--output': 'Output file path (default: auto-named in cwd)',
+      '--file-id': 'Download directly by TDLib file ID',
     },
-    minArgs: 2,
+    minArgs: 0,
     run: async (client, args, flags) => {
-      if (!args[0]) fail('Missing required argument: <chat>', 'INVALID_ARGS');
-      if (!args[1]) fail('Missing required argument: <msgId>', 'INVALID_ARGS');
-      const chatId = await resolveChatId(client, args[0]);
-      const msg = await client.invoke({
-        _: 'getMessage',
-        chat_id: chatId,
-        message_id: Number(args[1]),
-      });
-      const fileId = getFileId(msg.content);
-      if (!fileId) fail('Message has no downloadable media', 'NOT_FOUND');
+      let fileId: number;
+      let mimeType: string | undefined;
+
+      if (flags['--file-id']) {
+        fileId = Number(flags['--file-id']);
+        if (!Number.isFinite(fileId)) fail('--file-id must be a number', 'INVALID_ARGS');
+      } else {
+        if (!args[0])
+          fail('Missing required argument: <chat>. Or use --file-id <id>', 'INVALID_ARGS');
+        if (!args[1]) fail('Missing required argument: <msgId>', 'INVALID_ARGS');
+        const chatId = await resolveChatId(client, args[0]);
+        const msg = await client.invoke({
+          _: 'getMessage',
+          chat_id: chatId,
+          message_id: Number(args[1]),
+        });
+        const extracted = getFileId(msg.content);
+        if (!extracted) fail('Message has no downloadable media', 'NOT_FOUND');
+        fileId = extracted;
+        mimeType = getContentMimeType(msg.content);
+      }
 
       const downloaded = await client.invoke({
         _: 'downloadFile',
@@ -1475,31 +1527,121 @@ export const commands: Command[] = [
       }
 
       const localPath = downloaded.local.path;
-      const outputFile = flags['--output'] || `tg_${args[0]}_${args[1]}.bin`;
       if (flags['--output']) {
-        // Copy to output path
-        copyFileSync(localPath, outputFile);
+        copyFileSync(localPath, flags['--output']);
       }
 
       success({
-        file: path.resolve(flags['--output'] ? outputFile : localPath),
+        file: path.resolve(flags['--output'] ?? localPath),
         size: downloaded.size,
-        mime_type: getContentMimeType(msg.content),
+        ...(mimeType ? { mime_type: mimeType } : {}),
       });
+    },
+  },
+
+  // --- Transcribe ---
+  {
+    name: 'transcribe',
+    description: 'Transcribe a voice or video note to text (Telegram Premium)',
+    usage: 'tg transcribe <chat> <msgId>',
+    minArgs: 2,
+    run: async (client, args) => {
+      if (!args[0]) fail('Missing required argument: <chat>', 'INVALID_ARGS');
+      if (!args[1]) fail('Missing required argument: <msgId>', 'INVALID_ARGS');
+      const chatId = await resolveChatId(client, args[0]);
+      const messageId = Number(args[1]);
+
+      // Check if already transcribed
+      const msg = await client.invoke({ _: 'getMessage', chat_id: chatId, message_id: messageId });
+      const getResult = (content: Td.MessageContent) => {
+        if (content._ === 'messageVoiceNote') return content.voice_note.speech_recognition_result;
+        if (content._ === 'messageVideoNote') return content.video_note.speech_recognition_result;
+        return undefined;
+      };
+
+      const existing = getResult(msg.content);
+      if (existing?._ === 'speechRecognitionResultText') {
+        success({ text: existing.text });
+        return;
+      }
+
+      const contentType = msg.content._;
+      if (contentType !== 'messageVoiceNote' && contentType !== 'messageVideoNote') {
+        fail('Message is not a voice or video note', 'INVALID_ARGS');
+      }
+
+      // Request recognition
+      await client.invoke({ _: 'recognizeSpeech', chat_id: chatId, message_id: messageId });
+
+      // Poll for result
+      const MAX_ATTEMPTS = 30;
+      for (let i = 0; i < MAX_ATTEMPTS; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        const updated = await client.invoke({
+          _: 'getMessage',
+          chat_id: chatId,
+          message_id: messageId,
+        });
+        const result = getResult(updated.content);
+        if (!result || result._ === 'speechRecognitionResultPending') continue;
+        if (result._ === 'speechRecognitionResultText') {
+          success({ text: result.text });
+          return;
+        }
+        if (result._ === 'speechRecognitionResultError') {
+          fail(`Speech recognition failed: ${result.error.message}`, 'UNKNOWN');
+        }
+      }
+      fail('Speech recognition timed out', 'UNKNOWN');
     },
   },
 
   // --- Contacts ---
   {
     name: 'contacts',
-    description: 'List or search your saved contacts',
-    usage: 'tg contacts [--limit N] [--search query] [--offset N]',
+    description: 'List, search saved contacts, or search globally',
+    usage:
+      'tg contacts [--limit N] [--search query] [--offset N]\ntg contacts search "<query>" [--limit N]',
     flags: {
       '--limit': 'Max contacts to return (default: 100)',
       '--search': 'Search contacts by name',
       '--offset': 'Start from this index (for pagination)',
     },
-    run: async (client, _args, flags) => {
+    run: async (client, args, flags) => {
+      // Subcommand: contacts search — search contacts + global users
+      if (args[0] === 'search') {
+        const query = args[1];
+        if (!query)
+          fail(
+            'Missing required argument: <query>. Usage: tg contacts search "<query>" [--limit N]',
+            'INVALID_ARGS',
+          );
+        const limit = parseLimit(flags, 50);
+
+        const result = await client.invoke({
+          _: 'searchContacts',
+          query,
+          limit,
+        });
+
+        const myResults: Td.user[] = [];
+        const globalResults: Td.user[] = [];
+
+        for (const userId of result.user_ids) {
+          const user = await client.invoke({ _: 'getUser', user_id: userId });
+          if (user.phone_number) {
+            myResults.push(user);
+          } else {
+            globalResults.push(user);
+          }
+        }
+
+        success(
+          strip({ myResults: slimUsers(myResults), globalResults: slimUsers(globalResults) }),
+        );
+        return;
+      }
+
       const limit = parseLimit(flags, 100);
       const offset = flags['--offset'] ? Number(flags['--offset']) : 0;
 
@@ -1537,44 +1679,6 @@ export const commands: Command[] = [
           nextOffset: hasMore ? offset + limit : undefined,
         });
       }
-    },
-  },
-
-  // --- Photo ---
-  {
-    name: 'photo',
-    description: 'Download a profile photo of a user or chat',
-    usage: 'tg photo <id|username|me> [--output path] [--big]',
-    flags: {
-      '--output': 'Output file path (default: /tmp/tg_photo_<id>.jpg)',
-      '--big': 'Download high-resolution version',
-    },
-    minArgs: 1,
-    run: async (client, args, flags) => {
-      if (!args[0]) fail('Missing required argument: <id|username|me>', 'INVALID_ARGS');
-      const chatId = await resolveChatId(client, args[0]);
-      const chat = await client.invoke({ _: 'getChat', chat_id: chatId });
-      if (!chat.photo) fail('No profile photo found', 'NOT_FOUND');
-
-      const photoFile = '--big' in flags ? chat.photo.big : chat.photo.small;
-      const downloaded = await client.invoke({
-        _: 'downloadFile',
-        file_id: photoFile.id,
-        priority: 1,
-        offset: 0,
-        limit: 0,
-        synchronous: true,
-      });
-
-      if (!downloaded.local.is_downloading_completed) {
-        fail('Failed to download profile photo', 'NOT_FOUND');
-      }
-
-      const label = args[0].replace(/[^a-zA-Z0-9_-]/g, '_');
-      const outputFile = flags['--output'] || path.join(tmpdir(), `tg_photo_${label}.jpg`);
-      copyFileSync(downloaded.local.path, outputFile);
-
-      success({ file: path.resolve(outputFile), size: downloaded.size });
     },
   },
 
@@ -1857,152 +1961,66 @@ export const commands: Command[] = [
     },
   },
 
-  // --- Download Photo (cached) ---
-  {
-    name: 'download-photo-cached',
-    description: 'Download a profile photo to the media cache',
-    usage: 'tg download-photo-cached <id|username|me> [--big]',
-    flags: {
-      '--big': 'Download high-resolution version',
-    },
-    minArgs: 1,
-    run: async (client, args, flags) => {
-      if (!args[0]) fail('Missing required argument: <id|username|me>', 'INVALID_ARGS');
-      const chatId = await resolveChatId(client, args[0]);
-      const chat = await client.invoke({ _: 'getChat', chat_id: chatId });
-      if (!chat.photo) fail('No profile photo found', 'NOT_FOUND');
-
-      const photoFile = '--big' in flags ? chat.photo.big : chat.photo.small;
-
-      // Check if already downloaded
-      if (photoFile.local.is_downloading_completed && photoFile.local.path) {
-        success({ file: photoFile.local.path, cached: true });
-        return;
-      }
-
-      const downloaded = await client.invoke({
-        _: 'downloadFile',
-        file_id: photoFile.id,
-        priority: 1,
-        offset: 0,
-        limit: 0,
-        synchronous: true,
-      });
-
-      if (!downloaded.local.is_downloading_completed) {
-        fail('Failed to download profile photo', 'NOT_FOUND');
-      }
-
-      success({
-        file: downloaded.local.path,
-        size: downloaded.size,
-        cached: false,
-      });
-    },
-  },
-
-  // --- Download Media (cached) ---
-  {
-    name: 'download-media-cached',
-    description: 'Download message media to the media cache',
-    usage: 'tg download-media-cached <chat> <msgId>',
-    minArgs: 2,
-    run: async (client, args) => {
-      if (!args[0]) fail('Missing required argument: <chat>', 'INVALID_ARGS');
-      if (!args[1]) fail('Missing required argument: <msgId>', 'INVALID_ARGS');
-      const chatId = await resolveChatId(client, args[0]);
-      const msgId = Number(args[1]);
-      const msg = await client.invoke({
-        _: 'getMessage',
-        chat_id: chatId,
-        message_id: msgId,
-      });
-      const fileId = getFileId(msg.content);
-      if (!fileId) fail('Message has no downloadable media', 'NOT_FOUND');
-
-      const downloaded = await client.invoke({
-        _: 'downloadFile',
-        file_id: fileId,
-        priority: 1,
-        offset: 0,
-        limit: 0,
-        synchronous: true,
-      });
-
-      if (!downloaded.local.is_downloading_completed) {
-        fail('Download failed', 'UNKNOWN');
-      }
-
-      const mime = getContentMimeType(msg.content);
-      success({
-        file: downloaded.local.path,
-        size: downloaded.size,
-        cached: false,
-        mime,
-      });
-    },
-  },
-
-  // --- Open/Close Chat ---
-  {
-    name: 'open-chat',
-    description: 'Notify TDLib that a chat is being viewed',
-    usage: 'tg open-chat <chat>',
-    minArgs: 1,
-    run: async (client, args) => {
-      if (!args[0]) fail('Missing required argument: <chat>', 'INVALID_ARGS');
-      const chatId = await resolveChatId(client, args[0]);
-      await client.invoke({ _: 'openChat', chat_id: chatId });
-      success({ chat_id: chatId });
-    },
-  },
-  {
-    name: 'close-chat',
-    description: 'Notify TDLib that a chat is no longer being viewed',
-    usage: 'tg close-chat <chat>',
-    minArgs: 1,
-    run: async (client, args) => {
-      if (!args[0]) fail('Missing required argument: <chat>', 'INVALID_ARGS');
-      const chatId = await resolveChatId(client, args[0]);
-      await client.invoke({ _: 'closeChat', chat_id: chatId });
-      success({ chat_id: chatId });
-    },
-  },
-
   // --- Listen ---
   {
     name: 'listen',
     description: 'Stream real-time events (NDJSON). Requires --chat or --type.',
     usage:
-      'tg listen --type user|group|channel [--chat <ids>] [--exclude-chat <ids>] [--exclude-type <type>] [--incoming] [--download-media]',
+      'tg listen --type user|group|channel [--chat <ids>] [--exclude-chat <ids>] [--exclude-type <type>] [--event <types>] [--incoming] [--download-media]',
     flags: {
       '--chat': 'Comma-separated chat IDs to include',
       '--type': 'Include entire category: user, group, or channel',
       '--exclude-chat': 'Comma-separated chat IDs to exclude from included set',
       '--exclude-type': 'Exclude category: user, group, or channel',
+      '--event':
+        'Comma-separated event types (default: new_message,edit_message,delete_messages,message_reactions). Also: read_outbox, user_typing, user_status, message_send_succeeded',
       '--incoming': 'Only include incoming messages (filter out outgoing)',
       '--download-media': 'Auto-download photos, stickers, voice messages',
     },
     streaming: true,
     run: async (client, _args, flags) => {
+      const DEFAULT_EVENTS = new Set([
+        'new_message',
+        'edit_message',
+        'delete_messages',
+        'message_reactions',
+      ]);
+      const eventFilter = flags['--event']
+        ? new Set(
+            flags['--event']
+              .split(',')
+              .map((s: string) => s.trim())
+              .filter(Boolean),
+          )
+        : DEFAULT_EVENTS;
+
       const emit = (event: Record<string, unknown>) => {
+        if (!eventFilter.has(event.type as string)) return;
         process.stdout.write(`${JSON.stringify(event)}\n`);
       };
 
       const typeFilter = flags['--type'];
       const excludeType = flags['--exclude-type'];
-      const chatIds = new Set(
+      const rawChatIds =
         flags['--chat']
           ?.split(',')
           .map((s: string) => s.trim())
-          .filter(Boolean) ?? [],
-      );
-      const excludeChatIds = new Set(
+          .filter(Boolean) ?? [];
+      const chatIds = new Set<string>();
+      for (const raw of rawChatIds) {
+        const resolved = await resolveChatId(client, raw);
+        chatIds.add(String(resolved));
+      }
+      const rawExcludeChatIds =
         flags['--exclude-chat']
           ?.split(',')
           .map((s: string) => s.trim())
-          .filter(Boolean) ?? [],
-      );
+          .filter(Boolean) ?? [];
+      const excludeChatIds = new Set<string>();
+      for (const raw of rawExcludeChatIds) {
+        const resolved = await resolveChatId(client, raw);
+        excludeChatIds.add(String(resolved));
+      }
       const downloadMedia = '--download-media' in flags;
       const incomingOnly = '--incoming' in flags;
 
@@ -2084,6 +2102,7 @@ export const commands: Command[] = [
               const msg = update.message;
               if (await shouldSkip(msg.chat_id)) return;
               if (incomingOnly && msg.is_outgoing) return;
+              await autoDownloadSmall(client, [msg]);
               if (downloadMedia && shouldAutoDownloadContent(msg.content)) {
                 const fileId = getFileId(msg.content);
                 if (fileId) {
@@ -2099,18 +2118,22 @@ export const commands: Command[] = [
                   } catch {
                     // emit even if download fails
                   }
+                  const slimDl = slimMessage(msg);
+                  await addSenderNames(client, [slimDl]);
                   emit({
                     type: 'new_message',
                     chat_id: msg.chat_id,
-                    message: slimMessage(msg),
+                    message: slimDl,
                   });
                   return;
                 }
               }
+              const slimMsg = slimMessage(msg);
+              await addSenderNames(client, [slimMsg]);
               emit({
                 type: 'new_message',
                 chat_id: msg.chat_id,
-                message: slimMessage(msg),
+                message: slimMsg,
               });
             }
 

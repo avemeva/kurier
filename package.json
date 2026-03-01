@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev:daemon": "bun --filter @tg/daemon dev",
-    "dev:cli": "bun --filter @tg/cli dev",
+    "cli": "bun run apps/cli/src/index.ts --",
     "dev:web": "bun --filter @tg/web dev",
     "dev:app": "bun --filter @tg/app dev",
     "build": "bun --filter './packages/*' build && bun --filter './apps/*' build",

@@ -2,16 +2,16 @@
  * End-to-end tests for the listen (streaming) command.
  * Requires a valid Telegram session and a running daemon.
  *
- * Streaming tests inject synthetic TDLib updates via `eval` to trigger
- * registered event handlers, avoiding dependency on real incoming messages.
+ * Tests use real messages (send → listen) to verify the full pipeline:
+ * TDLib update → daemon SSE → CLI listen handler → NDJSON output.
  *
- * Run: bun test scripts/tg/listen.e2e.test.ts
+ * Run: bun test src/listen.e2e.test.ts
  */
 
-import { beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import path from 'node:path';
 
-const TG = path.resolve(import.meta.dir, '../..');
+const CLI_ENTRY = path.resolve(import.meta.dir, 'index.ts');
 const TIMEOUT = 30_000;
 const STREAM_TIMEOUT = 30_000;
 
@@ -30,8 +30,7 @@ type TgResult = {
 
 /** Run a CLI command and parse JSON result */
 async function tg(...args: string[]): Promise<TgResult> {
-  const proc = Bun.spawn(['bun', 'tg', ...args], {
-    cwd: TG,
+  const proc = Bun.spawn(['bun', 'run', CLI_ENTRY, ...args], {
     stdout: 'pipe',
     stderr: 'pipe',
     env: { ...process.env },
@@ -54,8 +53,7 @@ async function tg(...args: string[]): Promise<TgResult> {
 
 /** Spawn listen in background, collect NDJSON lines incrementally */
 function listenBg(...args: string[]) {
-  const proc = Bun.spawn(['bun', 'tg', 'listen', ...args], {
-    cwd: TG,
+  const proc = Bun.spawn(['bun', 'run', CLI_ENTRY, 'listen', ...args], {
     stdout: 'pipe',
     stderr: 'pipe',
   });
@@ -101,89 +99,21 @@ function listenBg(...args: string[]) {
   };
 }
 
-/**
- * Inject a synthetic update into the daemon's client.
- * Uses `eval` to emit a TDLib update through the client's event system,
- * triggering registered event handlers.
- */
-async function injectUpdate(code: string): Promise<TgResult> {
-  return tg('eval', code);
-}
-
-/** Build eval code to inject a synthetic updateNewMessage */
-function newMessageCode(opts: {
-  text: string;
-  chatId: number;
-  msgId?: number;
-  isOutgoing?: boolean;
-}): string {
-  return `
-client.emit('update', {
-  _: 'updateNewMessage',
-  message: {
-    _: 'message',
-    id: ${opts.msgId ?? 999999},
-    sender_id: { _: 'messageSenderUser', user_id: ${opts.chatId} },
-    chat_id: ${opts.chatId},
-    is_outgoing: ${opts.isOutgoing ?? false},
-    date: Math.floor(Date.now() / 1000),
-    content: {
-      _: 'messageText',
-      text: { _: 'formattedText', text: ${JSON.stringify(opts.text)}, entities: [] },
-    },
-  },
-});
-return { dispatched: 1 };
-`;
-}
-
-/** Build eval code to inject a synthetic updateNewMessage from a group chat */
-function groupMessageCode(opts: { text: string; chatId: number; msgId?: number }): string {
-  return `
-client.emit('update', {
-  _: 'updateNewMessage',
-  message: {
-    _: 'message',
-    id: ${opts.msgId ?? 999998},
-    sender_id: { _: 'messageSenderUser', user_id: 12345 },
-    chat_id: ${opts.chatId},
-    is_outgoing: false,
-    date: Math.floor(Date.now() / 1000),
-    content: {
-      _: 'messageText',
-      text: { _: 'formattedText', text: ${JSON.stringify(opts.text)}, entities: [] },
-    },
-  },
-});
-return { dispatched: 1 };
-`;
-}
-
-/**
- * Build eval code to ensure a chat exists in the in-memory chats map.
- * Required for --type filtering which uses getChatType(chats.get(chatId)).
- * Only the `type` field matters for filtering; other fields are stubs.
- */
-function ensureChatCode(chatId: number, type: 'user' | 'group'): string {
-  const chatType =
-    type === 'user'
-      ? `{ _: 'chatTypePrivate', user_id: ${chatId} }`
-      : `{ _: 'chatTypeBasicGroup', basic_group_id: ${Math.abs(chatId)} }`;
-  const title = type === 'user' ? 'Test User' : 'Test Group';
-  return `
-const { chats } = await import('./tdlib-client');
-chats.set(${chatId}, { id: ${chatId}, type: ${chatType}, title: '${title}', positions: [] });
-return { ok: true };
-`;
-}
-
 // --- Shared state ---
 let myId: number;
+/** Message IDs to clean up after all tests */
+const cleanupMsgIds: number[] = [];
 
 beforeAll(async () => {
   const me = await tg('me');
   expect(me.ok).toBe(true);
-  myId = Number(me.data.id);
+  myId = me.data.id;
+}, TIMEOUT);
+
+afterAll(async () => {
+  for (const id of cleanupMsgIds) {
+    await tg('delete', 'me', String(id));
+  }
 }, TIMEOUT);
 
 // ─── Validation ───
@@ -227,29 +157,30 @@ describe('listen validation', () => {
 
 describe('listen streaming', () => {
   it(
-    'receives synthetic new_message',
+    'receives new_message from real send',
     async () => {
       const handle = listenBg('--chat', String(myId));
 
       try {
-        // Wait for handlers to register in daemon
-        await new Promise((r) => setTimeout(r, 2000));
+        // Wait for SSE connection to establish
+        await new Promise((r) => setTimeout(r, 3000));
 
         const nonce = `listen-new-${Date.now()}`;
-        const inject = await injectUpdate(newMessageCode({ text: nonce, chatId: myId }));
-        expect(inject.ok).toBe(true);
-        expect(inject.data.dispatched).toBeGreaterThan(0);
+        const sent = await tg('send', 'me', nonce);
+        expect(sent.ok).toBe(true);
+        cleanupMsgIds.push(sent.data.id);
 
-        const lines = await handle.waitForLines(1, 5000);
+        const lines = await handle.waitForLines(1, 8000);
         expect(lines.length).toBeGreaterThanOrEqual(1);
 
         const events = lines.map((l) => JSON.parse(l));
         const match = events.find(
           // biome-ignore lint/suspicious/noExplicitAny: parsed JSON
-          (e: any) => e.type === 'new_message' && e.message?.content?.text?.text === nonce,
+          (e: any) => e.type === 'new_message' && e.message?.content?.text === nonce,
         );
         expect(match).toBeTruthy();
         expect(match.chat_id).toBe(myId);
+        expect(match.message.sender_name).toBeString();
       } finally {
         await handle.kill();
       }
@@ -257,27 +188,22 @@ describe('listen streaming', () => {
     STREAM_TIMEOUT,
   );
 
-  // Edit message tests are skipped because updateMessageContent and
-  // updateMessageEdited both call client.invoke({ _: "getMessage" }),
-  // which fails for synthetic (non-existent) message IDs.
-
   it(
     '--type group excludes user messages',
     async () => {
-      // Ensure myId chat is in the map as a private chat
-      await injectUpdate(ensureChatCode(myId, 'user'));
-
       const handle = listenBg('--type', 'group');
 
       try {
-        await new Promise((r) => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 3000));
 
-        // Inject a user message (should be excluded by --type group)
+        // Send to Saved Messages (a user/private chat — should be excluded by --type group)
         const nonce = `listen-exclude-${Date.now()}`;
-        await injectUpdate(newMessageCode({ text: nonce, chatId: myId }));
+        const sent = await tg('send', 'me', nonce);
+        expect(sent.ok).toBe(true);
+        cleanupMsgIds.push(sent.data.id);
 
         // Wait briefly and verify no matching events
-        await new Promise((r) => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 3000));
         const lines = handle.getLines();
         const events = lines
           .map((l) => {
@@ -290,7 +216,7 @@ describe('listen streaming', () => {
           .filter(Boolean);
         const match = events.find(
           // biome-ignore lint/suspicious/noExplicitAny: parsed JSON
-          (e: any) => e.type === 'new_message' && e.message?.content?.text?.text === nonce,
+          (e: any) => e.type === 'new_message' && e.message?.content?.text === nonce,
         );
         expect(match).toBeUndefined();
       } finally {
@@ -306,18 +232,20 @@ describe('listen streaming', () => {
       const handle = listenBg('--chat', String(myId));
 
       try {
-        await new Promise((r) => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 3000));
 
         const nonce = `listen-chat-${Date.now()}`;
-        await injectUpdate(newMessageCode({ text: nonce, chatId: myId }));
+        const sent = await tg('send', 'me', nonce);
+        expect(sent.ok).toBe(true);
+        cleanupMsgIds.push(sent.data.id);
 
-        const lines = await handle.waitForLines(1, 5000);
+        const lines = await handle.waitForLines(1, 8000);
         expect(lines.length).toBeGreaterThanOrEqual(1);
 
         const events = lines.map((l) => JSON.parse(l));
         const match = events.find(
           // biome-ignore lint/suspicious/noExplicitAny: parsed JSON
-          (e: any) => e.type === 'new_message' && e.message?.content?.text?.text === nonce,
+          (e: any) => e.type === 'new_message' && e.message?.content?.text === nonce,
         );
         expect(match).toBeTruthy();
         expect(match.chat_id).toBe(myId);
@@ -329,44 +257,57 @@ describe('listen streaming', () => {
   );
 
   it(
-    '--type user receives user messages but not group',
+    '--chat resolves usernames and "me"',
     async () => {
-      const groupChatId = -100_123_456;
+      const handle = listenBg('--chat', 'me');
 
-      // Ensure both chats are in the map with correct types
-      await injectUpdate(ensureChatCode(myId, 'user'));
-      await injectUpdate(ensureChatCode(groupChatId, 'group'));
+      try {
+        await new Promise((r) => setTimeout(r, 3000));
 
+        const nonce = `listen-resolve-${Date.now()}`;
+        const sent = await tg('send', 'me', nonce);
+        expect(sent.ok).toBe(true);
+        cleanupMsgIds.push(sent.data.id);
+
+        const lines = await handle.waitForLines(1, 8000);
+        expect(lines.length).toBeGreaterThanOrEqual(1);
+
+        const events = lines.map((l) => JSON.parse(l));
+        const match = events.find(
+          // biome-ignore lint/suspicious/noExplicitAny: parsed JSON
+          (e: any) => e.type === 'new_message' && e.message?.content?.text === nonce,
+        );
+        expect(match).toBeTruthy();
+      } finally {
+        await handle.kill();
+      }
+    },
+    STREAM_TIMEOUT,
+  );
+
+  it(
+    '--type user receives user messages',
+    async () => {
       const handle = listenBg('--type', 'user');
 
       try {
-        await new Promise((r) => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 3000));
 
-        // Inject a group message (should be excluded)
-        const groupNonce = `listen-group-${Date.now()}`;
-        await injectUpdate(groupMessageCode({ text: groupNonce, chatId: groupChatId }));
+        const nonce = `listen-user-${Date.now()}`;
+        const sent = await tg('send', 'me', nonce);
+        expect(sent.ok).toBe(true);
+        cleanupMsgIds.push(sent.data.id);
 
-        // Inject a user message (should be included)
-        const userNonce = `listen-user-${Date.now()}`;
-        await injectUpdate(newMessageCode({ text: userNonce, chatId: myId }));
-
-        const lines = await handle.waitForLines(1, 5000);
+        const lines = await handle.waitForLines(1, 8000);
         const events = lines.map((l) => JSON.parse(l));
 
-        // User message should appear
+        // User message should appear (Saved Messages is a private/user chat)
         expect(
           events.find(
             // biome-ignore lint/suspicious/noExplicitAny: parsed JSON
-            (e: any) => e.type === 'new_message' && e.message?.content?.text?.text === userNonce,
+            (e: any) => e.type === 'new_message' && e.message?.content?.text === nonce,
           ),
         ).toBeTruthy();
-        // Group message should not
-        expect(
-          events.find(
-            // biome-ignore lint/suspicious/noExplicitAny: parsed JSON
-            (e: any) => e.type === 'new_message' && e.message?.content?.text?.text === groupNonce,
-          ),
-        ).toBeUndefined();
       } finally {
         await handle.kill();
       }
