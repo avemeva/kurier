@@ -3,6 +3,7 @@
  * Applied before strip() — slim selects fields, strip handles serialization.
  */
 
+import type { AuthState } from '@tg/protocol';
 import type * as Td from 'tdlib-types';
 
 // --- Helpers ---
@@ -497,4 +498,48 @@ export function slimMessages(messages: Td.message[]): SlimMessage[] {
 
 export function slimMembers(members: Td.chatMember[]): SlimChatMember[] {
   return members.map(slimMember);
+}
+
+// --- Auth state ---
+
+const CODE_TYPE_MAP: Record<string, string> = {
+  authenticationCodeTypeTelegramMessage: 'telegram',
+  authenticationCodeTypeSms: 'sms',
+  authenticationCodeTypeCall: 'call',
+  authenticationCodeTypeFlashCall: 'flash_call',
+  authenticationCodeTypeFragment: 'fragment',
+  authenticationCodeTypeFirebaseAndroid: 'firebase',
+  authenticationCodeTypeFirebaseIos: 'firebase',
+};
+
+export function slimAuthState(state: AuthState): Record<string, unknown> {
+  const base: Record<string, unknown> = { state: state.state, ready: state.ready };
+
+  if (state.state === 'wait_code') {
+    const ci = state.code_info as
+      | {
+          phone_number: string;
+          type: { _: string; length?: number };
+          next_type?: { _: string };
+          timeout: number;
+        }
+      | undefined;
+    if (ci) {
+      base.phone_number = ci.phone_number;
+      base.code_type = CODE_TYPE_MAP[ci.type._] ?? ci.type._;
+      if (ci.type.length) base.code_length = ci.type.length;
+      if (ci.next_type) base.next_type = CODE_TYPE_MAP[ci.next_type._] ?? ci.next_type._;
+      if (ci.timeout) base.timeout = ci.timeout;
+    }
+  }
+
+  if (state.state === 'wait_password') {
+    if (state.password_hint) base.password_hint = state.password_hint;
+    if (state.has_recovery_email_address)
+      base.has_recovery_email = state.has_recovery_email_address;
+    if (state.recovery_email_address_pattern)
+      base.recovery_email_pattern = state.recovery_email_address_pattern;
+  }
+
+  return base;
 }

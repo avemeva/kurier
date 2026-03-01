@@ -94,8 +94,8 @@ function okResponse(data: unknown): Response {
   return jsonResponse({ ok: true, data });
 }
 
-function errResponse(message: string, code: string, status = 400): Response {
-  return jsonResponse({ ok: false, error: message, code }, status);
+function errResponse(message: string, _code: string, status = 400): Response {
+  return jsonResponse({ ok: false, error: { _: 'error' as const, code: status, message } }, status);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,19 +170,9 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
 
     const base = { state: getStateName(), ready: authState._ === 'authorizationStateReady' };
 
-    switch (authState._) {
-      case 'authorizationStateWaitCode':
-        return { ...base, code_info: authState.code_info };
-      case 'authorizationStateWaitPassword':
-        return {
-          ...base,
-          password_hint: authState.password_hint,
-          has_recovery_email: authState.has_recovery_email_address,
-          recovery_email_pattern: authState.recovery_email_address_pattern,
-        };
-      default:
-        return base;
-    }
+    // Return raw TDLib state — CLI transforms as needed
+    const { _: __, ...rest } = authState as Record<string, unknown>;
+    return { ...base, ...rest };
   }
 
   function waitForStateChange(timeoutMs: number): Promise<void> {

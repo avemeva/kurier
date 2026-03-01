@@ -142,5 +142,6 @@ export function mapErrorCode(message: string): ErrorCode {
   if (/FORBIDDEN|ADMIN_REQUIRED|WRITE_FORBIDDEN|USER_BANNED/i.test(message)) return 'UNAUTHORIZED';
   if (/FLOOD_WAIT|FLOOD_PREMIUM_WAIT|Too Many Requests/i.test(message)) return 'FLOOD_WAIT';
   if (/timed out|TIMEOUT/i.test(message)) return 'TIMEOUT';
+  if (/Expected: wait_/i.test(message)) return 'INVALID_ARGS';
   return 'UNKNOWN';
 }

@@ -13,6 +13,7 @@ import { fail, strip, success, warn } from './output';
 import { resolveChatId, resolveEntity } from './resolve';
 import {
   type SlimMessage,
+  slimAuthState,
   slimChat,
   slimChats,
   slimMembers,
@@ -2246,16 +2247,10 @@ export const commands: Command[] = [
       if (!sub) {
         const state = await client.getAuthState();
         if (state.ready) {
-          success(state);
+          const me = await client.invoke({ _: 'getMe' });
+          success({ ...state, ...(strip(slimUser(me)) as Record<string, unknown>) });
         } else {
-          // Provide actionable instructions based on current state
-          const instructions: Record<string, string> = {
-            wait_phone_number: 'Run: tg auth phone <+phone_number>',
-            wait_code: 'Run: tg auth code <verification_code>',
-            wait_password: 'Run: tg auth password <2fa_password>',
-          };
-          const hint = instructions[state.state];
-          success({ ...state, ...(hint ? { next: hint } : {}) });
+          success(slimAuthState(state));
         }
         return;
       }
@@ -2264,7 +2259,7 @@ export const commands: Command[] = [
         const phone = args[1];
         if (!phone) fail('Missing phone number. Usage: tg auth phone +1234567890', 'INVALID_ARGS');
         const state = await client.submitPhone(phone);
-        success(state);
+        success(slimAuthState(state));
         return;
       }
 
@@ -2272,7 +2267,7 @@ export const commands: Command[] = [
         const code = args[1];
         if (!code) fail('Missing verification code. Usage: tg auth code 12345', 'INVALID_ARGS');
         const state = await client.submitCode(code);
-        success(state);
+        success(slimAuthState(state));
         return;
       }
 
@@ -2280,13 +2275,13 @@ export const commands: Command[] = [
         const password = args[1];
         if (!password) fail('Missing password. Usage: tg auth password <pw>', 'INVALID_ARGS');
         const state = await client.submitPassword(password);
-        success(state);
+        success(slimAuthState(state));
         return;
       }
 
       if (sub === 'logout') {
         const res = await client.invoke({ _: 'logOut' });
-        success({ logged_out: true, ...res });
+        success(strip(res));
         return;
       }
 
