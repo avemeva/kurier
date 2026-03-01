@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "tdl": "^8.0.2",
-    "tdlib-types": "^0.0.1",
+    "@prebuilt-tdlib/types": "0.1008061.0",
     "prebuilt-tdlib": "^0.1008061.0"
   },
   "devDependencies": {

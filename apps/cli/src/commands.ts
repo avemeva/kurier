@@ -302,9 +302,7 @@ async function enrichWithContext(
         only_local: false,
       });
       const context = strip(
-        slimMessages(
-          ctx.messages.filter((m): m is Td.message => m !== undefined && m.id !== msgId),
-        ),
+        slimMessages(ctx.messages.filter((m): m is Td.message => m != null && m.id !== msgId)),
       );
       enriched.push({ ...hit, context });
     } catch {
@@ -319,7 +317,7 @@ async function enrichWithContext(
 function truncateContent(result: Record<string, unknown>, maxLen = 500): Record<string, unknown> {
   const content = result.content as Record<string, unknown> | undefined;
   if (!content) return result;
-  const type = content._ as string;
+  const type = (content.type ?? content._) as string;
   if (type === 'messageText' && typeof content.text === 'string' && content.text.length > maxLen) {
     return {
       ...result,
@@ -597,9 +595,9 @@ export const commands: Command[] = [
       // Search mode (--search or --since)
       if (flags['--search'] || flags['--since']) {
         const query = flags['--search'] ?? '';
-        let filter: Td.SearchMessagesFilter = { _: 'searchMessagesFilterEmpty' };
+        let filter: Td.SearchMessagesFilter$Input = { _: 'searchMessagesFilterEmpty' };
         if (flags['--filter']) {
-          const filterMap: Record<string, Td.SearchMessagesFilter> = {
+          const filterMap: Record<string, Td.SearchMessagesFilter$Input> = {
             photo: { _: 'searchMessagesFilterPhoto' },
             video: { _: 'searchMessagesFilterVideo' },
             document: { _: 'searchMessagesFilterDocument' },
@@ -645,8 +643,7 @@ export const commands: Command[] = [
             offset: 0,
             limit: since ? BATCH : limit,
             filter,
-            message_thread_id: 0,
-          } as Td.searchChatMessages);
+          } satisfies Td.searchChatMessages as Td.searchChatMessages);
 
           const batch = result.messages.filter(
             (m: Td.message | null): m is Td.message => m !== null,
@@ -700,7 +697,7 @@ export const commands: Command[] = [
 
       // Media filter in history mode
       if (flags['--filter']) {
-        const filterMap: Record<string, Td.SearchMessagesFilter> = {
+        const filterMap: Record<string, Td.SearchMessagesFilter$Input> = {
           photo: { _: 'searchMessagesFilterPhoto' },
           video: { _: 'searchMessagesFilterVideo' },
           document: { _: 'searchMessagesFilterDocument' },
@@ -731,8 +728,7 @@ export const commands: Command[] = [
             offset: 0,
             limit: hasClientFilter ? BATCH : limit,
             filter: f,
-            message_thread_id: 0,
-          } as Td.searchChatMessages);
+          } satisfies Td.searchChatMessages as Td.searchChatMessages);
 
           const batch = result.messages.filter(
             (m: Td.message | null): m is Td.message => m !== null,
@@ -871,10 +867,11 @@ export const commands: Command[] = [
       }
 
       // Build input content
-      const inputContent: Td.inputMessageText = {
+      const inputContent: Td.inputMessageText$Input = {
         _: 'inputMessageText',
         text: formattedText,
-        disable_web_page_preview: '--no-preview' in flags,
+        link_preview_options:
+          '--no-preview' in flags ? { _: 'linkPreviewOptions', is_disabled: true } : undefined,
         clear_draft: true,
       };
 
@@ -907,7 +904,11 @@ export const commands: Command[] = [
             update.old_message_id === provisionalId
           ) {
             cleanup();
-            reject(new Error(update.error_message || `Send failed (code ${update.error_code})`));
+            reject(
+              new Error(
+                `${update.error.message || 'Send failed'}${update.error.code ? ` (${update.error.code})` : ''}`,
+              ),
+            );
           }
         }
 
@@ -918,7 +919,6 @@ export const commands: Command[] = [
           .invoke({
             _: 'sendMessage',
             chat_id: chatId,
-            message_thread_id: 0,
             reply_to: flags['--reply-to']
               ? { _: 'inputMessageReplyToMessage', message_id: Number(flags['--reply-to']) }
               : undefined,
@@ -929,12 +929,10 @@ export const commands: Command[] = [
               protect_content: false,
               update_order_of_installed_sticker_sets: false,
               scheduling_state: undefined,
-              effect_id: '0',
               sending_id: 0,
-              only_preview: false,
             },
             input_message_content: inputContent,
-          } as Td.sendMessage)
+          } satisfies Td.sendMessage as Td.sendMessage)
           .then(
             (result) => {
               if (settled) return;
@@ -955,7 +953,9 @@ export const commands: Command[] = [
           );
       });
 
-      success(strip(slimMessage(serverMessage)));
+      const slim = slimMessage(serverMessage);
+      await addSenderNames(client, [slim]);
+      success(strip(slim));
     },
   },
 
@@ -984,12 +984,12 @@ export const commands: Command[] = [
         fail('Missing <query>. Or use --filter to search by media type.', 'INVALID_ARGS');
       const query = args[0] ?? ' ';
       const limit = parseLimit(flags, 20);
-      const contextN = flags['--context'] ? Number(flags['--context']) : 0;
-      if (
-        contextN &&
-        (!Number.isFinite(contextN) || contextN < 1 || contextN !== Math.floor(contextN))
-      ) {
-        fail('--context must be a positive integer', 'INVALID_ARGS');
+      let contextN = 0;
+      if (flags['--context'] !== undefined) {
+        contextN = Number(flags['--context']);
+        if (!Number.isFinite(contextN) || contextN < 1 || contextN !== Math.floor(contextN)) {
+          fail('--context must be a positive integer', 'INVALID_ARGS');
+        }
       }
 
       if (flags['--chat']) {
@@ -1006,11 +1006,11 @@ export const commands: Command[] = [
           }
         }
 
-        let searchFilter: Td.SearchMessagesFilter = {
+        let searchFilter: Td.SearchMessagesFilter$Input = {
           _: 'searchMessagesFilterEmpty',
         };
         if (flags['--filter']) {
-          const filterMap: Record<string, Td.SearchMessagesFilter> = {
+          const filterMap: Record<string, Td.SearchMessagesFilter$Input> = {
             photo: { _: 'searchMessagesFilterPhoto' },
             video: { _: 'searchMessagesFilterVideo' },
             document: { _: 'searchMessagesFilterDocument' },
@@ -1040,13 +1040,12 @@ export const commands: Command[] = [
             _: 'searchChatMessages',
             chat_id: chatId,
             query,
-            sender_id: senderOption ?? null,
+            sender_id: senderOption,
             from_message_id: cursor,
             offset: 0,
             limit: since ? BATCH : limit,
             filter: searchFilter,
-            message_thread_id: 0,
-          } as Td.searchChatMessages);
+          } satisfies Td.searchChatMessages as Td.searchChatMessages);
 
           const batch = result.messages.filter((m): m is Td.message => m !== null);
           if (batch.length === 0) break;
@@ -1112,7 +1111,7 @@ export const commands: Command[] = [
             filter: undefined,
             min_date: flags['--since'] ? Number(flags['--since']) : 0,
             max_date: 0,
-          } as Td.searchMessages);
+          } satisfies Td.searchMessages as Td.searchMessages);
 
           const batch = result.messages.filter((m): m is Td.message => m !== null);
           if (batch.length === 0) break;
@@ -1182,9 +1181,7 @@ export const commands: Command[] = [
               });
               const context = strip(
                 slimMessages(
-                  ctx.messages.filter(
-                    (cm): cm is Td.message => cm !== undefined && cm.id !== msgId,
-                  ),
+                  ctx.messages.filter((cm): cm is Td.message => cm != null && cm.id !== msgId),
                 ),
               );
               enriched.push({ ...formatted[i], context });
@@ -1316,12 +1313,13 @@ export const commands: Command[] = [
         input_message_content: {
           _: 'inputMessageText',
           text: formattedText,
-          link_preview_options: undefined,
           clear_draft: false,
         },
-      } as Td.editMessageText);
+      } satisfies Td.editMessageText as Td.editMessageText);
 
-      success(strip(slimMessage(result)));
+      const slim = slimMessage(result);
+      await addSenderNames(client, [slim]);
+      success(strip(slim));
     },
   },
 
@@ -1420,7 +1418,6 @@ export const commands: Command[] = [
           .invoke({
             _: 'forwardMessages',
             chat_id: toChatId,
-            message_thread_id: 0,
             from_chat_id: fromChatId,
             message_ids: ids,
             options: {
@@ -1430,13 +1427,11 @@ export const commands: Command[] = [
               protect_content: false,
               update_order_of_installed_sticker_sets: false,
               scheduling_state: undefined,
-              effect_id: '0',
               sending_id: 0,
-              only_preview: false,
             },
             send_copy: false,
             remove_caption: false,
-          } as Td.forwardMessages)
+          } satisfies Td.forwardMessages as Td.forwardMessages)
           .then(
             (result) => {
               if (settled) return;
@@ -1688,7 +1683,7 @@ export const commands: Command[] = [
       const typeFlag = flags['--type'] ?? flags['--filter'];
 
       if (chat.type._ === 'chatTypeSupergroup') {
-        let filter: Td.SupergroupMembersFilter;
+        let filter: Td.SupergroupMembersFilter$Input;
         if (typeFlag === 'bot') {
           filter = { _: 'supergroupMembersFilterBots' };
         } else if (typeFlag === 'admin') {
@@ -1875,7 +1870,7 @@ export const commands: Command[] = [
         }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (/REACTION_INVALID/i.test(msg)) {
+        if (/REACTION_INVALID|reaction.*isn.t available/i.test(msg)) {
           fail(
             `Reaction "${emoji}" is invalid — this emoji may not be allowed in this chat`,
             'INVALID_ARGS',

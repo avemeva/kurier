@@ -56,7 +56,12 @@ async function tg(...args: string[]): Promise<TgResult> {
 // --- Shared state ---
 let myId: number;
 let myUsername: string;
-let testMsgId: number | null = null;
+const cleanupIds: number[] = [];
+
+/** Track a message for cleanup in afterAll (call right after send, before assertions) */
+function track(id: number) {
+  cleanupIds.push(id);
+}
 
 // --- Setup / Teardown ---
 
@@ -68,9 +73,8 @@ beforeAll(async () => {
 }, TIMEOUT);
 
 afterAll(async () => {
-  // Clean up test messages
-  if (testMsgId) {
-    await tg('delete', 'me', String(testMsgId));
+  for (const id of cleanupIds) {
+    await tg('delete', 'me', String(id));
   }
 }, TIMEOUT);
 
@@ -591,9 +595,9 @@ describe('send', () => {
     async () => {
       const r = await tg('send', 'me', 'e2e test message — will be deleted');
       expect(r.ok).toBe(true);
+      track(r.data.id);
       expect(r.data.id).toBeNumber();
       expect(r.data.content.text).toBe('e2e test message — will be deleted');
-      testMsgId = r.data.id;
     },
     TIMEOUT,
   );
@@ -603,9 +607,8 @@ describe('send', () => {
     async () => {
       const r = await tg('send', 'me', '<b>bold</b> <i>italic</i>', '--html');
       expect(r.ok).toBe(true);
+      track(r.data.id);
       expect(r.data.content.text).toBe('**bold** __italic__');
-      // Clean up
-      await tg('delete', 'me', String(r.data.id));
     },
     TIMEOUT,
   );
@@ -615,8 +618,7 @@ describe('send', () => {
     async () => {
       const r = await tg('send', 'me', '*bold* `code`', '--md');
       expect(r.ok).toBe(true);
-      // Clean up
-      await tg('delete', 'me', String(r.data.id));
+      track(r.data.id);
     },
     TIMEOUT,
   );
@@ -636,9 +638,8 @@ describe('send', () => {
       await proc.exited;
       const r = JSON.parse(stdout.trim());
       expect(r.ok).toBe(true);
+      track(r.data.id);
       expect(r.data.content.text).toBe('stdin test msg');
-      // Clean up
-      await tg('delete', 'me', String(r.data.id));
     },
     TIMEOUT,
   );
@@ -651,9 +652,8 @@ describe('send', () => {
       Bun2.write(tmpFile, 'file test msg');
       const r = await tg('send', 'me', '--file', tmpFile);
       expect(r.ok).toBe(true);
+      track(r.data.id);
       expect(r.data.content.text).toBe('file test msg');
-      // Clean up
-      await tg('delete', 'me', String(r.data.id));
       unlinkSync(tmpFile);
     },
     TIMEOUT,
@@ -677,15 +677,13 @@ describe('edit', () => {
       // Send a message first
       const s = await tg('send', 'me', 'original text');
       expect(s.ok).toBe(true);
+      track(s.data.id);
       const msgId = s.data.id;
 
       const r = await tg('edit', 'me', String(msgId), 'edited text');
       expect(r.ok).toBe(true);
       expect(r.data.content.text).toBe('edited text');
       expect(r.data.edit_date).toBeNumber();
-
-      // Clean up
-      await tg('delete', 'me', String(msgId));
     },
     TIMEOUT,
   );
@@ -713,11 +711,10 @@ describe('delete', () => {
     async () => {
       const s = await tg('send', 'me', 'to be deleted');
       expect(s.ok).toBe(true);
+      track(s.data.id);
       const r = await tg('delete', 'me', String(s.data.id));
       expect(r.ok).toBe(true);
       expect(r.data.deleted).toContain(s.data.id);
-      // Prevent afterAll from double-deleting
-      if (testMsgId === s.data.id) testMsgId = null;
     },
     TIMEOUT,
   );
@@ -732,12 +729,11 @@ describe('forward', () => {
       // Send then forward to self
       const s = await tg('send', 'me', 'forward test');
       expect(s.ok).toBe(true);
+      track(s.data.id);
       const r = await tg('forward', 'me', 'me', String(s.data.id));
       expect(r.ok).toBe(true);
+      if (r.data[0]?.id) track(r.data[0].id);
       expect(r.data.length).toBeGreaterThan(0);
-      // Clean up both
-      await tg('delete', 'me', String(s.data.id));
-      if (r.data[0]?.id) await tg('delete', 'me', String(r.data[0].id));
     },
     TIMEOUT,
   );
@@ -914,10 +910,10 @@ describe('download', () => {
       // Send a text-only message, try to download
       const s = await tg('send', 'me', 'no media here');
       expect(s.ok).toBe(true);
+      track(s.data.id);
       const r = await tg('download', 'me', String(s.data.id));
       expect(r.ok).toBe(false);
       expect(r.code).toBe('NOT_FOUND');
-      await tg('delete', 'me', String(s.data.id));
     },
     TIMEOUT,
   );
@@ -931,11 +927,11 @@ describe('pin/unpin', () => {
     async () => {
       const s = await tg('send', 'me', 'pin test');
       expect(s.ok).toBe(true);
+      track(s.data.id);
       const pin = await tg('pin', 'me', String(s.data.id), '--silent');
       expect(pin.ok).toBe(true);
       const unpin = await tg('unpin', 'me', String(s.data.id));
       expect(unpin.ok).toBe(true);
-      await tg('delete', 'me', String(s.data.id));
     },
     TIMEOUT,
   );

@@ -33,9 +33,9 @@
       "name": "@tg/protocol",
       "version": "0.1.0",
       "dependencies": {
+        "@prebuilt-tdlib/types": "0.1008061.0",
         "prebuilt-tdlib": "^0.1008061.0",
         "tdl": "^8.0.2",
-        "tdlib-types": "^0.0.1",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -97,8 +97,6 @@
     "prebuilt-tdlib": ["prebuilt-tdlib@0.1008061.0", "", { "optionalDependencies": { "@prebuilt-tdlib/darwin-arm64": "0.1008061.0", "@prebuilt-tdlib/darwin-x64": "0.1008061.0", "@prebuilt-tdlib/linux-arm64-glibc": "0.1008061.0", "@prebuilt-tdlib/linux-x64-glibc": "0.1008061.0", "@prebuilt-tdlib/types": "0.1008061.0", "@prebuilt-tdlib/win32-x64": "0.1008061.0" } }, "sha512-HRliSstTJRwRMbnm0AUkrgBgd3vT3wu9+anrVpTeJn8xDo7P2wB6VkS5i1E4VfLVXY5g2Q7n2FlcuPkJa/t7WQ=="],
 
     "tdl": ["tdl@8.0.2", "", { "dependencies": { "debug": "^4.4.0", "node-addon-api": "^7.1.1", "node-gyp-build": "^4.8.4" } }, "sha512-KYxlJ4eao7FUu91U1dCDkaHmK70JAyZ1KqitkKqpPC7rxAiXWhaYxddWvt84UxIYoWbgdd0B70FYJ4p/YqpFCA=="],
-
-    "tdlib-types": ["tdlib-types@0.0.1", "", {}, "sha512-wK8HC5+dM2PjJFARFo8MR2KeGhO0B3ANEgK3jyV4Ves5+jtLAH/klVIRj6iuq2klstpN81n4JT3VuP4SKsiB5A=="],
 
     "typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 

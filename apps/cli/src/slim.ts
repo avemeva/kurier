@@ -298,10 +298,10 @@ export function slimUser(u: Td.user): SlimUser {
     phone_number: u.phone_number,
     type: flattenUserType(u.type),
     is_contact: u.is_contact,
-    is_verified: u.is_verified ?? false,
+    is_verified: u.verification_status?.is_verified ?? false,
     is_premium: u.is_premium,
-    is_scam: u.is_scam ?? false,
-    is_fake: u.is_fake ?? false,
+    is_scam: u.verification_status?.is_scam ?? false,
+    is_fake: u.verification_status?.is_fake ?? false,
   });
 }
 
@@ -344,9 +344,7 @@ export function slimMessage(m: Td.message): SlimMessage {
     reply_in_chat_id: replyInChatId,
     forward_info: m.forward_info,
     media_album_id:
-      m.media_album_id && m.media_album_id !== '0' && m.media_album_id !== 0
-        ? String(m.media_album_id)
-        : undefined,
+      m.media_album_id && m.media_album_id !== '0' ? String(m.media_album_id) : undefined,
     content: slimContent(m.content),
   });
 }

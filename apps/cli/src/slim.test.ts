@@ -58,15 +58,19 @@ function makeUser(overrides: Partial<Td.user> = {}): Td.user {
     phone_number: '+1234567890',
     status: { _: 'userStatusEmpty' },
     profile_photo: undefined,
+    accent_color_id: 0,
+    background_custom_emoji_id: '0',
+    profile_accent_color_id: -1,
+    profile_background_custom_emoji_id: '0',
     emoji_status: undefined,
     is_contact: false,
     is_mutual_contact: false,
-    is_verified: false,
+    is_close_friend: false,
+    verification_status: undefined,
     is_premium: false,
     is_support: false,
-    restriction_reason: '',
-    is_scam: false,
-    is_fake: false,
+    restricts_new_chats: false,
+    paid_message_star_count: 0,
     have_access: true,
     type: { _: 'userTypeRegular' },
     language_code: '',
@@ -79,7 +83,8 @@ function makeTextContent(overrides: Partial<Td.messageText> = {}): Td.messageTex
   return {
     _: 'messageText',
     text: { _: 'formattedText', text: 'hello', entities: [] },
-    web_page: undefined,
+    link_preview: undefined,
+    link_preview_options: undefined,
     ...overrides,
   };
 }
@@ -94,36 +99,29 @@ function makeMessage(overrides: Partial<Td.message> = {}): Td.message {
     scheduling_state: undefined,
     is_outgoing: false,
     is_pinned: false,
-    can_be_edited: true,
-    can_be_forwarded: true,
+    is_from_offline: false,
     can_be_saved: true,
-    can_be_deleted_only_for_self: true,
-    can_be_deleted_for_all_users: false,
-    can_get_added_reactions: false,
-    can_get_statistics: false,
-    can_get_message_thread: false,
-    can_get_viewers: false,
-    can_get_media_timestamp_links: false,
-    can_report_reactions: false,
     has_timestamped_media: false,
     is_channel_post: false,
-    is_topic_message: false,
+    is_paid_star_suggested_post: false,
+    is_paid_ton_suggested_post: false,
     contains_unread_mention: false,
     date: 1700000000,
     edit_date: 0,
     forward_info: undefined,
     interaction_info: undefined,
     unread_reactions: [],
-    reply_in_chat_id: 0,
-    reply_to_message_id: 0,
-    message_thread_id: 0,
-    self_destruct_time: 0,
+    reply_to: undefined,
     self_destruct_in: 0,
     auto_delete_in: 0,
     via_bot_user_id: 0,
+    sender_business_bot_user_id: 0,
+    sender_boost_count: 0,
+    paid_message_star_count: 0,
     author_signature: '',
-    media_album_id: 0,
-    restriction_reason: '',
+    media_album_id: '0',
+    effect_id: '0',
+    summary_language_code: '',
     content: makeTextContent(),
     reply_markup: undefined,
     ...overrides,
@@ -148,19 +146,21 @@ function makeChat(overrides: Partial<Td.chat> = {}): Td.chat {
       can_send_voice_notes: true,
       can_send_polls: true,
       can_send_other_messages: true,
-      can_add_web_page_previews: true,
+      can_add_link_previews: true,
       can_change_info: true,
       can_invite_users: true,
       can_pin_messages: true,
-      can_manage_topics: true,
+      can_create_topics: true,
     },
     last_message: undefined,
     positions: [],
+    chat_lists: [],
     message_sender_id: undefined,
+    block_list: undefined,
     has_protected_content: false,
     is_translatable: false,
     is_marked_as_unread: false,
-    is_blocked: false,
+    view_as_topics: false,
     has_scheduled_messages: false,
     can_be_deleted_only_for_self: true,
     can_be_deleted_for_all_users: false,
@@ -176,18 +176,27 @@ function makeChat(overrides: Partial<Td.chat> = {}): Td.chat {
       use_default_mute_for: false,
       mute_for: 0,
       use_default_sound: true,
-      sound_id: 0,
+      sound_id: '0',
       use_default_show_preview: true,
       show_preview: true,
+      use_default_mute_stories: false,
+      mute_stories: false,
+      use_default_story_sound: true,
+      story_sound_id: '0',
+      use_default_show_story_poster: true,
+      show_story_poster: false,
       use_default_disable_pinned_message_notifications: true,
       disable_pinned_message_notifications: false,
       use_default_disable_mention_notifications: true,
       disable_mention_notifications: false,
     },
-    available_reactions: { _: 'chatAvailableReactionsAll' },
+    available_reactions: { _: 'chatAvailableReactionsAll', max_reaction_count: 3 },
     message_auto_delete_time: 0,
+    accent_color_id: 0,
+    background_custom_emoji_id: '0',
+    profile_accent_color_id: -1,
+    profile_background_custom_emoji_id: '0',
     background: undefined,
-    theme_name: '',
     action_bar: undefined,
     video_chat: {
       _: 'videoChat',
@@ -209,7 +218,7 @@ function makeChatMember(overrides: Partial<Td.chatMember> = {}): Td.chatMember {
     member_id: { _: 'messageSenderUser', user_id: 42 },
     inviter_user_id: 99,
     joined_chat_date: 1700000000,
-    status: { _: 'chatMemberStatusMember' },
+    status: { _: 'chatMemberStatusMember', member_until_date: 0 },
     ...overrides,
   };
 }
@@ -238,7 +247,7 @@ describe('slimUser', () => {
     'profile_photo',
     'emoji_status',
     'status',
-    'restriction_reason',
+    'restriction_info',
     'have_access',
     'language_code',
     'added_to_attachment_menu',
@@ -278,6 +287,7 @@ describe('slimUser', () => {
           active_usernames: ['alice', 'alice2'],
           disabled_usernames: [],
           editable_username: 'alice',
+          collectible_usernames: [],
         },
       }),
     );
@@ -391,7 +401,6 @@ describe('slimChat', () => {
     const msg = makeMessage({
       content: makeTextContent({
         text: { _: 'formattedText', text: 'preview text here', entities: [] },
-        web_page: undefined,
       }),
     });
     const result = slimChat(makeChat({ last_message: msg }));
@@ -436,14 +445,13 @@ describe('slimMessage', () => {
   const absentKeys = [
     '_',
     'is_pinned',
-    'can_be_edited',
-    'can_be_forwarded',
+    'can_be_saved',
     'interaction_info',
     'unread_reactions',
     'reply_markup',
     'via_bot_user_id',
     'author_signature',
-    'message_thread_id',
+    'effect_id',
   ];
 
   test('has exactly the expected keys (zero fields omitted)', () => {
@@ -488,28 +496,40 @@ describe('slimMessage', () => {
     expect(result.edit_date).toBe(1700001000);
   });
 
-  test('omits reply_to_message_id when 0', () => {
-    const result = slimMessage(makeMessage({ reply_to_message_id: 0 }));
+  test('omits reply_to_message_id when no reply_to', () => {
+    const result = slimMessage(makeMessage({ reply_to: undefined }));
     expect('reply_to_message_id' in result).toBe(false);
   });
 
-  test('keeps reply_to_message_id when non-zero', () => {
-    const msg = makeMessage();
-    (msg as Rec).reply_to = { _: 'messageReplyToMessage', chat_id: 456, message_id: 500 };
+  test('keeps reply_to_message_id when reply_to present', () => {
+    const msg = makeMessage({
+      reply_to: {
+        _: 'messageReplyToMessage',
+        chat_id: 456,
+        message_id: 500,
+        checklist_task_id: 0,
+        origin_send_date: 0,
+      },
+    });
     const result = slimMessage(msg);
     expect(result.reply_to_message_id).toBe(500);
     // Same chat — reply_in_chat_id should be omitted
     expect('reply_in_chat_id' in result).toBe(false);
   });
 
-  test('omits reply_in_chat_id when 0', () => {
-    const result = slimMessage(makeMessage({ reply_in_chat_id: 0 }));
+  test('omits reply_in_chat_id when reply is in same chat', () => {
+    const result = slimMessage(
+      makeMessage({
+        reply_to: {
+          _: 'messageReplyToMessage',
+          chat_id: 456,
+          message_id: 500,
+          checklist_task_id: 0,
+          origin_send_date: 0,
+        },
+      }),
+    );
     expect('reply_in_chat_id' in result).toBe(false);
-  });
-
-  test('omits media_album_id when 0', () => {
-    const result = slimMessage(makeMessage({ media_album_id: 0 }));
-    expect('media_album_id' in result).toBe(false);
   });
 
   test('omits media_album_id when "0"', () => {
@@ -518,7 +538,7 @@ describe('slimMessage', () => {
   });
 
   test('keeps media_album_id as string when non-zero', () => {
-    const result = slimMessage(makeMessage({ media_album_id: 12345 }));
+    const result = slimMessage(makeMessage({ media_album_id: '12345' }));
     expect(result.media_album_id).toBe('12345');
   });
 
@@ -531,35 +551,20 @@ describe('slimMessage', () => {
     const result = slimMessage(
       makeMessage({
         content: makeTextContent({
-          web_page: {
-            _: 'webPage',
+          link_preview: {
+            _: 'linkPreview',
             url: 'https://example.com',
             display_url: 'example.com',
-            type: '',
             site_name: '',
             title: '',
             description: { _: 'formattedText', text: '', entities: [] },
-            photo: undefined,
-            embed_url: '',
-            embed_type: '',
-            embed_width: 0,
-            embed_height: 0,
-            duration: 0,
-            author: '',
-            animation: undefined,
-            audio: undefined,
-            document: undefined,
-            sticker: undefined,
-            video: undefined,
-            video_note: undefined,
-            voice_note: undefined,
-            instant_view_version: 0,
-          } as Td.webPage,
+            type: { _: 'linkPreviewTypeArticle' },
+          } as unknown as Td.linkPreview,
         }),
       }),
     );
     expect(result.content.type).toBe('messageText');
-    expect('web_page' in result.content).toBe(false);
+    expect('link_preview' in result.content).toBe(false);
   });
 });
 
@@ -573,40 +578,25 @@ describe('slimContent', () => {
     return slimMessage(makeMessage({ content })).content;
   }
 
-  test('messageText: flattens formattedText, drops web_page', () => {
+  test('messageText: flattens formattedText, drops link_preview', () => {
     const content = slimContentVia({
       _: 'messageText',
       text: { _: 'formattedText', text: 'hi', entities: [] },
-      web_page: {
-        _: 'webPage',
+      link_preview: {
+        _: 'linkPreview',
         url: 'https://example.com',
         display_url: 'example.com',
-        type: '',
         site_name: '',
         title: '',
         description: { _: 'formattedText', text: '', entities: [] },
-        photo: undefined,
-        embed_url: '',
-        embed_type: '',
-        embed_width: 0,
-        embed_height: 0,
-        duration: 0,
-        author: '',
-        animation: undefined,
-        audio: undefined,
-        document: undefined,
-        sticker: undefined,
-        video: undefined,
-        video_note: undefined,
-        voice_note: undefined,
-        instant_view_version: 0,
-      } as Td.webPage,
+        type: { _: 'linkPreviewTypeArticle' },
+      } as unknown as Td.linkPreview,
     } satisfies Td.messageText);
 
     expect(content.type).toBe('messageText');
     // text is now a plain string, not nested formattedText
     expect((content as Rec).text).toBe('hi');
-    expect('web_page' in content).toBe(false);
+    expect('link_preview' in content).toBe(false);
     expect(Object.keys(content).sort()).toEqual(['text', 'type']);
   });
 
@@ -628,7 +618,7 @@ describe('slimContent', () => {
           { _: 'textEntity', offset: 0, length: 4, type: { _: 'textEntityTypeItalic' } },
         ],
       },
-      web_page: undefined,
+      link_preview: undefined,
     } satisfies Td.messageText);
 
     expect(content).toEqual({
@@ -646,7 +636,7 @@ describe('slimContent', () => {
         text: 'bold italic',
         entities: [],
       },
-      web_page: undefined,
+      link_preview: undefined,
     } satisfies Td.messageText);
 
     expect(content).toEqual({ type: 'messageText', text: 'bold italic' });
@@ -679,6 +669,7 @@ describe('slimContent', () => {
         ],
       },
       caption: { _: 'formattedText', text: 'a photo', entities: [] },
+      show_caption_above_media: false,
       has_spoiler: true,
       is_secret: false,
     } satisfies Td.messagePhoto);
@@ -720,6 +711,7 @@ describe('slimContent', () => {
         ],
       },
       caption: { _: 'formattedText', text: '', entities: [] },
+      show_caption_above_media: false,
       has_spoiler: false,
       is_secret: false,
     } satisfies Td.messagePhoto);
@@ -744,7 +736,11 @@ describe('slimContent', () => {
         thumbnail: undefined,
         video: makeFile(),
       },
+      alternative_videos: [],
+      storyboards: [],
+      start_timestamp: 0,
       caption: { _: 'formattedText', text: 'a video', entities: [] },
+      show_caption_above_media: false,
       has_spoiler: false,
       is_secret: false,
     } satisfies Td.messageVideo);
@@ -801,14 +797,13 @@ describe('slimContent', () => {
       _: 'messageSticker',
       sticker: {
         _: 'sticker',
-        id: 1,
-        set_id: 1,
+        id: '1',
+        set_id: '1',
         width: 512,
         height: 512,
         emoji: '😀',
         format: { _: 'stickerFormatWebp' },
         full_type: { _: 'stickerFullTypeRegular', premium_animation: undefined },
-        outline: [],
         thumbnail: undefined,
         sticker: makeFile(),
       },
@@ -939,6 +934,7 @@ describe('extractPreview', () => {
           ],
         },
         caption: { _: 'formattedText', text: 'photo caption', entities: [] },
+        show_caption_above_media: false,
         has_spoiler: false,
         is_secret: false,
       } satisfies Td.messagePhoto,
@@ -952,14 +948,13 @@ describe('extractPreview', () => {
         _: 'messageSticker',
         sticker: {
           _: 'sticker',
-          id: 1,
-          set_id: 1,
+          id: '1',
+          set_id: '1',
           width: 512,
           height: 512,
           emoji: '😀',
           format: { _: 'stickerFormatWebp' },
           full_type: { _: 'stickerFullTypeRegular', premium_animation: undefined },
-          outline: [],
           thumbnail: undefined,
           sticker: makeFile(),
         },
@@ -1048,15 +1043,20 @@ describe('slimMember', () => {
               can_manage_topics: false,
               can_promote_members: false,
               can_manage_video_chats: false,
+              can_post_stories: false,
+              can_edit_stories: false,
+              can_delete_stories: false,
+              can_manage_direct_messages: false,
               is_anonymous: false,
             },
           },
         }),
       ).status,
     ).toBe('admin');
-    expect(slimMember(makeChatMember({ status: { _: 'chatMemberStatusMember' } })).status).toBe(
-      'member',
-    );
+    expect(
+      slimMember(makeChatMember({ status: { _: 'chatMemberStatusMember', member_until_date: 0 } }))
+        .status,
+    ).toBe('member');
     expect(slimMember(makeChatMember({ status: { _: 'chatMemberStatusLeft' } })).status).toBe(
       'left',
     );
@@ -1106,6 +1106,10 @@ describe('slimMember', () => {
             can_manage_topics: false,
             can_promote_members: false,
             can_manage_video_chats: false,
+            can_post_stories: false,
+            can_edit_stories: false,
+            can_delete_stories: false,
+            can_manage_direct_messages: false,
             is_anonymous: false,
           },
         },
@@ -1131,7 +1135,7 @@ describe('slimMember', () => {
   test('omits custom_title for non-admin statuses', () => {
     const result = slimMember(
       makeChatMember({
-        status: { _: 'chatMemberStatusMember' },
+        status: { _: 'chatMemberStatusMember', member_until_date: 0 },
       }),
     );
     expect('custom_title' in result).toBe(false);
@@ -1167,6 +1171,10 @@ describe('slimMember', () => {
             can_manage_topics: false,
             can_promote_members: false,
             can_manage_video_chats: false,
+            can_post_stories: false,
+            can_edit_stories: false,
+            can_delete_stories: false,
+            can_manage_direct_messages: false,
             is_anonymous: false,
           },
         },

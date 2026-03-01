@@ -54,8 +54,8 @@ export function strip(obj: unknown, depth = 0): unknown {
   if (depth > 12) return undefined;
   if (Array.isArray(obj)) {
     const a = obj.map((x) => strip(x, depth + 1)).filter((x) => x !== undefined);
-    // Preserve empty arrays at depth 0 (top-level data), strip deeper
-    return a.length ? a : depth === 0 ? a : undefined;
+    // Always preserve arrays — empty means "no results", not "field absent"
+    return a;
   }
   if (typeof obj === 'object') {
     const entries = Object.entries(obj);
@@ -125,10 +125,14 @@ export function mapErrorCode(message: string): ErrorCode {
     )
   )
     return 'NOT_FOUND';
-  if (/No user has|Chat not found|User not found|Message not found/i.test(message))
+  if (
+    /No user has|Chat not found|User not found|Message not found|Not Found|Chat info not found|File not found|Username is invalid|Invalid chat identifier/i.test(
+      message,
+    )
+  )
     return 'NOT_FOUND';
   if (
-    /MESSAGE_TOO_LONG|MESSAGE_EMPTY|MEDIA_INVALID|SCHEDULE_DATE_INVALID|ENTITY_BOUNDS_INVALID/i.test(
+    /MESSAGE_TOO_LONG|MESSAGE_EMPTY|MEDIA_INVALID|SCHEDULE_DATE_INVALID|ENTITY_BOUNDS_INVALID|Can't parse entities|reaction.*isn.t available/i.test(
       message,
     )
   )
