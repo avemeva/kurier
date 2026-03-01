@@ -8,7 +8,7 @@
     "start": "bun run src/index.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
-    "build": "bun build src/index.ts --compile --outfile ~/.local/bin/tg"
+    "build": "bun run scripts/build.ts && bun run scripts/install-tdjson.ts"
   },
   "dependencies": {
     "@tg/protocol": "workspace:*"

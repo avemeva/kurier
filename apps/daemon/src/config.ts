@@ -1,31 +1,24 @@
 /**
  * Application configuration — paths, ports, environment.
  *
- * All path constants resolve to ~/Library/Application Support/dev.telegramai.app.
- * TDLib API credentials are loaded from environment variables or .env files.
+ * Path constants come from @tg/protocol/paths (cross-platform).
+ * TDLib API credentials are loaded from environment variables or config files.
  */
 
 import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import path from 'node:path';
 
-/** Root application data directory. */
-export const APP_DIR = path.join(homedir(), 'Library', 'Application Support', 'dev.telegramai.app');
+export {
+  APP_DIR,
+  CREDENTIALS_FILE,
+  DB_DIR,
+  FILES_DIR,
+  LOG_FILE,
+  PID_FILE,
+  PORT_FILE,
+} from '@tg/protocol/paths';
 
-/** TDLib database directory (session, metadata). */
-export const DB_DIR = path.join(APP_DIR, 'tdlib_db');
-
-/** TDLib downloaded files directory (media, profile photos). */
-export const FILES_DIR = path.join(APP_DIR, 'media_cache');
-
-/** Daemon PID file path. */
-export const PID_FILE = path.join(APP_DIR, 'tg_daemon.pid');
-
-/** Daemon port file path (written after server starts). */
-export const PORT_FILE = path.join(APP_DIR, 'tg_daemon.port');
-
-/** Daemon log file path. */
-export const LOG_FILE = path.join(APP_DIR, 'tg_daemon.log');
+import { APP_DIR, CREDENTIALS_FILE } from '@tg/protocol/paths';
 
 /** Default HTTP server port. */
 export const DEFAULT_PORT = 7312;
@@ -43,12 +36,14 @@ export interface TdlibCredentials {
 }
 
 /**
- * Load TDLib API credentials from environment or .env files.
+ * Load TDLib API credentials from environment or config files.
  *
  * Search order:
  *   1. Environment variables: TG_API_ID / TG_API_HASH
  *   2. Environment variables: VITE_TG_API_ID / VITE_TG_API_HASH
- *   3. .env files in known project locations
+ *   3. ~/.config/tg/credentials (or platform equivalent)
+ *   4. App data dir .env
+ *   5. .env files in known project locations (dev mode)
  */
 export function loadCredentials(): TdlibCredentials {
   // Try environment variables first
@@ -59,8 +54,10 @@ export function loadCredentials(): TdlibCredentials {
     if (apiId && envHash) return { apiId, apiHash: envHash };
   }
 
-  // Fall back to .env files
+  // Fall back to config/env files
   const candidates = [
+    CREDENTIALS_FILE,
+    path.join(APP_DIR, '.env'),
     path.resolve(import.meta.dir, '../../../.env'),
     path.resolve(import.meta.dir, '../../.env'),
     path.resolve(import.meta.dir, '../.env'),
@@ -74,7 +71,7 @@ export function loadCredentials(): TdlibCredentials {
         const m = line.match(/^(\w+)=(.*)$/);
         if (m?.[1] && m[2] !== undefined) vars[m[1]] = m[2];
       }
-      const apiId = Number(vars.VITE_TG_API_ID ?? vars.TG_API_ID);
+      const apiId = Number(vars.TG_API_ID ?? vars.VITE_TG_API_ID);
       const apiHash = vars.VITE_TG_API_HASH ?? vars.TG_API_HASH ?? '';
       if (apiId && apiHash) return { apiId, apiHash };
     } catch {
@@ -83,6 +80,6 @@ export function loadCredentials(): TdlibCredentials {
   }
 
   throw new Error(
-    'Could not find TDLib API credentials. Set TG_API_ID and TG_API_HASH environment variables.',
+    'TDLib API credentials not found. Set TG_API_ID and TG_API_HASH, or run: tg auth setup',
   );
 }

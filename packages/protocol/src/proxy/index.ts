@@ -1,17 +1,16 @@
-import { homedir } from 'node:os';
 import path from 'node:path';
 import { getTdjson } from 'prebuilt-tdlib';
 import tdl from 'tdl';
 import type * as Td from 'tdlib-types';
 import type { Invoke } from 'tdlib-types';
+import { DB_DIR, FILES_DIR } from '../paths';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const APP_DIR = path.join(homedir(), 'Library', 'Application Support', 'dev.telegramai.app');
-const DEFAULT_DB_DIR = path.join(APP_DIR, 'tdlib_db');
-const DEFAULT_FILES_DIR = path.join(APP_DIR, 'media_cache');
+const DEFAULT_DB_DIR = DB_DIR;
+const DEFAULT_FILES_DIR = FILES_DIR;
 const DEFAULT_PORT = 7312;
 
 const CORS = {
@@ -63,6 +62,8 @@ export interface ProxyOptions {
   databaseDirectory?: string;
   /** TDLib files directory. Default: ~/Library/Application Support/dev.telegramai.app/media_cache */
   filesDirectory?: string;
+  /** Path to libtdjson shared library. Default: resolved by prebuilt-tdlib. */
+  tdjson?: string;
   /** Pre-created TDLib client for testing. When provided, skips TDLib initialization and auth waiting. */
   client?: tdl.Client;
 }
@@ -117,7 +118,7 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
       throw new Error('apiId and apiHash are required when client is not provided');
     }
 
-    tdl.configure({ tdjson: getTdjson() });
+    tdl.configure({ tdjson: options.tdjson ?? getTdjson() });
 
     client = tdl.createClient({
       apiId: options.apiId,

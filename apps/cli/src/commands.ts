@@ -2226,6 +2226,76 @@ export const commands: Command[] = [
       await new Promise<void>(() => {});
     },
   },
+  // ------------------------------------------------------------------
+  // auth — authentication management
+  // ------------------------------------------------------------------
+  {
+    name: 'auth',
+    description: 'Check auth state or authenticate (phone/code/password/logout)',
+    usage: [
+      'tg auth                       Show current auth state',
+      'tg auth phone <number>        Submit phone number (e.g. +1234567890)',
+      'tg auth code <code>           Submit verification code',
+      'tg auth password <password>   Submit 2FA password',
+      'tg auth logout                Log out of Telegram',
+    ].join('\n'),
+    async run(client, args, _flags) {
+      const sub = args[0];
+
+      // No subcommand — show current auth state
+      if (!sub) {
+        const state = await client.getAuthState();
+        if (state.ready) {
+          success(state);
+        } else {
+          // Provide actionable instructions based on current state
+          const instructions: Record<string, string> = {
+            wait_phone_number: 'Run: tg auth phone <+phone_number>',
+            wait_code: 'Run: tg auth code <verification_code>',
+            wait_password: 'Run: tg auth password <2fa_password>',
+          };
+          const hint = instructions[state.state];
+          success({ ...state, ...(hint ? { next: hint } : {}) });
+        }
+        return;
+      }
+
+      if (sub === 'phone') {
+        const phone = args[1];
+        if (!phone) fail('Missing phone number. Usage: tg auth phone +1234567890', 'INVALID_ARGS');
+        const state = await client.submitPhone(phone);
+        success(state);
+        return;
+      }
+
+      if (sub === 'code') {
+        const code = args[1];
+        if (!code) fail('Missing verification code. Usage: tg auth code 12345', 'INVALID_ARGS');
+        const state = await client.submitCode(code);
+        success(state);
+        return;
+      }
+
+      if (sub === 'password') {
+        const password = args[1];
+        if (!password) fail('Missing password. Usage: tg auth password <pw>', 'INVALID_ARGS');
+        const state = await client.submitPassword(password);
+        success(state);
+        return;
+      }
+
+      if (sub === 'logout') {
+        const res = await client.invoke({ _: 'logOut' });
+        success({ logged_out: true, ...res });
+        return;
+      }
+
+      fail(
+        `Unknown auth subcommand: "${sub}". Available: phone, code, password, logout`,
+        'INVALID_ARGS',
+      );
+    },
+  },
 ];
 
 // --- Command lookup ---

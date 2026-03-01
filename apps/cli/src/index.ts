@@ -1,21 +1,28 @@
 /**
  * CLI entry point — Telegram CLI optimized for AI agents.
  *
- * Usage: bun tg <command> [args] [--flags]
+ * Usage: tg <command> [args] [--flags]
  *
  * stdout: JSON only — { ok, data } or { ok, error, code }
  * stderr: help text, warnings
  * Entity arguments accept: numeric ID, @username, phone, "me"/"self"
  *
- * Always uses the daemon (auto-started if needed). No direct TDLib fallback.
+ * The daemon is a persistent background process. The CLI auto-starts it
+ * if needed, then communicates over HTTP. `tg --daemon` runs daemon mode.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
 import { TelegramClient, TelegramError } from '@tg/protocol';
 import { type Command, commands, getCommand } from './commands';
-import { ensureDaemon, getDaemonPid, LOG_FILE, spawnDaemon } from './daemon';
+import { ensureDaemon, getDaemonPid, LOG_FILE, runDaemonMode, spawnDaemon } from './daemon';
 import { CliError, fail, mapErrorCode, setPretty, success, warn } from './output';
 import { parseArgs } from './parse';
+
+// --- Daemon mode: `tg --daemon` (must be checked before arg parsing) ---
+
+if (process.argv.includes('--daemon')) {
+  await runDaemonMode();
+}
 
 const MAX_FLOOD_WAIT_SEC = 30;
 
@@ -29,6 +36,7 @@ const COMMAND_GROUPS: [string, string[]][] = [
   ['Real-time', ['listen']],
   ['Media', ['download', 'transcribe']],
   ['Advanced', ['eval', 'list']],
+  ['Auth', ['auth']],
 ];
 
 function printHelp(): void {
@@ -36,7 +44,7 @@ function printHelp(): void {
   const lines = [
     'tg — Telegram CLI for AI agents',
     '',
-    'Usage: bun tg <command> [args] [--flags]',
+    'Usage: tg <command> [args] [--flags]',
     '',
     'stdout: JSON { ok, data } | { ok, error, code }',
     'stderr: warnings',
@@ -65,7 +73,7 @@ function printHelp(): void {
     '  daemon status Check if daemon is running',
     '  daemon log    Show last 20 lines of daemon log',
     '',
-    "Run 'bun tg <command> --help' for command-specific usage.",
+    "Run 'tg <command> --help' for command-specific usage.",
   );
   process.stdout.write(`${lines.join('\n')}\n`);
 }
@@ -118,7 +126,6 @@ async function handleDaemonSubcommand(sub: string): Promise<never> {
     if (existsSync(LOG_FILE)) {
       const log = readFileSync(LOG_FILE, 'utf-8');
       const lines = log.trim().split('\n');
-      // Logs are inherently unstructured — output as plain text on stdout
       if ('--json' in flags) {
         success({ lines: lines.slice(-20) });
       } else {
@@ -128,7 +135,7 @@ async function handleDaemonSubcommand(sub: string): Promise<never> {
       fail('No daemon log file', 'NOT_FOUND');
     }
   } else {
-    fail('Usage: bun tg daemon <start|stop|status|log>', 'INVALID_ARGS');
+    fail('Usage: tg daemon <start|stop|status|log>', 'INVALID_ARGS');
   }
   process.exit(0);
 }
@@ -179,10 +186,7 @@ async function run(): Promise<void> {
   // Resolve command
   const cmd = getCommand(cmdName as string);
   if (!cmd)
-    fail(
-      `Unknown command: "${cmdName}". Run 'bun tg --help' for available commands.`,
-      'INVALID_ARGS',
-    );
+    fail(`Unknown command: "${cmdName}". Run 'tg --help' for available commands.`, 'INVALID_ARGS');
 
   if ('--help' in flags) {
     printCommandHelp(cmd);
@@ -193,7 +197,7 @@ async function run(): Promise<void> {
   if ('--stdin' in flags) {
     if (process.stdin.isTTY) {
       fail(
-        "--stdin requires piped input (e.g., echo 'text' | bun tg send me --stdin --html)",
+        "--stdin requires piped input (e.g., echo 'text' | tg send me --stdin --html)",
         'INVALID_ARGS',
       );
     }

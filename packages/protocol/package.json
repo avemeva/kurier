@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./proxy": "./src/proxy/index.ts"
+    "./proxy": "./src/proxy/index.ts",
+    "./paths": "./src/paths.ts"
   },
   "dependencies": {
     "tdl": "^8.0.2",
