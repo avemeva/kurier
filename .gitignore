@@ -1,7 +1,8 @@
 node_modules/
 dist/
 build/
-.claude/
+.claude/worktrees/
+apps/app/.logs/
 *.log
 .env
 .env.local
@@ -11,3 +12,4 @@ stderr.tmp
 stderr.txt
 stdout.txt
 tg
+test-results/

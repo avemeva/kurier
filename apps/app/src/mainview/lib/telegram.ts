@@ -1,0 +1,718 @@
+/**
+ * Telegram data layer — all data flows through the daemon via TelegramClient (HTTP/SSE).
+ *
+ * Auth flow uses daemon HTTP endpoints (submitPhone/submitCode/submitPassword).
+ * State transitions arrive via SSE (updateAuthorizationState).
+ * Everything else:
+ *   - Commands: POST /api/tg/invoke → daemon TDLib calls
+ *   - Events:   GET /api/tg/updates → SSE from daemon
+ *   - Media:    GET /api/media/* → cached files on disk
+ */
+
+import { TelegramClient } from '@tg/protocol';
+import type { SearchResultMessage, Td, TelegramUpdateEvent } from '@/lib/types';
+import { telegramLog } from './log';
+
+// --- TelegramClient instance (same-origin in dev, Vite proxies /api/tg → daemon) ---
+
+const client = new TelegramClient('');
+
+// --- Auth ---
+
+export type AuthStep = 'phone' | 'code' | 'password';
+
+function formatFloodWait(secs: number): string {
+  if (secs >= 3600) {
+    const h = Math.floor(secs / 3600);
+    const m = Math.ceil((secs % 3600) / 60);
+    return `Too many login attempts. Try again in ${h}h${m > 0 ? ` ${m}m` : ''}`;
+  }
+  if (secs >= 60) return `Too many login attempts. Try again in ${Math.ceil(secs / 60)} minutes`;
+  return `Too many login attempts. Try again in ${secs} seconds`;
+}
+
+const ERROR_MAP: Record<string, string> = {
+  PHONE_NUMBER_INVALID: 'Invalid phone number. Check the format and try again',
+  PHONE_NUMBER_BANNED: 'This phone number is banned from Telegram',
+  PHONE_NUMBER_FLOOD: 'Too many attempts. Please try again later',
+  PHONE_CODE_INVALID: 'Incorrect code. Please check and try again',
+  PHONE_CODE_EXPIRED: 'Code has expired. Please request a new one',
+  PHONE_CODE_EMPTY: 'Please enter the verification code',
+  PASSWORD_HASH_INVALID: 'Incorrect password. Please try again',
+};
+
+export function formatTelegramError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+
+  const floodMatch = message.match(/FLOOD_WAIT_(\d+)/);
+  if (floodMatch) return formatFloodWait(Number(floodMatch[1]));
+  const waitMatch = message.match(/A wait of (\d+) seconds is required/);
+  if (waitMatch) return formatFloodWait(Number(waitMatch[1]));
+
+  for (const [code, friendly] of Object.entries(ERROR_MAP)) {
+    if (message.includes(code)) return friendly;
+  }
+
+  return message || 'An unknown error occurred';
+}
+
+export async function submitPhone(phone: string): Promise<void> {
+  const masked = `${phone.slice(0, 4)}****${phone.slice(-2)}`;
+  telegramLog.info(`submitPhone: ${masked}`);
+  await client.submitPhone(phone);
+}
+
+export async function submitCode(code: string): Promise<void> {
+  telegramLog.info(`submitCode: ${code.length} digits`);
+  await client.submitCode(code);
+}
+
+export async function submitPassword(pw: string): Promise<void> {
+  telegramLog.info('submitPassword');
+  await client.submitPassword(pw);
+}
+
+export async function resendCode(): Promise<void> {
+  telegramLog.info('resendCode');
+  await client.invoke({ _: 'resendAuthenticationCode' } as unknown as Parameters<
+    typeof client.invoke
+  >[0]);
+}
+
+// --- Client lifecycle ---
+
+export async function initialize(): Promise<void> {
+  // Always start SSE — needed for auth state transitions
+  startUpdates();
+  try {
+    await client.getAuthState();
+  } catch {
+    // Daemon not running - will show auth screen
+  }
+}
+
+export async function isAuthorized(): Promise<boolean> {
+  try {
+    const authState = await client.getAuthState();
+    return authState.ready;
+  } catch {
+    return false;
+  }
+}
+
+// --- Data types ---
+
+export type { SearchResultMessage, TelegramUpdateEvent } from '@/lib/types';
+
+export interface PeerInfo {
+  id: number;
+  name: string;
+  username: string | null;
+  isUser: boolean;
+  isGroup: boolean;
+  isChannel: boolean;
+}
+
+// --- Update events ---
+
+type UpdateListener = (event: TelegramUpdateEvent) => void;
+const updateListeners = new Set<UpdateListener>();
+
+export function onUpdate(listener: UpdateListener): () => void {
+  updateListeners.add(listener);
+  return () => updateListeners.delete(listener);
+}
+
+function emitUpdate(event: TelegramUpdateEvent) {
+  for (const listener of updateListeners) {
+    try {
+      listener(event);
+    } catch (err) {
+      telegramLog.error('update listener error:', err);
+    }
+  }
+}
+
+// --- Data fetching via TelegramClient.invoke() ---
+
+export async function getDialogs(
+  opts: { limit?: number; archived?: boolean } = {},
+): Promise<Td.chat[]> {
+  const limit = opts.limit ?? 100;
+  const chat_list = opts.archived
+    ? { _: 'chatListArchive' as const }
+    : { _: 'chatListMain' as const };
+
+  const result = await client.invoke({ _: 'getChats', chat_list, limit });
+  const chats = await Promise.all(
+    result.chat_ids.map((id: number) => client.invoke({ _: 'getChat', chat_id: id })),
+  );
+  return chats;
+}
+
+export async function getMessages(
+  chatId: number,
+  options?: { limit?: number; fromMessageId?: number },
+): Promise<{ messages: Td.message[]; hasMore: boolean }> {
+  const limit = options?.limit ?? 50;
+  const result = await client.invoke({
+    _: 'getChatHistory',
+    chat_id: chatId,
+    from_message_id: options?.fromMessageId ?? 0,
+    offset: 0,
+    limit,
+    only_local: false,
+  });
+  const messages = result.messages.filter((m): m is Td.message => m !== undefined);
+  // TDLib may return fewer messages than requested even when more exist
+  // (filtered service messages, gaps, etc.). The only reliable signal
+  // that history is exhausted is receiving 0 messages back.
+  return { messages, hasMore: messages.length > 0 };
+}
+
+// --- Send ---
+
+export async function sendMessage(chatId: number, text: string): Promise<Td.message> {
+  const result = await client.invoke({
+    _: 'sendMessage',
+    chat_id: chatId,
+    input_message_content: {
+      _: 'inputMessageText',
+      text: { _: 'formattedText', text, entities: [] },
+      clear_draft: true,
+    },
+  });
+  return result;
+}
+
+// --- Reactions ---
+
+export async function sendReaction(
+  chatId: number,
+  messageId: number,
+  emoji: string,
+  chosen: boolean,
+): Promise<void> {
+  if (chosen) {
+    // Remove reaction
+    await client.invoke({
+      _: 'removeMessageReaction',
+      chat_id: chatId,
+      message_id: messageId,
+      reaction_type: { _: 'reactionTypeEmoji', emoji },
+    });
+  } else {
+    // Add reaction
+    await client.invoke({
+      _: 'addMessageReaction',
+      chat_id: chatId,
+      message_id: messageId,
+      reaction_type: { _: 'reactionTypeEmoji', emoji },
+      is_big: false,
+      update_recent_reactions: true,
+    });
+  }
+}
+
+// --- Mark as read ---
+
+export async function markAsRead(chatId: number): Promise<void> {
+  try {
+    const history = await client.invoke({
+      _: 'getChatHistory',
+      chat_id: chatId,
+      from_message_id: 0,
+      offset: 0,
+      limit: 1,
+      only_local: true,
+    });
+    const firstMsg = history.messages.find((m): m is Td.message => m !== undefined);
+    if (firstMsg) {
+      await client.invoke({
+        _: 'viewMessages',
+        chat_id: chatId,
+        message_ids: [firstMsg.id],
+        force_read: true,
+      });
+    }
+  } catch {
+    // Non-critical
+  }
+}
+
+// --- Me ---
+
+export async function getMe(): Promise<Td.user> {
+  return client.invoke({ _: 'getMe' });
+}
+
+// --- Media (served from daemon's filesystem cache) ---
+
+/** Remove a cached media download so it can be retried. */
+export function clearMediaCache(messageId: number): void {
+  // Clear all entries for this messageId from the URL cache
+  for (const [key] of mediaUrlCache) {
+    if (key.endsWith(`_${messageId}`)) {
+      mediaUrlCache.delete(key);
+    }
+  }
+}
+
+const profilePhotoCache = new Map<number, Promise<string | null>>();
+
+export function getProfilePhotoUrl(chatId: number): Promise<string | null> {
+  const cached = profilePhotoCache.get(chatId);
+  if (cached) return cached;
+  const promise = (async (): Promise<string | null> => {
+    try {
+      const chat = await client.invoke({ _: 'getChat', chat_id: chatId });
+      const photo = chat.photo;
+      if (!photo) return null;
+
+      // Download the small photo
+      const file = await client.invoke({
+        _: 'downloadFile',
+        file_id: photo.small.id,
+        priority: 1,
+        offset: 0,
+        limit: 0,
+        synchronous: true,
+      });
+
+      if (file.local.is_downloading_completed && file.local.path) {
+        // Convert absolute path to /api/media/ URL
+        const match = file.local.path.match(/media_cache\/(.+)$/);
+        if (match) return `/api/media/${match[1]}`;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  })();
+  profilePhotoCache.set(chatId, promise);
+  return promise;
+}
+
+const mediaUrlCache = new Map<string, Promise<string | null>>();
+
+export function downloadMedia(chatId: number, messageId: number): Promise<string | null> {
+  const key = `${chatId}_${messageId}`;
+  const cached = mediaUrlCache.get(key);
+  if (cached) return cached;
+  const promise = (async (): Promise<string | null> => {
+    try {
+      const msg = await client.invoke({
+        _: 'getMessage',
+        chat_id: chatId,
+        message_id: messageId,
+      });
+
+      // Extract file from message content
+      const file = getFileFromContent(msg.content);
+      if (!file) return null;
+
+      const downloaded = await client.invoke({
+        _: 'downloadFile',
+        file_id: file.id,
+        priority: 1,
+        offset: 0,
+        limit: 0,
+        synchronous: true,
+      });
+
+      if (downloaded.local.is_downloading_completed && downloaded.local.path) {
+        const match = downloaded.local.path.match(/media_cache\/(.+)$/);
+        if (match) return `/api/media/${match[1]}`;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  })();
+  mediaUrlCache.set(key, promise);
+  return promise;
+}
+
+function getFileFromContent(content: Td.MessageContent): Td.file | null {
+  switch (content._) {
+    case 'messagePhoto': {
+      // Get the largest photo size
+      const sizes = content.photo.sizes;
+      return sizes[sizes.length - 1]?.photo ?? null;
+    }
+    case 'messageVideo':
+      return content.video.video;
+    case 'messageVoiceNote':
+      return content.voice_note.voice;
+    case 'messageVideoNote':
+      return content.video_note.video;
+    case 'messageDocument':
+      return content.document.document;
+    case 'messageAnimation':
+      return content.animation.animation;
+    case 'messageAudio':
+      return content.audio.audio;
+    case 'messageSticker':
+      return content.sticker.sticker;
+    default:
+      return null;
+  }
+}
+
+const customEmojiCache = new Map<string, Promise<string | null>>();
+
+export function getCustomEmojiUrl(documentId: string): Promise<string | null> {
+  const cached = customEmojiCache.get(documentId);
+  if (cached) return cached;
+  // Custom emoji download is not yet supported via daemon — return null
+  // TODO: add custom emoji download command to daemon
+  const promise = Promise.resolve(null as string | null);
+  customEmojiCache.set(documentId, promise);
+  return promise;
+}
+
+// --- Chat open/close ---
+
+export async function openTdChat(chatId: number): Promise<void> {
+  await client.invoke({ _: 'openChat', chat_id: chatId });
+}
+
+export async function closeTdChat(chatId: number): Promise<void> {
+  await client.invoke({ _: 'closeChat', chat_id: chatId });
+}
+
+// --- Real-time updates via SSE ---
+
+let updatesStarted = false;
+
+function startUpdates() {
+  if (updatesStarted) return;
+  updatesStarted = true;
+
+  client.on('update', async (update) => {
+    try {
+      const event = await translateUpdate(update);
+      if (event) emitUpdate(event);
+    } catch (err) {
+      telegramLog.error('Update translation error:', err);
+    }
+  });
+
+  telegramLog.info('Real-time updates started via SSE');
+}
+
+async function translateUpdate(update: Td.Update): Promise<TelegramUpdateEvent | null> {
+  switch (update._) {
+    case 'updateNewMessage':
+      return {
+        type: 'new_message',
+        chat_id: update.message.chat_id,
+        message: update.message,
+      };
+
+    case 'updateMessageContent': {
+      // Fetch full updated message
+      try {
+        const msg = await client.invoke({
+          _: 'getMessage',
+          chat_id: update.chat_id,
+          message_id: update.message_id,
+        });
+        return { type: 'edit_message', chat_id: update.chat_id, message: msg };
+      } catch {
+        return null;
+      }
+    }
+
+    case 'updateMessageEdited': {
+      try {
+        const msg = await client.invoke({
+          _: 'getMessage',
+          chat_id: update.chat_id,
+          message_id: update.message_id,
+        });
+        return { type: 'edit_message', chat_id: update.chat_id, message: msg };
+      } catch {
+        return null;
+      }
+    }
+
+    case 'updateDeleteMessages':
+      if (!update.is_permanent) return null;
+      return {
+        type: 'delete_messages',
+        chat_id: update.chat_id,
+        message_ids: update.message_ids,
+        is_permanent: update.is_permanent,
+      };
+
+    case 'updateMessageInteractionInfo':
+      if (!update.interaction_info) return null;
+      return {
+        type: 'message_reactions',
+        chat_id: update.chat_id,
+        message_id: update.message_id,
+        interaction_info: update.interaction_info,
+      };
+
+    case 'updateChatReadOutbox':
+      return {
+        type: 'read_outbox',
+        chat_id: update.chat_id,
+        last_read_outbox_message_id: update.last_read_outbox_message_id,
+      };
+
+    case 'updateChatAction':
+      return {
+        type: 'user_typing',
+        chat_id: update.chat_id,
+        sender_id: update.sender_id,
+        action: update.action,
+      };
+
+    case 'updateUserStatus':
+      return {
+        type: 'user_status',
+        user_id: update.user_id,
+        status: update.status,
+      };
+
+    case 'updateMessageSendSucceeded':
+      return {
+        type: 'message_send_succeeded',
+        chat_id: update.message.chat_id,
+        old_message_id: update.old_message_id,
+        message: update.message,
+      };
+
+    case 'updateAuthorizationState':
+      return {
+        type: 'auth_state',
+        authorization_state: update.authorization_state,
+      };
+
+    default:
+      return null;
+  }
+}
+
+export async function logout() {
+  client.close();
+  mediaUrlCache.clear();
+  profilePhotoCache.clear();
+  customEmojiCache.clear();
+  updatesStarted = false;
+  updateListeners.clear();
+}
+
+// --- Search functions ---
+
+export async function searchInChat(
+  chatId: number,
+  query: string,
+  options: { limit?: number; offsetId?: number } = {},
+): Promise<{
+  messages: Td.message[];
+  totalCount: number;
+  hasMore: boolean;
+  nextOffsetId: number | undefined;
+}> {
+  const limit = options.limit ?? 50;
+  const result = await client.invoke({
+    _: 'searchChatMessages',
+    chat_id: chatId,
+    query,
+    from_message_id: options.offsetId ?? 0,
+    offset: 0,
+    limit,
+    sender_id: undefined,
+    filter: undefined,
+    topic_id: undefined,
+  });
+
+  const messages = result.messages;
+  const totalCount = result.total_count;
+  const hasMore = result.next_from_message_id !== 0;
+  const nextOffsetId = result.next_from_message_id || undefined;
+
+  return {
+    messages,
+    totalCount,
+    hasMore,
+    nextOffsetId,
+  };
+}
+
+export async function searchGlobal(
+  query: string,
+  options: { limit?: number; offsetCursor?: string } = {},
+): Promise<{
+  messages: SearchResultMessage[];
+  totalCount: number | undefined;
+  hasMore: boolean;
+  nextCursor: string | undefined;
+}> {
+  const limit = options.limit ?? 50;
+
+  const result = await client.invoke({
+    _: 'searchMessages',
+    query,
+    offset: options.offsetCursor ?? '',
+    limit,
+    filter: undefined,
+    min_date: 0,
+    max_date: 0,
+  });
+
+  const messages: SearchResultMessage[] = await Promise.all(
+    result.messages.map(async (msg: Td.message) => {
+      try {
+        const chat = await client.invoke({ _: 'getChat', chat_id: msg.chat_id });
+        return { ...msg, chat_title: chat.title };
+      } catch {
+        return { ...msg, chat_title: undefined };
+      }
+    }),
+  );
+
+  const hasMore = result.next_offset !== '';
+  const nextCursor = result.next_offset || undefined;
+
+  return {
+    messages,
+    totalCount: result.total_count,
+    hasMore,
+    nextCursor,
+  };
+}
+
+export async function searchContacts(
+  query: string,
+  limit = 50,
+): Promise<{ myResults: PeerInfo[]; globalResults: PeerInfo[] }> {
+  const [contacts, global] = await Promise.all([
+    client.invoke({ _: 'searchContacts', query, limit }),
+    client.invoke({ _: 'searchChatsOnServer', query, limit }),
+  ]);
+
+  const toPeerInfo = async (userId: number): Promise<PeerInfo> => {
+    const user = await client.invoke({ _: 'getUser', user_id: userId });
+    return {
+      id: user.id,
+      name: [user.first_name, user.last_name].filter(Boolean).join(' '),
+      username: user.usernames?.active_usernames?.[0] ?? null,
+      isUser: true,
+      isGroup: false,
+      isChannel: false,
+    };
+  };
+
+  const myResults = await Promise.all(contacts.user_ids.slice(0, limit).map(toPeerInfo));
+  const globalResults = await Promise.all(
+    global.chat_ids.slice(0, limit).map(async (chatId: number) => {
+      const chat = await client.invoke({ _: 'getChat', chat_id: chatId });
+      const isPrivate = chat.type._ === 'chatTypePrivate';
+      const isGroup =
+        chat.type._ === 'chatTypeBasicGroup' ||
+        (chat.type._ === 'chatTypeSupergroup' && !chat.type.is_channel);
+      const isChannel = chat.type._ === 'chatTypeSupergroup' && chat.type.is_channel;
+      return {
+        id: chat.id,
+        name: chat.title,
+        username: null,
+        isUser: isPrivate,
+        isGroup,
+        isChannel,
+      };
+    }),
+  );
+
+  return { myResults, globalResults };
+}
+
+// --- Formatting ---
+
+export function formatTime(timestamp: number): string {
+  if (!timestamp) return '';
+  const date = new Date(timestamp * 1000);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const dayMs = 86_400_000;
+
+  if (diffMs < dayMs && date.getDate() === now.getDate()) {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  if (diffMs < 7 * dayMs) {
+    return date.toLocaleDateString([], { weekday: 'short' });
+  }
+  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+export function formatLastSeen(timestamp: number): string {
+  const date = new Date(timestamp * 1000);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return `last seen at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  return `last seen ${formatTime(timestamp)}`;
+}
+
+// --- TDLib message utilities ---
+
+export function getMessageText(msg: Td.message): string {
+  const c = msg.content;
+  if (c._ === 'messageText') return c.text.text;
+  if ('caption' in c && c.caption) return (c.caption as Td.formattedText).text;
+  return '';
+}
+
+export function getMessageEntities(msg: Td.message): Td.textEntity[] {
+  const c = msg.content;
+  if (c._ === 'messageText') return c.text.entities;
+  if ('caption' in c && c.caption) return (c.caption as Td.formattedText).entities;
+  return [];
+}
+
+export function getMediaTypeLabel(msg: Td.message): string {
+  switch (msg.content._) {
+    case 'messagePhoto':
+      return 'Photo';
+    case 'messageVideo':
+      return 'Video';
+    case 'messageVoiceNote':
+      return 'Voice message';
+    case 'messageVideoNote':
+      return 'Video message';
+    case 'messageSticker':
+      return msg.content.sticker.emoji ?? 'Sticker';
+    case 'messageDocument':
+      return 'File';
+    case 'messageAnimation':
+      return 'GIF';
+    case 'messageAudio':
+      return 'Audio';
+    case 'messagePoll':
+      return 'Poll';
+    case 'messageContact':
+      return 'Contact';
+    case 'messageLocation':
+      return 'Location';
+    case 'messageVenue':
+      return 'Venue';
+    case 'messageDice':
+      return msg.content.emoji;
+    default:
+      return '';
+  }
+}
+
+export function extractMessagePreview(msg: Td.message | undefined): string {
+  if (!msg) return '';
+  const text = getMessageText(msg);
+  if (text) return text;
+  return getMediaTypeLabel(msg);
+}
+
+export function getSenderUserId(sender: Td.MessageSender): number {
+  return sender._ === 'messageSenderUser' ? sender.user_id : 0;
+}

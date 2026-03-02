@@ -1,0 +1,75 @@
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
+
+export type ReactionInfo = {
+  emoticon: string;
+  count: number;
+  chosen: boolean;
+};
+
+export const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢'];
+
+export function PureReactionBar({
+  reactions,
+  onReact,
+}: {
+  reactions: ReactionInfo[];
+  onReact: (emoticon: string, chosen: boolean) => void;
+}) {
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      {reactions.map((r) => (
+        <button
+          key={r.emoticon}
+          type="button"
+          onClick={() => onReact(r.emoticon, r.chosen)}
+          className={cn(
+            'flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 leading-none transition-colors',
+            r.chosen
+              ? 'border-accent-blue/40 bg-accent-blue/15 text-accent-blue'
+              : 'border-border/50 bg-accent/60 text-text-secondary hover:bg-accent/80',
+          )}
+        >
+          <span className="text-[15px] leading-none">{r.emoticon}</span>
+          <span className="text-[11px] leading-none font-medium">{r.count}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function PureReactionPicker({
+  onReact,
+}: {
+  onReact: (emoticon: string, chosen: boolean) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="absolute -right-1 -top-3 hidden rounded-full bg-card px-1 py-0.5 text-[10px] shadow group-hover/bubble:block"
+      >
+        +
+      </button>
+    );
+  }
+  return (
+    <div className="absolute -top-8 right-0 z-10 flex gap-0.5 rounded-full bg-popover px-1 py-0.5 shadow-md">
+      {QUICK_REACTIONS.map((e) => (
+        <button
+          key={e}
+          type="button"
+          onClick={() => {
+            onReact(e, false);
+            setOpen(false);
+          }}
+          className="rounded p-0.5 text-sm transition-transform hover:scale-125"
+        >
+          {e}
+        </button>
+      ))}
+    </div>
+  );
+}

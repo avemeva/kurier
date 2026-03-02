@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "noEmit": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "verbatimModuleSyntax": false,
+    "noUncheckedIndexedAccess": false,
+    "types": ["@prebuilt-tdlib/types", "@types/bun", "vite/client"],
+    "paths": {
+      "@/*": ["./src/mainview/*"],
+      "electrobun/bun": ["./src/electrobun.d.ts"],
+      "electrobun": ["./src/electrobun-config.d.ts"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

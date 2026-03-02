@@ -1,0 +1,377 @@
+import type * as Td from 'tdlib-types';
+import type { PendingMessage } from './index';
+import type {
+  ChatKind,
+  MessageContentKind,
+  UIChat,
+  UIKeyboardRow,
+  UIMessage,
+  UIMessageGroup,
+  UIMessageItem,
+  UIPendingMessage,
+  UIReaction,
+  UITextEntity,
+  UIUser,
+  UIWebPreview,
+} from './ui';
+
+// --- Content kind ---
+
+const CONTENT_KIND_MAP: Record<string, MessageContentKind> = {
+  messageText: 'text',
+  messagePhoto: 'photo',
+  messageVideo: 'video',
+  messageVoiceNote: 'voice',
+  messageVideoNote: 'videoNote',
+  messageSticker: 'sticker',
+  messageDocument: 'document',
+  messageAnimation: 'animation',
+  messageAudio: 'audio',
+  messagePoll: 'poll',
+  messageContact: 'contact',
+  messageLocation: 'location',
+  messageVenue: 'venue',
+  messageDice: 'dice',
+};
+
+function toContentKind(content: Td.MessageContent): MessageContentKind {
+  return CONTENT_KIND_MAP[content._] ?? 'unsupported';
+}
+
+// --- Text extraction ---
+
+function extractText(content: Td.MessageContent): string {
+  if (content._ === 'messageText') return content.text.text;
+  if ('caption' in content && content.caption) return (content.caption as Td.formattedText).text;
+  return '';
+}
+
+function extractEntities(content: Td.MessageContent): Td.textEntity[] {
+  if (content._ === 'messageText') return content.text.entities;
+  if ('caption' in content && content.caption)
+    return (content.caption as Td.formattedText).entities;
+  return [];
+}
+
+// --- Media label ---
+
+function extractMediaLabel(content: Td.MessageContent): string {
+  switch (content._) {
+    case 'messagePhoto':
+      return 'Photo';
+    case 'messageVideo':
+      return 'Video';
+    case 'messageVoiceNote':
+      return 'Voice message';
+    case 'messageVideoNote':
+      return 'Video message';
+    case 'messageSticker':
+      return content.sticker.emoji ?? 'Sticker';
+    case 'messageDocument':
+      return 'File';
+    case 'messageAnimation':
+      return 'GIF';
+    case 'messageAudio':
+      return 'Audio';
+    case 'messagePoll':
+      return 'Poll';
+    case 'messageContact':
+      return 'Contact';
+    case 'messageLocation':
+      return 'Location';
+    case 'messageVenue':
+      return 'Venue';
+    case 'messageDice':
+      return content.emoji;
+    default:
+      return '';
+  }
+}
+
+// --- Web preview ---
+
+function extractWebPreview(content: Td.MessageContent): UIWebPreview | null {
+  if (content._ !== 'messageText' || !content.link_preview) return null;
+  const lp = content.link_preview;
+  return {
+    url: lp.url,
+    siteName: lp.site_name,
+    title: lp.title,
+    description: lp.description?.text ?? '',
+  };
+}
+
+// --- Message preview (for chat list) ---
+
+export function extractMessagePreview(msg: Td.message | undefined): string {
+  if (!msg) return '';
+  const text = extractText(msg.content);
+  if (text) return text;
+  return extractMediaLabel(msg.content);
+}
+
+// --- Sender ---
+
+function extractSenderUserId(sender: Td.MessageSender): number {
+  return sender._ === 'messageSenderUser' ? sender.user_id : 0;
+}
+
+function resolveSenderName(sender: Td.MessageSender, users: Map<number, Td.user>): string {
+  if (sender._ === 'messageSenderUser') {
+    const user = users.get(sender.user_id);
+    if (user) return [user.first_name, user.last_name].filter(Boolean).join(' ');
+  }
+  return 'Unknown';
+}
+
+// --- Reply ---
+
+function extractReplyToMessageId(msg: Td.message): number {
+  if (msg.reply_to?._ === 'messageReplyToMessage') return msg.reply_to.message_id;
+  return 0;
+}
+
+// --- Forward ---
+
+export function extractForwardName(
+  info: Td.messageForwardInfo | undefined,
+  users: Map<number, Td.user>,
+): string | null {
+  if (!info) return null;
+  const origin = info.origin;
+  switch (origin._) {
+    case 'messageOriginUser': {
+      const user = users.get(origin.sender_user_id);
+      return user ? [user.first_name, user.last_name].filter(Boolean).join(' ') : 'Unknown';
+    }
+    case 'messageOriginHiddenUser':
+      return origin.sender_name;
+    case 'messageOriginChat':
+      return null; // Chat name resolved by caller if needed
+    case 'messageOriginChannel':
+      return null; // Channel name resolved by caller if needed
+    default:
+      return null;
+  }
+}
+
+// --- Service text ---
+
+export function extractServiceText(content: Td.MessageContent): string | null {
+  switch (content._) {
+    case 'messageChatAddMembers':
+      return 'joined the group';
+    case 'messageChatDeleteMember':
+      return 'left the group';
+    case 'messageChatChangeTitle':
+      return `changed group name to "${content.title}"`;
+    case 'messageChatChangePhoto':
+      return 'changed group photo';
+    case 'messageChatDeletePhoto':
+      return 'removed group photo';
+    case 'messageBasicGroupChatCreate':
+      return `created group "${content.title}"`;
+    case 'messageSupergroupChatCreate':
+      return `created group "${content.title}"`;
+    case 'messagePinMessage':
+      return 'pinned a message';
+    case 'messageScreenshotTaken':
+      return 'took a screenshot';
+    case 'messageCustomServiceAction':
+      return content.text;
+    case 'messageChatJoinByLink':
+      return 'joined via invite link';
+    case 'messageChatJoinByRequest':
+      return 'was accepted to the group';
+    default:
+      return null;
+  }
+}
+
+// --- Inline keyboard ---
+
+export function extractInlineKeyboard(msg: Td.message): UIKeyboardRow[] | null {
+  if (msg.reply_markup?._ !== 'replyMarkupInlineKeyboard') return null;
+  return msg.reply_markup.rows.map((row) =>
+    row.map((btn) => {
+      const result: { text: string; url?: string } = { text: btn.text };
+      if (btn.type._ === 'inlineKeyboardButtonTypeUrl') {
+        result.url = btn.type.url;
+      }
+      return result;
+    }),
+  );
+}
+
+// --- Public converters ---
+
+export function toUITextEntities(entities: Td.textEntity[]): UITextEntity[] {
+  return entities.map((e) => {
+    const result: UITextEntity = {
+      offset: e.offset,
+      length: e.length,
+      type: e.type._,
+    };
+    if (e.type._ === 'textEntityTypeTextUrl') {
+      result.url = e.type.url;
+    }
+    if (e.type._ === 'textEntityTypeCustomEmoji') {
+      result.customEmojiId = String(e.type.custom_emoji_id);
+    }
+    return result;
+  });
+}
+
+export function toUIReactions(info: Td.messageInteractionInfo | undefined): UIReaction[] {
+  const reactions = info?.reactions?.reactions;
+  if (!reactions) return [];
+  return reactions.map((r) => ({
+    emoji: r.type._ === 'reactionTypeEmoji' ? r.type.emoji : '',
+    count: r.total_count,
+    chosen: r.is_chosen,
+  }));
+}
+
+export function toUIMessage(
+  msg: Td.message,
+  users: Map<number, Td.user>,
+  lastReadOutboxId: number,
+): UIMessage {
+  return {
+    id: msg.id,
+    chatId: msg.chat_id,
+    date: msg.date,
+    isOutgoing: msg.is_outgoing,
+    contentKind: toContentKind(msg.content),
+    text: extractText(msg.content),
+    entities: toUITextEntities(extractEntities(msg.content)),
+    mediaLabel: extractMediaLabel(msg.content),
+    mediaAlbumId: String(msg.media_album_id ?? '0'),
+    senderUserId: extractSenderUserId(msg.sender_id),
+    senderName: resolveSenderName(msg.sender_id, users),
+    replyToMessageId: extractReplyToMessageId(msg),
+    editDate: msg.edit_date,
+    reactions: toUIReactions(msg.interaction_info),
+    webPreview: extractWebPreview(msg.content),
+    isRead: msg.is_outgoing && msg.id > 0 && msg.id <= lastReadOutboxId,
+    forwardFromName: extractForwardName(msg.forward_info, users),
+    forwardDate: msg.forward_info?.date ?? 0,
+    serviceText: extractServiceText(msg.content),
+    inlineKeyboard: extractInlineKeyboard(msg),
+    replyPreview: null, // Populated by enrichReplyPreviews after batch conversion
+  };
+}
+
+/**
+ * Second-pass enrichment: resolves reply previews from a converted message list.
+ * Call after toUIMessage batch conversion so reply targets are available.
+ */
+export function enrichReplyPreviews(messages: UIMessage[]): UIMessage[] {
+  const byId = new Map<number, UIMessage>();
+  for (const m of messages) byId.set(m.id, m);
+  return messages.map((m) => {
+    if (m.replyToMessageId === 0) return m;
+    const target = byId.get(m.replyToMessageId);
+    if (!target) return m;
+    return {
+      ...m,
+      replyPreview: {
+        senderName: target.senderName,
+        text: target.text,
+        mediaLabel: target.mediaLabel,
+      },
+    };
+  });
+}
+
+export function toUIPendingMessage(pending: PendingMessage): UIPendingMessage {
+  return {
+    localId: pending.localId,
+    chatId: pending.chat_id,
+    text: pending.text,
+    date: pending.date,
+    isPending: true,
+    status: pending._pending,
+  };
+}
+
+export function toChatKind(type: Td.ChatType): ChatKind {
+  switch (type._) {
+    case 'chatTypePrivate':
+      return 'private';
+    case 'chatTypeBasicGroup':
+      return 'basicGroup';
+    case 'chatTypeSupergroup':
+      return type.is_channel ? 'channel' : 'supergroup';
+    default:
+      return 'private';
+  }
+}
+
+export function toUIChat(chat: Td.chat, photoUrl: string | null): UIChat {
+  const draftInput = chat.draft_message?.input_message_text;
+  const draftText = draftInput?._ === 'inputMessageText' ? draftInput.text.text || null : null;
+  return {
+    id: chat.id,
+    title: chat.title,
+    kind: toChatKind(chat.type),
+    userId: chat.type._ === 'chatTypePrivate' ? chat.type.user_id : 0,
+    unreadCount: chat.unread_count,
+    lastReadOutboxMessageId: chat.last_read_outbox_message_id,
+    isPinned: chat.positions.some((p) => p.is_pinned),
+    lastMessagePreview: extractMessagePreview(chat.last_message),
+    lastMessageDate: chat.last_message?.date ?? 0,
+    photoUrl,
+    isMuted: chat.notification_settings.mute_for > 0,
+    unreadMentionCount: chat.unread_mention_count,
+    draftText,
+  };
+}
+
+export function toUIUser(user: Td.user): UIUser {
+  return {
+    id: user.id,
+    firstName: user.first_name,
+    lastName: user.last_name,
+    fullName: [user.first_name, user.last_name].filter(Boolean).join(' '),
+    username: user.usernames?.active_usernames?.[0] ?? null,
+    isPremium: user.is_premium,
+    emojiStatusId:
+      user.emoji_status?.type._ === 'emojiStatusTypeCustomEmoji'
+        ? String(user.emoji_status.type.custom_emoji_id)
+        : null,
+  };
+}
+
+export function groupUIMessages(items: UIMessageItem[]): UIMessageGroup[] {
+  const result: UIMessageGroup[] = [];
+  let i = 0;
+  while (i < items.length) {
+    const item = items[i] as UIMessageItem;
+    if ('isPending' in item) {
+      result.push({ type: 'single', message: item });
+      i++;
+      continue;
+    }
+    const msg: UIMessage = item;
+    if (msg.mediaAlbumId !== '0') {
+      const group: UIMessage[] = [msg];
+      while (i + 1 < items.length) {
+        const next = items[i + 1] as UIMessageItem;
+        if ('isPending' in next) break;
+        if ((next as UIMessage).mediaAlbumId !== msg.mediaAlbumId) break;
+        i++;
+        group.push(next as UIMessage);
+      }
+      if (group.length > 1) {
+        result.push({ type: 'album', messages: group });
+      } else {
+        result.push({ type: 'single', message: group[0] as UIMessage });
+      }
+    } else {
+      result.push({ type: 'single', message: msg });
+    }
+    i++;
+  }
+  return result;
+}
