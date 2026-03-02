@@ -11,7 +11,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import path from 'node:path';
 
-const CLI_ENTRY = path.resolve(import.meta.dir, 'index.ts');
+const CLI_ENTRY = path.resolve(import.meta.dir, '../../src/index.ts');
 const TIMEOUT = 30_000;
 const STREAM_TIMEOUT = 30_000;
 

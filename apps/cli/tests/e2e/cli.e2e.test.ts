@@ -13,7 +13,7 @@ import { existsSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-const CLI_ENTRY = path.resolve(import.meta.dir, 'index.ts');
+const CLI_ENTRY = path.resolve(import.meta.dir, '../../src/index.ts');
 const TIMEOUT = 30_000;
 
 type TgResult = {

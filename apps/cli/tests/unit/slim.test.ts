@@ -10,7 +10,7 @@ import {
   slimMessages,
   slimUser,
   slimUsers,
-} from './slim';
+} from '../../src/slim';
 
 /** Loose record type for asserting on dynamically-shaped slim content without `any`. */
 type Rec = Record<string, unknown>;

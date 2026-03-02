@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "start": "bun run src/index.ts",
-    "test": "bun test",
+    "test": "bun test tests/unit",
+    "test:e2e": "bun test tests/e2e",
     "typecheck": "tsc --noEmit",
     "build": "bun run scripts/build.ts && bun run scripts/install-tdjson.ts"
   },
