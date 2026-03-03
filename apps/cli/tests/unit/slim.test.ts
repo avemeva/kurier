@@ -310,6 +310,53 @@ describe('slimUser', () => {
     expect(result.is_scam).toBe(false);
     expect(result.is_fake).toBe(false);
   });
+
+  test('includes active_user_count for bot with active users', () => {
+    const result = slimUser(
+      makeUser({
+        type: {
+          _: 'userTypeBot',
+          can_be_edited: false,
+          can_join_groups: true,
+          can_read_all_group_messages: false,
+          is_inline: false,
+          inline_query_placeholder: '',
+          need_location: false,
+          can_connect_to_business: false,
+          can_be_added_to_attachment_menu: false,
+          has_main_web_app: false,
+          active_user_count: 5000,
+        },
+      }),
+    );
+    expect(result.active_user_count).toBe(5000);
+  });
+
+  test('omits active_user_count for regular users', () => {
+    const result = slimUser(makeUser({ type: { _: 'userTypeRegular' } }));
+    expect('active_user_count' in result).toBe(false);
+  });
+
+  test('omits active_user_count for bots with 0 users', () => {
+    const result = slimUser(
+      makeUser({
+        type: {
+          _: 'userTypeBot',
+          can_be_edited: false,
+          can_join_groups: true,
+          can_read_all_group_messages: false,
+          is_inline: false,
+          inline_query_placeholder: '',
+          need_location: false,
+          can_connect_to_business: false,
+          can_be_added_to_attachment_menu: false,
+          has_main_web_app: false,
+          active_user_count: 0,
+        },
+      }),
+    );
+    expect('active_user_count' in result).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

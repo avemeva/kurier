@@ -148,6 +148,7 @@ type SlimUser = {
   is_premium: boolean;
   is_scam: boolean;
   is_fake: boolean;
+  active_user_count?: number;
 };
 
 type SlimChat = {
@@ -354,6 +355,8 @@ export function slimUser(u: Td.user): SlimUser {
     is_premium: u.is_premium,
     is_scam: u.verification_status?.is_scam ?? false,
     is_fake: u.verification_status?.is_fake ?? false,
+    active_user_count:
+      u.type._ === 'userTypeBot' ? u.type.active_user_count || undefined : undefined,
   });
 }
 

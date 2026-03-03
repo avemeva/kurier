@@ -494,9 +494,9 @@ describe('search', () => {
   );
 
   it(
-    '--type user filters to DM results',
+    '--type private filters to DM results',
     async () => {
-      const r = await tg('search', 'привет', '--type', 'user', '--limit', '10');
+      const r = await tg('search', 'привет', '--type', 'private', '--limit', '10');
       expect(r.ok).toBe(true);
       for (const m of r.data) {
         // User chat_ids are positive
@@ -785,37 +785,6 @@ describe('resolve', () => {
       const r = await tg('resolve');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('INVALID_ARGS');
-    },
-    TIMEOUT,
-  );
-});
-
-// ─── Contacts ───
-
-describe('contacts', () => {
-  it(
-    'returns contact list',
-    async () => {
-      const r = await tg('contacts', '--limit', '5');
-      expect(r.ok).toBe(true);
-      expect(Array.isArray(r.data)).toBe(true);
-      for (const c of r.data) {
-        expect(c.id).toBeNumber();
-        expect(c.type).toMatch(/^(regular|bot|deleted|unknown)$/);
-      }
-    },
-    TIMEOUT,
-  );
-
-  it(
-    'pagination with --offset',
-    async () => {
-      const r1 = await tg('contacts', '--limit', '3');
-      expect(r1.ok).toBe(true);
-      if (r1.hasMore) {
-        const r2 = await tg('contacts', '--limit', '3', '--offset', String(r1.nextOffset));
-        expect(r2.ok).toBe(true);
-      }
     },
     TIMEOUT,
   );

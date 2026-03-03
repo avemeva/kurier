@@ -43,8 +43,15 @@ Use `--` to separate flags from negative positional arguments if needed: `tg mes
 # Identity
 tg me                                    # Current user info
 tg resolve <username|phone|link>         # Resolve to entity
-tg contacts [--limit N] [--search query] [--offset N]  # Saved contacts
-tg contacts search "<query>" [--limit N]               # Search contacts + global users
+
+# Entity Discovery
+tg find "query"                              # Find entities (bots, channels, groups, users)
+tg find "query" --type bot                   # Bots only
+tg find "query" --type channel               # Channels only
+tg find "query" --type group                 # Groups only
+tg find "query" --type user                  # Users only (non-bot)
+tg find "query" --type contact               # Contacts only
+tg find "query" --limit 10                   # Cap results
 
 # Chats
 tg dialogs [--limit N] [--archived]      # List chats (paginated)
@@ -70,16 +77,18 @@ tg messages <chat> --reverse             # Oldest first
 tg messages <chat> --download-media      # Auto-download photos/stickers/voice
 tg message <chat> <msgId>               # Single message by ID
 
-# Search
-tg search "query"                        # Global search (paginated)
-tg search "query" --chat <id>            # Per-chat search (paginated)
+# Message Search
+tg search "query"                            # Global search across all chats
+tg search "query" --type channel             # Only messages in channels
+tg search "query" --type group               # Only messages in groups
+tg search "query" --type private             # Only messages in private chats
+tg search "query" --filter photo             # Filter by content type
+tg search "query" --since N                  # Messages after unix timestamp
+tg search "query" --until N                  # Messages before unix timestamp
+tg search "query" --chat <id>               # Search within a specific chat
 tg search "query" --chat <id> --from <user>  # Filter by sender (per-chat only)
-tg search "query" --since N              # Only results after unix timestamp
-tg search "query" --type user|group|channel  # Filter by chat type (global only)
-tg search "query" --filter photo         # Filter by media type (per-chat only)
-tg search "query" --context N            # Include N messages before/after each hit
-tg search "query" --full                 # Disable 500-char text truncation
-tg search --chat <id> --filter photo     # Media search (no text query needed with --filter)
+tg search "query" --context N                # Include N messages before/after each hit
+tg search "query" --full                     # Disable 500-char text truncation
 
 # Send & Edit (plain text by default — no implicit markdown parsing)
 tg send <chat> "text"                    # Send message (plain text)
@@ -141,9 +150,9 @@ List commands return `hasMore` (boolean) and `nextOffset` (varies by command). P
 |---------|------------|-----------------|
 | `messages` | `--offset-id` | message ID (number) |
 | `dialogs` | `--offset-date` | unix timestamp (number) |
+| `find` | — | No pagination |
 | `search` (global) | `--offset` | opaque cursor (string) |
-| `search` (per-chat) | `--offset-id` | message ID (number) |
-| `contacts` | `--offset` | index (number) |
+| `search` (per-chat) | `--offset` | message ID (number) |
 | `members` | `--offset` | index (number) |
 
 ## Formatting
@@ -169,12 +178,17 @@ Unknown flags are rejected with `INVALID_ARGS` — never silently ignored. Rate 
 
 ## Important Constraints
 
-- **`--from` requires `--chat`**: Global search does not support sender filtering.
-- **`--filter` requires `--chat`**: Global search does not support media filtering.
+- **`find` returns entities, `search` returns messages** — two separate commands, no mixing.
+- **`--type` means different things**: in `find` it's entity type (bot/channel/group/user/contact), in `search` it's chat type filter (private/group/channel).
+- **`--filter` works in both global and per-chat search** — but `mention` and `pinned` require `--chat`.
+- **`--from` requires `--chat`** — TDLib only supports sender filtering per-chat.
+- **`--until` is global only** — TDLib's per-chat search has no max_date parameter.
+- **`--since` in per-chat mode scans up to 500 messages** — client-side filtering, not instant.
+- **Bot entities include `active_user_count`** (monthly active users).
+- **Entity search has no pagination** — all results returned in one call.
 - **`--limit` must be a positive integer**: 0, negative, or non-numeric values return `INVALID_ARGS`.
 - **`--type` values are validated**: Invalid values (e.g., `--type dm`) return `INVALID_ARGS`.
 - **Telegram search is single-term**: No boolean operators. Run separate queries and merge.
-- **Global search matches message content, not chat titles**: Use `dialogs --search` for name lookup.
 - **`resolve` accepts usernames, phones, and t.me links only**: Not display names.
 - **`listen` requires `--chat` or `--type`**: At least one inclusion filter is mandatory.
 - **`listen` default events**: `new_message`, `edit_message`, `delete_messages`, `message_reactions`. Additional: `read_outbox`, `user_typing`, `user_status`, `message_send_succeeded`.
@@ -220,10 +234,10 @@ tg messages <chat> --filter photo --limit 5
 tg download <chat> <msgId> --output /tmp/file.jpg
 ```
 
-### Search contacts globally
+### Find entities
 ```bash
-tg contacts search "Alex"         # Searches contacts + global Telegram users
-tg contacts --search "Alex"       # Searches saved contacts only
+tg find "chatgpt" --type bot     # Find bots by name
+tg find "telegram" --type channel # Find channels by name
 ```
 
 ### Monitor a chat

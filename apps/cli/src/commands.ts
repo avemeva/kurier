@@ -20,7 +20,6 @@ import {
   slimMessage,
   slimMessages,
   slimUser,
-  slimUsers,
 } from './slim';
 
 // --- Flag parsing helpers ---
@@ -36,6 +35,32 @@ function parseLimit(flags: Record<string, string>, defaultVal: number): number {
 }
 
 const VALID_CHAT_TYPES = new Set(['user', 'group', 'channel']);
+
+const VALID_FIND_TYPES = new Set(['bot', 'channel', 'group', 'user', 'contact']);
+
+const VALID_SEARCH_TYPES = new Set(['private', 'group', 'channel']);
+
+const FILTER_MAP: Record<string, string> = {
+  photo: 'searchMessagesFilterPhoto',
+  video: 'searchMessagesFilterVideo',
+  document: 'searchMessagesFilterDocument',
+  url: 'searchMessagesFilterUrl',
+  voice: 'searchMessagesFilterVoiceNote',
+  gif: 'searchMessagesFilterAnimation',
+  music: 'searchMessagesFilterAudio',
+  media: 'searchMessagesFilterPhotoAndVideo',
+  videonote: 'searchMessagesFilterVideoNote',
+  mention: 'searchMessagesFilterMention',
+  pinned: 'searchMessagesFilterPinned',
+};
+
+const GLOBAL_UNSUPPORTED_FILTERS = new Set(['mention', 'pinned']);
+
+const CHAT_TYPE_FILTER_MAP: Record<string, string> = {
+  private: 'searchMessagesChatTypeFilterPrivate',
+  group: 'searchMessagesChatTypeFilterGroup',
+  channel: 'searchMessagesChatTypeFilterChannel',
+};
 
 // --- Command type ---
 
@@ -965,24 +990,29 @@ export const commands: Command[] = [
     name: 'search',
     description: 'Search messages globally or in a specific chat',
     usage:
-      'tg search "<query>" [--chat <id>] [--limit N] [--from <user>] [--since N] [--type user|group|channel] [--filter photo|video|document|url|voice|gif|music] [--context N] [--offset-id N] [--offset "cursor"] [--offset-cursor "cursor"] [--full]',
+      'tg search "<query>" [--chat <id>] [--limit N] [--from <user>] [--since N] [--until N] [--type private|group|channel] [--filter photo|video|document|url|voice|gif|music|media|videonote|mention|pinned] [--context N] [--offset "cursor"] [--full]',
     flags: {
       '--chat': 'Search in a specific chat (default: global)',
       '--limit': 'Max results (default: 20)',
       '--from': 'Filter by sender (requires --chat)',
       '--since': 'Only messages after this unix timestamp',
-      '--type': 'Filter by chat type: user, group, or channel (global search only)',
+      '--until': 'Only messages before this unix timestamp (global only)',
+      '--type': 'Filter by chat type: private, group, or channel (global only)',
       '--filter':
-        'Filter by media type: photo, video, document, url, voice, gif, music (per-chat only)',
+        'Filter by content: photo, video, document, url, voice, gif, music, media, videonote, mention, pinned',
       '--context': 'Include N messages before and after each hit',
-      '--offset-id': 'Paginate per-chat search: message ID from previous nextOffset',
-      '--offset': 'Paginate global search: cursor from previous nextOffset',
-      '--offset-cursor': 'Alias for --offset',
+      '--offset': 'Pagination cursor from previous nextOffset',
       '--full': 'Return full message text (default: truncated to 500 chars)',
     },
     run: async (client, args, flags) => {
-      if (!args[0] && !flags['--filter'])
+      const filterValue = flags['--filter'];
+      if (!args[0] && !filterValue)
         fail('Missing <query>. Or use --filter to search by media type.', 'INVALID_ARGS');
+      if (filterValue && !FILTER_MAP[filterValue])
+        fail(
+          `Invalid --filter: ${filterValue}. Valid: ${Object.keys(FILTER_MAP).join(', ')}`,
+          'INVALID_ARGS',
+        );
       const query = args[0] ?? ' ';
       const limit = parseLimit(flags, 20);
       let contextN = 0;
@@ -995,6 +1025,10 @@ export const commands: Command[] = [
 
       if (flags['--chat']) {
         // Per-chat search
+        if (flags['--type'])
+          fail('--type is for global search only (filters by chat type)', 'INVALID_ARGS');
+        if (flags['--until']) fail('--until is for global search only', 'INVALID_ARGS');
+
         const chatId = await resolveChatId(client, flags['--chat']);
 
         let senderOption: Td.MessageSender | undefined;
@@ -1007,33 +1041,15 @@ export const commands: Command[] = [
           }
         }
 
-        let searchFilter: Td.SearchMessagesFilter$Input = {
-          _: 'searchMessagesFilterEmpty',
-        };
-        if (flags['--filter']) {
-          const filterMap: Record<string, Td.SearchMessagesFilter$Input> = {
-            photo: { _: 'searchMessagesFilterPhoto' },
-            video: { _: 'searchMessagesFilterVideo' },
-            document: { _: 'searchMessagesFilterDocument' },
-            url: { _: 'searchMessagesFilterUrl' },
-            voice: { _: 'searchMessagesFilterVoiceNote' },
-            gif: { _: 'searchMessagesFilterAnimation' },
-            music: { _: 'searchMessagesFilterAudio' },
-          };
-          const f = filterMap[flags['--filter']];
-          if (!f)
-            fail(
-              `Invalid --filter "${flags['--filter']}". Expected: ${Object.keys(filterMap).join(', ')}`,
-              'INVALID_ARGS',
-            );
-          searchFilter = f;
-        }
+        const searchFilter: Td.SearchMessagesFilter$Input = filterValue
+          ? ({ _: FILTER_MAP[filterValue] } as Td.SearchMessagesFilter$Input)
+          : { _: 'searchMessagesFilterEmpty' };
 
         const since = flags['--since'] ? Number(flags['--since']) : undefined;
         const BATCH = 50;
         const MAX_SCAN = 500;
         const matched: Td.message[] = [];
-        let cursor = flags['--offset-id'] ? Number(flags['--offset-id']) : 0;
+        let cursor = flags['--offset'] ? Number(flags['--offset']) : 0;
         let scanned = 0;
 
         while (matched.length < limit && scanned < MAX_SCAN) {
@@ -1084,7 +1100,7 @@ export const commands: Command[] = [
             : {}),
         });
       } else {
-        // Global search
+        // Global search — message search only
         if (flags['--from']) {
           fail(
             '--from requires --chat for per-chat search. Global search does not support sender filtering.',
@@ -1092,53 +1108,55 @@ export const commands: Command[] = [
           );
         }
         const typeFilter = flags['--type'];
-        if (typeFilter && !VALID_CHAT_TYPES.has(typeFilter)) {
-          fail(`Invalid --type "${typeFilter}". Expected: user, group, or channel`, 'INVALID_ARGS');
+        if (typeFilter && !VALID_SEARCH_TYPES.has(typeFilter)) {
+          fail(
+            `Invalid --type: ${typeFilter}. Valid: ${[...VALID_SEARCH_TYPES].join(', ')}`,
+            'INVALID_ARGS',
+          );
+        }
+        if (filterValue && GLOBAL_UNSUPPORTED_FILTERS.has(filterValue)) {
+          fail(`--filter ${filterValue} requires --chat`, 'INVALID_ARGS');
         }
 
-        let offsetCursor = flags['--offset'] ?? flags['--offset-cursor'] ?? '';
+        let offsetCursor = flags['--offset'] ?? '';
         const BATCH = 50;
         const MAX_SCAN = 500;
         const matched: Td.message[] = [];
         let scanned = 0;
 
         while (matched.length < limit && scanned < MAX_SCAN) {
-          const result = await client.invoke({
+          const searchParams: Record<string, unknown> = {
             _: 'searchMessages',
             chat_list: undefined,
             query,
             offset: offsetCursor,
-            limit: typeFilter ? BATCH : limit,
-            filter: undefined,
+            limit: BATCH,
+            filter: filterValue ? { _: FILTER_MAP[filterValue] } : undefined,
             min_date: flags['--since'] ? Number(flags['--since']) : 0,
-            max_date: 0,
-          } satisfies Td.searchMessages as Td.searchMessages);
+            max_date: flags['--until'] ? Number(flags['--until']) : 0,
+          };
+          if (typeFilter) {
+            searchParams.chat_type_filter = { _: CHAT_TYPE_FILTER_MAP[typeFilter] };
+          }
+          const result = await client.invoke(searchParams as Td.searchMessages);
 
           const batch = result.messages.filter((m): m is Td.message => m !== null);
           if (batch.length === 0) break;
           scanned += batch.length;
 
           for (const m of batch) {
-            if (typeFilter) {
-              try {
-                const chat = await client.invoke({ _: 'getChat', chat_id: m.chat_id });
-                if (getChatType(chat) !== typeFilter) continue;
-              } catch {
-                continue;
-              }
-            }
             matched.push(m);
             if (matched.length >= limit) break;
           }
           offsetCursor = result.next_offset;
-          if (!typeFilter || !offsetCursor) break;
+          if (!offsetCursor) break;
         }
         const messages = matched;
 
         const full = '--full' in flags;
         const slimMsgs = slimMessages(messages);
         await addSenderNames(client, slimMsgs);
-        const formattedPromises = slimMsgs.map(async (sm, _i) => {
+        const formattedPromises = slimMsgs.map(async (sm) => {
           let chatTitle = '';
           try {
             const chat = await client.invoke({
@@ -1194,10 +1212,8 @@ export const commands: Command[] = [
         }
 
         const hasMore = messages.length >= limit;
-        success(formatted, {
-          hasMore,
-          ...(hasMore && offsetCursor ? { nextOffset: offsetCursor } : {}),
-        });
+        const nextOffset = hasMore && offsetCursor ? offsetCursor : undefined;
+        success(formatted, { hasMore, nextOffset });
       }
     },
   },
@@ -1243,6 +1259,145 @@ export const commands: Command[] = [
       } else {
         success(strip({ chat: slimChat(chat) }));
       }
+    },
+  },
+
+  // --- Find ---
+  {
+    name: 'find',
+    description: 'Find bots, channels, groups, or users by name',
+    usage: 'tg find "<query>" [--type bot|channel|group|user|contact] [--limit N]',
+    flags: {
+      '--type': 'Filter: bot, channel, group, user, or contact',
+      '--limit': 'Max results (default: 50)',
+    },
+    run: async (client, args, flags) => {
+      const query = args[0];
+      if (!query)
+        fail('Missing required argument: <query>. Usage: tg find "<query>"', 'INVALID_ARGS');
+
+      const limit = parseLimit(flags, 50);
+      const typeFilter = flags['--type'];
+      if (typeFilter && !VALID_FIND_TYPES.has(typeFilter))
+        fail(
+          `Invalid --type: ${typeFilter}. Valid: ${[...VALID_FIND_TYPES].join(', ')}`,
+          'INVALID_ARGS',
+        );
+
+      // Fire TDLib calls in parallel
+      const [publicRes, localRes, contactRes] = await Promise.all([
+        client
+          .invoke({ _: 'searchPublicChats', query })
+          .catch(() => ({ chat_ids: [] as number[] })),
+        client
+          .invoke({ _: 'searchChats', query, limit: 20 })
+          .catch(() => ({ chat_ids: [] as number[] })),
+        !typeFilter || typeFilter === 'contact' || typeFilter === 'user'
+          ? client
+              .invoke({ _: 'searchContacts', query, limit: 50 })
+              .catch(() => ({ user_ids: [] as number[] }))
+          : Promise.resolve({ user_ids: [] as number[] }),
+      ]);
+
+      // Merge + deduplicate chat IDs
+      const uniqueChatIds = new Map<number, true>();
+      for (const id of publicRes.chat_ids) uniqueChatIds.set(id, true);
+      for (const id of localRes.chat_ids) uniqueChatIds.set(id, true);
+
+      const contactUserIds = new Set(contactRes.user_ids);
+
+      // Resolve chat info
+      const chatPromises = [...uniqueChatIds.keys()].map(async (chatId) => {
+        try {
+          const chat = await client.invoke({ _: 'getChat', chat_id: chatId });
+          let user: Td.user | undefined;
+          if (chat.type._ === 'chatTypePrivate') {
+            try {
+              user = await client.invoke({
+                _: 'getUser',
+                user_id: chat.type.user_id,
+              });
+            } catch {
+              // skip user info
+            }
+          }
+          return { chat, user };
+        } catch {
+          return null;
+        }
+      });
+
+      // Resolve contact user IDs not already in chat set
+      const contactPromises = [...contactUserIds]
+        .filter((uid) => !uniqueChatIds.has(uid))
+        .map(async (userId) => {
+          try {
+            const chat = await client.invoke({
+              _: 'createPrivateChat',
+              user_id: userId,
+              force: false,
+            });
+            let user: Td.user | undefined;
+            try {
+              user = await client.invoke({ _: 'getUser', user_id: userId });
+            } catch {
+              // skip user info
+            }
+            return { chat, user };
+          } catch {
+            return null;
+          }
+        });
+
+      const allResults = (await Promise.all([...chatPromises, ...contactPromises])).filter(
+        (r): r is { chat: Td.chat; user: Td.user | undefined } => r !== null,
+      );
+
+      // Deduplicate by chat ID
+      const seen = new Set<number>();
+      const dedupedEntities = allResults.filter(({ chat }) => {
+        const id = chat.id;
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+
+      // Filter by --type
+      const filtered = typeFilter
+        ? dedupedEntities.filter(({ chat, user }) => {
+            const chatType = chat.type._;
+            switch (typeFilter) {
+              case 'bot':
+                return chatType === 'chatTypePrivate' && user?.type._ === 'userTypeBot';
+              case 'channel':
+                return (
+                  chatType === 'chatTypeSupergroup' &&
+                  (chat.type as Td.chatTypeSupergroup).is_channel
+                );
+              case 'group':
+                return (
+                  chatType === 'chatTypeBasicGroup' ||
+                  (chatType === 'chatTypeSupergroup' &&
+                    !(chat.type as Td.chatTypeSupergroup).is_channel)
+                );
+              case 'user':
+                return chatType === 'chatTypePrivate' && user?.type._ !== 'userTypeBot';
+              case 'contact':
+                return chatType === 'chatTypePrivate' && user?.is_contact === true;
+              default:
+                return true;
+            }
+          })
+        : dedupedEntities;
+
+      // Slim, strip, limit
+      const results = filtered.slice(0, limit).map(({ chat, user }) => {
+        const slim = strip(slimChat(chat)) as Record<string, unknown>;
+        if (user) slim.user = strip(slimUser(user));
+        return slim;
+      });
+
+      success(results);
     },
   },
 
@@ -1589,73 +1744,6 @@ export const commands: Command[] = [
         }
       }
       fail('Speech recognition timed out', 'UNKNOWN');
-    },
-  },
-
-  // --- Contacts ---
-  {
-    name: 'contacts',
-    description: 'List saved contacts, or search globally',
-    usage: 'tg contacts [--limit N] [--offset N]\ntg contacts search "<query>" [--limit N]',
-    flags: {
-      '--limit': 'Max contacts to return (default: 100)',
-      '--offset': 'Start from this index (for pagination)',
-    },
-    run: async (client, args, flags) => {
-      // Subcommand: contacts search — search contacts + global users
-      if (args[0] === 'search') {
-        const query = args[1];
-        if (!query)
-          fail(
-            'Missing required argument: <query>. Usage: tg contacts search "<query>" [--limit N]',
-            'INVALID_ARGS',
-          );
-        const limit = parseLimit(flags, 50);
-
-        const result = await client.invoke({
-          _: 'searchContacts',
-          query,
-          limit,
-        });
-
-        const myResults: Td.user[] = [];
-        const globalResults: Td.user[] = [];
-
-        for (const userId of result.user_ids) {
-          const user = await client.invoke({ _: 'getUser', user_id: userId });
-          if (user.phone_number) {
-            myResults.push(user);
-          } else {
-            globalResults.push(user);
-          }
-        }
-
-        success(
-          strip({ myResults: slimUsers(myResults), globalResults: slimUsers(globalResults) }),
-        );
-        return;
-      }
-
-      const limit = parseLimit(flags, 100);
-      const offset = flags['--offset'] ? Number(flags['--offset']) : 0;
-
-      const result = await client.invoke({
-        _: 'getContacts',
-      });
-      const sliced = result.user_ids.slice(offset, offset + limit);
-      const hasMore = result.user_ids.length > offset + limit;
-      const userList: Td.user[] = [];
-      for (const userId of sliced) {
-        const user = await client.invoke({
-          _: 'getUser',
-          user_id: userId,
-        });
-        userList.push(user);
-      }
-      success(strip(slimUsers(userList)), {
-        hasMore,
-        nextOffset: hasMore ? offset + limit : undefined,
-      });
     },
   },
 
