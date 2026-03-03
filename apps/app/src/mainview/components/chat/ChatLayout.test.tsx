@@ -62,10 +62,11 @@ vi.mock('./EmojiStatusBadge', () => ({ EmojiStatusBadge: () => null }));
 vi.mock('./FormattedText', () => ({
   FormattedText: ({ text }: { text: string }) => <span>{text}</span>,
 }));
-vi.mock('./MessageBubble', () => ({
-  MessageBubble: ({ msg }: { msg: { isRead: boolean } }) => (
-    <div data-testid="bubble" data-read={msg.isRead} />
-  ),
+vi.mock('./Message', () => ({
+  Message: ({ input }: { input: { kind: string; message?: { isRead?: boolean } } }) => {
+    const msg = input.kind === 'single' ? input.message : undefined;
+    return <div data-testid="bubble" data-read={msg?.isRead ?? false} />;
+  },
 }));
 
 import { _resetForTests, useChatStore } from '@/lib/store';

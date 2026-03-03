@@ -1,16 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { PureMessageInput } from '@/components/ui/chat/MessageInput';
-import { PureMessageTime } from '@/components/ui/chat/MessageTime';
-import { PureReactionBar, PureReactionPicker } from '@/components/ui/chat/ReactionBar';
-import { UserAvatar } from '@/components/ui/user-avatar';
 import { selectChatMessages, selectSelectedChat, useChatStore } from '@/lib/store';
 import type { UIMessage, UIPendingMessage } from '@/lib/types';
 import { groupUIMessages } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { AlbumGrid } from './AlbumGrid';
 import { ComposeSearchBottomBar } from './ComposeSearch';
-import { FormattedText } from './FormattedText';
-import { MessageBubble } from './MessageBubble';
+import { Message } from './Message';
 
 export function MessagePanel() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -109,6 +104,26 @@ export function MessagePanel() {
 
   const grouped = groupUIMessages(messages);
 
+  function getKey(group: (typeof grouped)[number]): string | number {
+    if (group.type === 'album') return group.messages[0].id;
+    const msg = group.message;
+    return 'isPending' in msg ? (msg as UIPendingMessage).localId : (msg as UIMessage).id;
+  }
+
+  function getSenderPhotoUrl(group: (typeof grouped)[number]): string | undefined {
+    if (group.type === 'album') return profilePhotos[group.messages[0].senderUserId];
+    const msg = group.message;
+    if ('isPending' in msg) return undefined;
+    return profilePhotos[(msg as UIMessage).senderUserId];
+  }
+
+  function getIsOutgoing(group: (typeof grouped)[number]): boolean {
+    if (group.type === 'album') return group.messages[0].isOutgoing;
+    const msg = group.message;
+    if ('isPending' in msg) return true;
+    return (msg as UIMessage).isOutgoing;
+  }
+
   return (
     <>
       <div
@@ -129,125 +144,22 @@ export function MessagePanel() {
         )}
         <div className="space-y-1">
           {grouped.map((group) => {
-            if (group.type === 'album') {
-              const first = group.messages[0];
-              const albumHasReactions = first.reactions.length > 0;
-              const albumShowAvatar = showSender && !first.isOutgoing;
+            const input =
+              group.type === 'album'
+                ? ({ kind: 'album', messages: group.messages } as const)
+                : ({ kind: 'single', message: group.message } as const);
+            const isOut = getIsOutgoing(group);
 
-              const albumBubble = (
-                <div
-                  data-testid="message-bubble"
-                  className={cn(
-                    'group/bubble relative rounded-2xl px-4 py-2.5',
-                    first.isOutgoing ? 'bg-message-own' : 'bg-message-peer',
-                    albumHasReactions && 'pb-5',
-                    albumShowAvatar ? 'max-w-[calc(100%-36px)]' : 'max-w-[55%]',
-                  )}
-                >
-                  <PureReactionPicker onReact={(e, c) => handleReact(first.id, e, c)} />
-                  {showSender && !first.isOutgoing && (
-                    <p className="mb-0.5 text-[10px] font-medium text-accent-blue">
-                      {first.senderName}
-                    </p>
-                  )}
-                  <AlbumGrid messages={group.messages} chatId={selectedChat.id} />
-                  {first.text && (
-                    <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-[18px] text-text-primary">
-                      <FormattedText text={first.text} entities={first.entities} />
-                      <span className="inline-block w-14 align-baseline" aria-hidden="true">
-                        {'\u00A0'}
-                      </span>
-                    </p>
-                  )}
-                  {albumHasReactions && (
-                    <PureReactionBar
-                      reactions={first.reactions.map((r) => ({
-                        emoticon: r.emoji,
-                        count: r.count,
-                        chosen: r.chosen,
-                      }))}
-                      onReact={(e, c) => handleReact(first.id, e, c)}
-                    />
-                  )}
-                  <span className="absolute bottom-1 right-2">
-                    <PureMessageTime
-                      date={first.date}
-                      out={first.isOutgoing}
-                      read={first.isRead}
-                      displayType={first.text ? 'default' : 'image'}
-                    />
-                  </span>
-                </div>
-              );
-
-              return (
-                <div
-                  key={first.id}
-                  className={cn('flex', first.isOutgoing ? 'justify-end' : 'justify-start')}
-                >
-                  {albumShowAvatar ? (
-                    <div className="flex max-w-[55%] items-end gap-2">
-                      <UserAvatar
-                        name={first.senderName}
-                        src={profilePhotos[first.senderUserId]}
-                        className="size-7 shrink-0 text-[11px]"
-                      />
-                      {albumBubble}
-                    </div>
-                  ) : (
-                    albumBubble
-                  )}
-                </div>
-              );
-            }
-
-            const msg = group.message;
-            const isPending = 'isPending' in msg;
-            const pendingStatus = isPending ? (msg as UIPendingMessage).status : null;
-
-            if (isPending) {
-              const pmsg = msg as UIPendingMessage;
-              return (
-                <div
-                  key={pmsg.localId}
-                  className={cn(
-                    'flex justify-end',
-                    pendingStatus === 'sending' && 'opacity-60',
-                    pendingStatus === 'failed' && 'opacity-40',
-                  )}
-                >
-                  <div
-                    data-testid="message-bubble"
-                    className="group/bubble relative max-w-[55%] rounded-2xl bg-message-own px-4 py-2.5"
-                  >
-                    <p className="whitespace-pre-wrap break-words text-[13px] leading-[18px] text-text-primary">
-                      {pmsg.text}
-                      <span className="float-right h-[18px] w-14" aria-hidden="true" />
-                    </p>
-                    <span className="absolute bottom-1 right-2">
-                      <PureMessageTime
-                        date={pmsg.date}
-                        out={true}
-                        read={false}
-                        displayType="default"
-                      />
-                    </span>
-                  </div>
-                </div>
-              );
-            }
-
-            const uiMsg = msg as UIMessage;
             return (
               <div
-                key={uiMsg.id}
-                className={cn('flex', uiMsg.isOutgoing ? 'justify-end' : 'justify-start')}
+                key={getKey(group)}
+                className={cn('flex', isOut ? 'justify-end' : 'justify-start')}
               >
-                <MessageBubble
-                  msg={uiMsg}
+                <Message
+                  input={input}
                   showSender={showSender}
-                  onReact={(e, c) => handleReact(uiMsg.id, e, c)}
-                  senderPhotoUrl={profilePhotos[uiMsg.senderUserId]}
+                  senderPhotoUrl={getSenderPhotoUrl(group)}
+                  onReact={handleReact}
                 />
               </div>
             );

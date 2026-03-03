@@ -10,7 +10,9 @@ import type {
 import { toUIChat, toUIMessage, toUIPendingMessage, toUIUser } from '@/lib/types';
 import { log } from './log';
 import {
+  clearMediaCache,
   closeTdChat,
+  downloadMedia,
   formatLastSeen,
   getDialogs,
   getMessages,
@@ -48,6 +50,7 @@ interface ChatState {
   pendingByChat: Record<number, PendingMessage[]>;
   users: Map<number, Td.user>;
   profilePhotos: Record<number, string>;
+  mediaUrls: Record<string, string | null>;
   typingByChat: Record<number, Record<number, { action: Td.ChatAction; expiresAt: number }>>;
   userStatuses: Record<number, Td.UserStatus>;
   authState: Td.AuthorizationState | null;
@@ -88,6 +91,9 @@ interface ChatState {
   react: (chatId: number, msgId: number, emoji: string, chosen: boolean) => void;
   handleUpdate: (event: TelegramUpdateEvent) => void;
   loadProfilePhoto: (chatId: number) => void;
+  loadMedia: (chatId: number, messageId: number) => void;
+  clearMediaUrl: (chatId: number, messageId: number) => void;
+  seedMedia: (urls: Record<string, string>) => void;
   clearError: () => void;
 
   // Global search actions
@@ -116,6 +122,7 @@ function isChatPinned(chat: Td.chat): boolean {
 
 let tempIdCounter = 0;
 const photoRequested = new Set<number>();
+const mediaRequested = new Set<string>();
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const statusTimers = new Map<number, ReturnType<typeof setTimeout>>();
 
@@ -127,6 +134,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   pendingByChat: {},
   users: new Map(),
   profilePhotos: {},
+  mediaUrls: {},
   typingByChat: {},
   userStatuses: {},
   authState: null,
@@ -711,6 +719,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  loadMedia: (chatId: number, messageId: number) => {
+    const key = `${chatId}_${messageId}`;
+    if (mediaRequested.has(key)) return;
+    mediaRequested.add(key);
+    downloadMedia(chatId, messageId).then((url) => {
+      set((s) => ({ mediaUrls: { ...s.mediaUrls, [key]: url } }));
+    });
+  },
+
+  clearMediaUrl: (chatId: number, messageId: number) => {
+    const key = `${chatId}_${messageId}`;
+    mediaRequested.delete(key);
+    clearMediaCache(messageId);
+    set((s) => {
+      const { [key]: _, ...rest } = s.mediaUrls;
+      return { mediaUrls: rest };
+    });
+  },
+
+  seedMedia: (urls: Record<string, string>) => {
+    set((s) => ({ mediaUrls: { ...s.mediaUrls, ...urls } }));
+  },
+
   clearError: () => set({ error: '' }),
 
   // --- Global search actions ---
@@ -1136,6 +1167,7 @@ export function selectUIUser(state: ChatState, userId: number): UIUser | null {
 export function _resetForTests() {
   tempIdCounter = 0;
   photoRequested.clear();
+  mediaRequested.clear();
   for (const t of typingTimers.values()) clearTimeout(t);
   typingTimers.clear();
   for (const t of statusTimers.values()) clearTimeout(t);
@@ -1168,6 +1200,7 @@ export function _resetForTests() {
       pendingByChat: {},
       users: new Map(),
       profilePhotos: {},
+      mediaUrls: {},
       typingByChat: {},
       userStatuses: {},
       authState: null,

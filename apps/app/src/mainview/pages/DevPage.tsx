@@ -1,8 +1,8 @@
 import { Agentation } from 'agentation';
 import { AtSign, BellOff, Pin } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { AlbumGrid } from '@/components/chat/AlbumGrid';
 import { FormattedText } from '@/components/chat/FormattedText';
+import { Message } from '@/components/chat/Message';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PureBotKeyboard } from '@/components/ui/chat/BotKeyboard';
@@ -10,15 +10,10 @@ import { PureEmojiStatusIcon } from '@/components/ui/chat/EmojiStatusIcon';
 import { PureForwardHeader } from '@/components/ui/chat/ForwardHeader';
 import { PureLinkPreviewCard } from '@/components/ui/chat/LinkPreviewCard';
 import { PureMessageInput } from '@/components/ui/chat/MessageInput';
-import type { InfoDisplayType } from '@/components/ui/chat/MessageTime';
 import { PureMessageTime } from '@/components/ui/chat/MessageTime';
 import { PureOnlineDot } from '@/components/ui/chat/OnlineDot';
 import { PurePhotoView } from '@/components/ui/chat/PhotoView';
-import {
-  PureReactionBar,
-  PureReactionPicker,
-  type ReactionInfo,
-} from '@/components/ui/chat/ReactionBar';
+import { PureReactionBar, PureReactionPicker } from '@/components/ui/chat/ReactionBar';
 import { PureReplyHeader } from '@/components/ui/chat/ReplyHeader';
 import { PureServiceMessage } from '@/components/ui/chat/ServiceMessage';
 import { PureTypingIndicator } from '@/components/ui/chat/TypingIndicator';
@@ -29,14 +24,10 @@ import { Separator } from '@/components/ui/separator';
 import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { log } from '@/lib/log';
-import { groupUIMessages, type UIMessage, type UIReaction } from '@/lib/types';
+import { useChatStore } from '@/lib/store';
+import { groupUIMessages, type UIMessage } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { CHATS, HEADER_STATES, MEDIA_URLS, MESSAGES, PROFILE_PHOTOS } from './dev-data';
-
-// UIReaction uses `emoji`, PureReactionBar expects `emoticon`
-function toReactionInfos(reactions: UIReaction[]): ReactionInfo[] {
-  return reactions.map((r) => ({ emoticon: r.emoji, count: r.count, chosen: r.chosen }));
-}
 
 // ---------------------------------------------------------------------------
 // Nav sections: [anchor, label]
@@ -96,19 +87,14 @@ const albums = groupUIMessages(MESSAGES).filter(
 );
 
 // ---------------------------------------------------------------------------
-// Media URL helper
+// Find first available real media URL for pure view demo sections
 // ---------------------------------------------------------------------------
 
-function getMediaUrl(msgId: number): string | null {
-  return MEDIA_URLS[msgId] ?? null;
-}
-
-// Find first available real media URL for demo sections
-const firstPhotoUrl = photoMessages.length > 0 ? getMediaUrl(photoMessages[0].id) : null;
-const firstVideoUrl = videoMessages.length > 0 ? getMediaUrl(videoMessages[0].id) : null;
+const firstPhotoUrl = photoMessages.length > 0 ? (MEDIA_URLS[photoMessages[0].id] ?? null) : null;
+const firstVideoUrl = videoMessages.length > 0 ? (MEDIA_URLS[videoMessages[0].id] ?? null) : null;
 const firstCircleVideoUrl =
   MESSAGES.find((m) => m.contentKind === 'videoNote' && MEDIA_URLS[m.id])?.id ?? null;
-const firstVoiceUrl = voiceMessages.length > 0 ? getMediaUrl(voiceMessages[0].id) : null;
+const firstVoiceUrl = voiceMessages.length > 0 ? (MEDIA_URLS[voiceMessages[0].id] ?? null) : null;
 
 // ---------------------------------------------------------------------------
 // Time formatting
@@ -203,164 +189,10 @@ function Case({
 }
 
 // ---------------------------------------------------------------------------
-// Pure message bubble
-// ---------------------------------------------------------------------------
-
-function getDevDisplayType(msg: UIMessage): InfoDisplayType {
-  const ck = msg.contentKind;
-  if (ck === 'sticker') return 'background';
-  if (ck === 'photo' || ck === 'video' || ck === 'videoNote' || ck === 'animation') {
-    if (msg.text) return 'default';
-    return 'image';
-  }
-  return 'default';
-}
-
-function PureBubble({
-  msg,
-  showSender,
-  isRead,
-}: {
-  msg: UIMessage;
-  showSender: boolean;
-  isRead: boolean;
-}) {
-  const ck = msg.contentKind;
-  const isSticker = ck === 'sticker';
-  const isPhoto = ck === 'photo';
-  const isVideo = ck === 'video' || ck === 'videoNote' || ck === 'animation';
-  const isVoice = ck === 'voice';
-  const hasReactions = msg.reactions.length > 0;
-  const mediaUrl = getMediaUrl(msg.id);
-  const showAvatar = showSender && !msg.isOutgoing;
-  const displayType = getDevDisplayType(msg);
-
-  /* -- Sticker: no bubble, constrained size -- */
-  if (isSticker) {
-    const stickerEl = (
-      <div className="group/bubble relative max-w-[224px]">
-        <PureReactionPicker onReact={() => {}} />
-        <PurePhotoView url={mediaUrl} />
-        {hasReactions && (
-          <PureReactionBar reactions={toReactionInfos(msg.reactions)} onReact={() => {}} />
-        )}
-        <span className="mt-0.5 flex justify-end">
-          <PureMessageTime
-            date={msg.date}
-            out={msg.isOutgoing}
-            read={isRead}
-            displayType="background"
-          />
-        </span>
-      </div>
-    );
-
-    if (!showAvatar) return stickerEl;
-
-    return (
-      <div className="flex items-end gap-2">
-        <UserAvatar
-          name={msg.senderName || 'Unknown'}
-          src={PROFILE_PHOTOS[msg.senderUserId]}
-          className="size-7 shrink-0 text-[11px]"
-        />
-        {stickerEl}
-      </div>
-    );
-  }
-
-  /* -- Regular bubble -- */
-  const isMediaOnly = (isPhoto || isVideo) && !msg.text;
-
-  const bubble = (
-    <div
-      className={cn(
-        'group/bubble relative rounded-2xl px-4 py-2.5',
-        msg.isOutgoing ? 'bg-message-own' : 'bg-message-peer',
-        hasReactions && 'pb-5',
-        showAvatar ? 'max-w-[calc(100%-36px)]' : 'max-w-[55%]',
-      )}
-    >
-      <PureReactionPicker onReact={() => {}} />
-      {showSender && !msg.isOutgoing && (
-        <p className="mb-0.5 text-[10px] font-medium text-accent-blue">
-          {msg.senderName || 'Unknown'}
-        </p>
-      )}
-      {msg.forwardFromName && <PureForwardHeader fromName={msg.forwardFromName} />}
-      {msg.replyPreview && (
-        <PureReplyHeader
-          senderName={msg.replyPreview.senderName}
-          text={msg.replyPreview.text}
-          mediaType={msg.replyPreview.mediaLabel}
-          isOutgoing={msg.isOutgoing}
-        />
-      )}
-      {isPhoto && <PurePhotoView url={mediaUrl} />}
-      {isVideo && (
-        <PureVideoView url={mediaUrl} isCircle={ck === 'videoNote'} isGif={ck === 'animation'} />
-      )}
-      {isVoice && <PureVoiceView url={mediaUrl} />}
-      {!isPhoto && !isVideo && !isVoice && msg.mediaLabel && (
-        <p className="text-xs italic text-text-tertiary">{msg.mediaLabel}</p>
-      )}
-      {msg.text && (
-        <p className="whitespace-pre-wrap break-words text-[13px] leading-[18px] text-text-primary">
-          <FormattedText text={msg.text} entities={msg.entities} />
-          <span className="float-right h-[18px] w-14" aria-hidden="true" />
-        </p>
-      )}
-      {msg.webPreview && <PureLinkPreviewCard preview={msg.webPreview} />}
-      {!msg.text && !msg.mediaLabel && (
-        <p className="text-sm italic text-text-quaternary">Unsupported message</p>
-      )}
-      {hasReactions && (
-        <PureReactionBar reactions={toReactionInfos(msg.reactions)} onReact={() => {}} />
-      )}
-      {msg.inlineKeyboard && (
-        <PureBotKeyboard rows={msg.inlineKeyboard.map((row) => ({ buttons: row }))} />
-      )}
-      {isMediaOnly ? (
-        <span className="absolute bottom-2 right-2">
-          <PureMessageTime
-            date={msg.date}
-            out={msg.isOutgoing}
-            read={isRead}
-            displayType={displayType}
-          />
-        </span>
-      ) : (
-        <span className="absolute bottom-1 right-2">
-          <PureMessageTime
-            date={msg.date}
-            out={msg.isOutgoing}
-            read={isRead}
-            displayType={displayType}
-          />
-        </span>
-      )}
-    </div>
-  );
-
-  if (!showAvatar) return bubble;
-
-  return (
-    <div className="flex max-w-[55%] items-end gap-2">
-      <UserAvatar
-        name={msg.senderName || 'Unknown'}
-        src={PROFILE_PHOTOS[msg.senderUserId]}
-        className="size-7 shrink-0 text-[11px]"
-      />
-      {bubble}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // DevPage
 // ---------------------------------------------------------------------------
 
-function DevPage() {
+export default function DevPage() {
   const [activeSection, setActiveSection] = useState<string>(SECTIONS[0][0]);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -379,6 +211,19 @@ function DevPage() {
         document.getElementById(hash)?.scrollIntoView();
       });
     }
+  }, []);
+
+  // Seed the store with dev media URLs so useMedia can resolve them
+  useEffect(() => {
+    const mediaMap: Record<string, string> = {};
+    for (const [msgIdStr, url] of Object.entries(MEDIA_URLS)) {
+      const msgId = Number(msgIdStr);
+      const msg = MESSAGES.find((m) => m.id === msgId);
+      if (msg && url) {
+        mediaMap[`${msg.chatId}_${msg.id}`] = url;
+      }
+    }
+    useChatStore.getState().seedMedia(mediaMap);
   }, []);
 
   const now = Math.floor(Date.now() / 1000);
@@ -576,7 +421,12 @@ function DevPage() {
               text={`Incoming text message ${i + 1}. Peer bubble with sender name and avatar.`}
             >
               <div className="flex justify-start">
-                <PureBubble msg={msg} showSender={true} isRead={false} />
+                <Message
+                  input={{ kind: 'single', message: msg }}
+                  showSender={true}
+                  senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                  onReact={() => {}}
+                />
               </div>
             </Case>
           ))}
@@ -586,7 +436,11 @@ function DevPage() {
               text={`Outgoing text message ${i + 1}. Own bubble aligned right with read checkmarks.`}
             >
               <div className="flex justify-end">
-                <PureBubble msg={msg} showSender={false} isRead={true} />
+                <Message
+                  input={{ kind: 'single', message: msg }}
+                  showSender={false}
+                  onReact={() => {}}
+                />
               </div>
             </Case>
           ))}
@@ -606,7 +460,12 @@ function DevPage() {
                   .join(', ')}).`}
               >
                 <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                  <PureBubble msg={msg} showSender={!msg.isOutgoing} isRead={msg.isOutgoing} />
+                  <Message
+                    input={{ kind: 'single', message: msg }}
+                    showSender={!msg.isOutgoing}
+                    senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                    onReact={() => {}}
+                  />
                 </div>
               </Case>
             ))}
@@ -617,7 +476,12 @@ function DevPage() {
                 text="Message with spoiler entity. Text should be hidden behind a blur overlay until tapped."
               >
                 <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                  <PureBubble msg={msg} showSender={!msg.isOutgoing} isRead={msg.isOutgoing} />
+                  <Message
+                    input={{ kind: 'single', message: msg }}
+                    showSender={!msg.isOutgoing}
+                    senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                    onReact={() => {}}
+                  />
                 </div>
               </Case>
             ))
@@ -639,7 +503,12 @@ function DevPage() {
                 text={`Photo-only bubble, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. No caption text, timestamp overlays the image.`}
               >
                 <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                  <PureBubble msg={msg} showSender={!msg.isOutgoing} isRead={msg.isOutgoing} />
+                  <Message
+                    input={{ kind: 'single', message: msg }}
+                    showSender={!msg.isOutgoing}
+                    senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                    onReact={() => {}}
+                  />
                 </div>
               </Case>
             ))}
@@ -649,7 +518,12 @@ function DevPage() {
               text={`Photo with caption, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. Image above, text below, timestamp after text.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <PureBubble msg={msg} showSender={!msg.isOutgoing} isRead={msg.isOutgoing} />
+                <Message
+                  input={{ kind: 'single', message: msg }}
+                  showSender={!msg.isOutgoing}
+                  senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                  onReact={() => {}}
+                />
               </div>
             </Case>
           ))}
@@ -663,7 +537,12 @@ function DevPage() {
               text={`${msg.mediaLabel} bubble, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. Tests video thumbnail, play button overlay, and timestamp.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <PureBubble msg={msg} showSender={!msg.isOutgoing} isRead={msg.isOutgoing} />
+                <Message
+                  input={{ kind: 'single', message: msg }}
+                  showSender={!msg.isOutgoing}
+                  senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                  onReact={() => {}}
+                />
               </div>
             </Case>
           ))}
@@ -678,7 +557,12 @@ function DevPage() {
                 text={`GIF bubble, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. Should autoplay silently with no play button.`}
               >
                 <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                  <PureBubble msg={msg} showSender={!msg.isOutgoing} isRead={msg.isOutgoing} />
+                  <Message
+                    input={{ kind: 'single', message: msg }}
+                    showSender={!msg.isOutgoing}
+                    senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                    onReact={() => {}}
+                  />
                 </div>
               </Case>
             ))
@@ -697,7 +581,12 @@ function DevPage() {
               text={`Sticker, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. Renders without a bubble background, with timestamp below.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <PureBubble msg={msg} showSender={!msg.isOutgoing} isRead={msg.isOutgoing} />
+                <Message
+                  input={{ kind: 'single', message: msg }}
+                  showSender={!msg.isOutgoing}
+                  senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                  onReact={() => {}}
+                />
               </div>
             </Case>
           ))}
@@ -711,7 +600,12 @@ function DevPage() {
               text={`Voice message, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. Waveform visualization with play/pause button inside a bubble.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <PureBubble msg={msg} showSender={!msg.isOutgoing} isRead={msg.isOutgoing} />
+                <Message
+                  input={{ kind: 'single', message: msg }}
+                  showSender={!msg.isOutgoing}
+                  senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                  onReact={() => {}}
+                />
               </div>
             </Case>
           ))}
@@ -725,7 +619,12 @@ function DevPage() {
               text={`Link preview in ${msg.isOutgoing ? 'outgoing' : 'incoming'} bubble. Card with site name, title, description, and optional image.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <PureBubble msg={msg} showSender={!msg.isOutgoing} isRead={msg.isOutgoing} />
+                <Message
+                  input={{ kind: 'single', message: msg }}
+                  showSender={!msg.isOutgoing}
+                  senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                  onReact={() => {}}
+                />
               </div>
             </Case>
           ))}
@@ -739,7 +638,12 @@ function DevPage() {
               text={`Text reply, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. Quoted message header above the reply body.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <PureBubble msg={msg} showSender={!msg.isOutgoing} isRead={msg.isOutgoing} />
+                <Message
+                  input={{ kind: 'single', message: msg }}
+                  showSender={!msg.isOutgoing}
+                  senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                  onReact={() => {}}
+                />
               </div>
             </Case>
           ))}
@@ -777,7 +681,12 @@ function DevPage() {
               text={`Reply to a media message, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. Reply header includes a media thumbnail.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <PureBubble msg={msg} showSender={!msg.isOutgoing} isRead={msg.isOutgoing} />
+                <Message
+                  input={{ kind: 'single', message: msg }}
+                  showSender={!msg.isOutgoing}
+                  senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                  onReact={() => {}}
+                />
               </div>
             </Case>
           ))}
@@ -808,7 +717,7 @@ function DevPage() {
           </Case>
           <Case text="Video message (circle) loaded. Round-clipped video thumbnail with play overlay.">
             <PureVideoView
-              url={firstCircleVideoUrl ? getMediaUrl(firstCircleVideoUrl) : null}
+              url={firstCircleVideoUrl ? (MEDIA_URLS[firstCircleVideoUrl] ?? null) : null}
               isCircle
             />
           </Case>
@@ -870,10 +779,10 @@ function DevPage() {
                 key={album.messages[0].id}
                 text={`Album with ${album.messages.length} media items. Tests the grid layout algorithm for multi-photo/video groups.`}
               >
-                <AlbumGrid
-                  messages={album.messages}
-                  chatId={album.messages[0].chatId}
-                  resolveUrl={getMediaUrl}
+                <Message
+                  input={{ kind: 'album', messages: album.messages }}
+                  showSender={false}
+                  onReact={() => {}}
                 />
               </Case>
             ))
@@ -890,7 +799,11 @@ function DevPage() {
             <div className="max-w-xs">
               {reactionMessages.length > 0 ? (
                 <PureReactionBar
-                  reactions={toReactionInfos(reactionMessages[0].reactions)}
+                  reactions={reactionMessages[0].reactions.map((r) => ({
+                    emoticon: r.emoji,
+                    count: r.count,
+                    chosen: r.chosen,
+                  }))}
                   onReact={() => {}}
                 />
               ) : (
@@ -909,7 +822,12 @@ function DevPage() {
               text={`Reactions attached to ${msg.isOutgoing ? 'outgoing' : 'incoming'} bubble. Emoji pills render below the message text.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <PureBubble msg={msg} showSender={!msg.isOutgoing} isRead={msg.isOutgoing} />
+                <Message
+                  input={{ kind: 'single', message: msg }}
+                  showSender={!msg.isOutgoing}
+                  senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                  onReact={() => {}}
+                />
               </div>
             </Case>
           ))}
@@ -929,7 +847,12 @@ function DevPage() {
               text={`Forwarded message in ${msg.isOutgoing ? 'outgoing' : 'incoming'} bubble. Forward header sits above the message content.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <PureBubble msg={msg} showSender={!msg.isOutgoing} isRead={msg.isOutgoing} />
+                <Message
+                  input={{ kind: 'single', message: msg }}
+                  showSender={!msg.isOutgoing}
+                  senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                  onReact={() => {}}
+                />
               </div>
             </Case>
           ))}
@@ -967,7 +890,12 @@ function DevPage() {
               text={`Bot keyboard attached to ${msg.isOutgoing ? 'outgoing' : 'incoming'} bubble. Buttons render below the message text.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <PureBubble msg={msg} showSender={!msg.isOutgoing} isRead={msg.isOutgoing} />
+                <Message
+                  input={{ kind: 'single', message: msg }}
+                  showSender={!msg.isOutgoing}
+                  senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
+                  onReact={() => {}}
+                />
               </div>
             </Case>
           ))}
@@ -1215,11 +1143,20 @@ function DevPage() {
           <Case text="Service messages mixed with regular bubbles. Tests vertical spacing and alignment in a realistic chat flow.">
             <div className="space-y-1 rounded-lg bg-sand-2 p-4">
               <div className="flex justify-start">
-                <PureBubble msg={MESSAGES[0]} showSender={true} isRead={false} />
+                <Message
+                  input={{ kind: 'single', message: MESSAGES[0] }}
+                  showSender={true}
+                  senderPhotoUrl={PROFILE_PHOTOS[MESSAGES[0].senderUserId]}
+                  onReact={() => {}}
+                />
               </div>
               <PureServiceMessage text="Andrey joined the group" />
               <div className="flex justify-end">
-                <PureBubble msg={MESSAGES[3]} showSender={false} isRead={true} />
+                <Message
+                  input={{ kind: 'single', message: MESSAGES[3] }}
+                  showSender={false}
+                  onReact={() => {}}
+                />
               </div>
               <PureServiceMessage text="Marusya pinned a message" />
             </div>
@@ -1295,5 +1232,3 @@ function DevPage() {
     </div>
   );
 }
-
-export default DevPage;
