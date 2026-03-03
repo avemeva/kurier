@@ -154,19 +154,31 @@ export async function getMessages(
   chatId: number,
   options?: { limit?: number; fromMessageId?: number },
 ): Promise<{ messages: Td.message[]; hasMore: boolean }> {
+  // TDLib returns locally cached messages first and may return fewer than
+  // `limit`. Must loop with advancing from_message_id; an empty response
+  // is the only reliable signal that history is exhausted.
+  // See: https://github.com/tdlib/td/issues/168
   const limit = options?.limit ?? 50;
-  const result = await client.invoke({
-    _: 'getChatHistory',
-    chat_id: chatId,
-    from_message_id: options?.fromMessageId ?? 0,
-    offset: 0,
-    limit,
-    only_local: false,
-  });
-  const messages = result.messages.filter((m): m is Td.message => m !== undefined);
-  // TDLib may return fewer messages than requested even when more exist
-  // (filtered service messages, gaps, etc.). The only reliable signal
-  // that history is exhausted is receiving 0 messages back.
+  const messages: Td.message[] = [];
+  let cursor = options?.fromMessageId ?? 0;
+  let left = limit;
+
+  while (left > 0) {
+    const result = await client.invoke({
+      _: 'getChatHistory',
+      chat_id: chatId,
+      from_message_id: cursor,
+      offset: 0,
+      limit: left,
+      only_local: false,
+    });
+    const batch = result.messages.filter((m): m is Td.message => m !== undefined);
+    if (batch.length === 0) break;
+    messages.push(...batch);
+    left -= batch.length;
+    cursor = batch[batch.length - 1].id;
+  }
+
   return { messages, hasMore: messages.length > 0 };
 }
 

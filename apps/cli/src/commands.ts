@@ -784,24 +784,28 @@ export const commands: Command[] = [
       }
 
       // Plain history mode
+      // TDLib may return fewer messages than `limit` on each call — it returns
+      // locally cached messages first. Must loop with advancing from_message_id.
+      // An empty response is the only reliable signal that history is exhausted.
+      // See: https://github.com/tdlib/td/issues/168
       const BATCH = 50;
       const MAX_SCAN = 500;
       const matched: Td.message[] = [];
-      let scanned = 0;
+      let left = hasClientFilter ? MAX_SCAN : limit;
 
-      while (matched.length < limit && scanned < MAX_SCAN) {
+      while (matched.length < limit && left > 0) {
         const result = await client.invoke({
           _: 'getChatHistory',
           chat_id: chatId,
           from_message_id: fromMessageId,
           offset: 0,
-          limit: hasClientFilter ? BATCH : limit,
+          limit: Math.min(BATCH, left),
           only_local: false,
         });
 
         const batch = result.messages.filter((m): m is Td.message => m != null);
         if (batch.length === 0) break;
-        scanned += batch.length;
+        left -= batch.length;
         for (const m of batch) {
           if (clientFilter(m)) {
             matched.push(m);
@@ -809,7 +813,6 @@ export const commands: Command[] = [
           }
         }
         fromMessageId = (batch.at(-1) as Td.message).id;
-        if (!hasClientFilter) break;
       }
 
       const isReverse = '--reverse' in flags;
@@ -990,7 +993,7 @@ export const commands: Command[] = [
     name: 'search',
     description: 'Search messages globally or in a specific chat',
     usage:
-      'tg search "<query>" [--chat <id>] [--limit N] [--from <user>] [--since N] [--until N] [--type private|group|channel] [--filter photo|video|document|url|voice|gif|music|media|videonote|mention|pinned] [--context N] [--offset "cursor"] [--full]',
+      'tg search "<query>" [--chat <id>] [--limit N] [--from <user>] [--since N] [--until N] [--type private|group|channel] [--filter photo|video|document|url|voice|gif|music|media|videonote|mention|pinned] [--context N] [--offset "cursor"] [--full] [--archived]',
     flags: {
       '--chat': 'Search in a specific chat (default: global)',
       '--limit': 'Max results (default: 20)',
@@ -1003,6 +1006,7 @@ export const commands: Command[] = [
       '--context': 'Include N messages before and after each hit',
       '--offset': 'Pagination cursor from previous nextOffset',
       '--full': 'Return full message text (default: truncated to 500 chars)',
+      '--archived': 'Search in archived chats only (default: main chat list)',
     },
     run: async (client, args, flags) => {
       const filterValue = flags['--filter'];
@@ -1138,7 +1142,9 @@ export const commands: Command[] = [
         while (matched.length < limit && scanned < MAX_SCAN) {
           const searchParams: Record<string, unknown> = {
             _: 'searchMessages',
-            chat_list: undefined,
+            chat_list: {
+              _: flags['--archived'] !== undefined ? 'chatListArchive' : 'chatListMain',
+            },
             query,
             offset: offsetCursor,
             limit: BATCH,
@@ -1277,10 +1283,11 @@ export const commands: Command[] = [
   {
     name: 'find',
     description: 'Find bots, channels, groups, users, or contacts by name',
-    usage: 'tg find "<query>" [--type bot|channel|group|user|contact] [--limit N]',
+    usage: 'tg find "<query>" [--type bot|channel|group|user|contact] [--limit N] [--archived]',
     flags: {
       '--type': 'Filter: bot, channel, group, user, or contact',
       '--limit': 'Max results (default: 50)',
+      '--archived': 'Show only archived chats (default: excludes archived)',
     },
     run: async (client, args, flags) => {
       const query = args[0];
@@ -1373,9 +1380,16 @@ export const commands: Command[] = [
         return true;
       });
 
+      // Filter by archive status
+      const showArchived = flags['--archived'] !== undefined;
+      const archiveFiltered = dedupedEntities.filter(({ chat }) => {
+        const isArchived = chat.positions?.some((p) => p.list._ === 'chatListArchive') ?? false;
+        return showArchived ? isArchived : !isArchived;
+      });
+
       // Filter by --type
       const filtered = typeFilter
-        ? dedupedEntities.filter(({ chat, user }) => {
+        ? archiveFiltered.filter(({ chat, user }) => {
             const chatType = chat.type._;
             switch (typeFilter) {
               case 'bot':
@@ -1399,7 +1413,7 @@ export const commands: Command[] = [
                 return true;
             }
           })
-        : dedupedEntities;
+        : archiveFiltered;
 
       // Sort bots by popularity (active_user_count descending)
       if (typeFilter === 'bot') {

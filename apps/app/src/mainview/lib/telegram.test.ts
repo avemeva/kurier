@@ -328,11 +328,19 @@ describe('getMessages', () => {
     const msg1 = makeMessage({ id: 1 });
     const msg2 = makeMessage({ id: 2 });
 
-    mockInvoke.mockResolvedValueOnce({
-      _: 'messages',
-      total_count: 3,
-      messages: [msg1, undefined, msg2],
-    });
+    // First call returns messages; second call returns empty to end the loop
+    // (getChatHistory pagination loop per tdlib/td#168)
+    mockInvoke
+      .mockResolvedValueOnce({
+        _: 'messages',
+        total_count: 3,
+        messages: [msg1, undefined, msg2],
+      })
+      .mockResolvedValueOnce({
+        _: 'messages',
+        total_count: 0,
+        messages: [],
+      });
 
     const result = await getMessages(100);
 
