@@ -15,7 +15,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { TelegramClient, TelegramError } from '@tg/protocol';
 import { type Command, commands, getCommand } from './commands';
 import { ensureDaemon, getDaemonPid, LOG_FILE, runDaemonMode, spawnDaemon } from './daemon';
-import { CliError, fail, mapErrorCode, setPretty, success, warn } from './output';
+import { CliError, fail, mapErrorCode, success, warn } from './output';
 import { parseArgs } from './parse';
 
 // --- Daemon mode: `tg --daemon` (must be checked before arg parsing) ---
@@ -51,7 +51,7 @@ function printHelp(): void {
     'Entities: numeric ID | @username | +phone | t.me/link | "me"',
     '',
     'Global flags:',
-    '  --pretty      Pretty-print JSON output',
+    '  --text        Human-readable text output (instead of JSON)',
     '  --timeout N   Timeout in seconds',
     '',
   ];
@@ -145,8 +145,7 @@ async function handleDaemonSubcommand(sub: string): Promise<never> {
 const [cmdName, ...rest] = process.argv.slice(2);
 const { positional, flags } = parseArgs(rest ?? []);
 
-// Apply global flags early
-if ('--pretty' in flags) setPretty(true);
+// Global flags applied in command handlers (--simple, --timeout, etc.)
 
 // Help (no connect needed)
 if (!cmdName || cmdName === 'help' || cmdName === '--help') {
@@ -230,14 +229,7 @@ async function run(): Promise<void> {
   }
 
   // Reject unknown flags
-  const GLOBAL_FLAGS = new Set([
-    '--pretty',
-    '--timeout',
-    '--help',
-    '--file',
-    '--stdin',
-    '--markdown',
-  ]);
+  const GLOBAL_FLAGS = new Set(['--timeout', '--help', '--file', '--stdin', '--text']);
   const knownFlags = new Set([...GLOBAL_FLAGS, ...Object.keys(cmd.flags ?? {})]);
   const unknownFlags = Object.keys(flags).filter((f) => !knownFlags.has(f));
   if (unknownFlags.length > 0) {

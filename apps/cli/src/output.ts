@@ -5,7 +5,6 @@
  * stderr: warnings, debug messages
  *
  * No AsyncLocalStorage — the CLI is a single-process, single-command tool.
- * Pretty-printing is controlled by a module-level flag set from the entry point.
  */
 
 export type ErrorCode =
@@ -23,14 +22,6 @@ export type ErrorCode =
 export interface PaginationMeta {
   hasMore?: boolean;
   nextOffset?: number | string;
-}
-
-// --- Pretty-print control ---
-
-let pretty = false;
-
-export function setPretty(v: boolean): void {
-  pretty = v;
 }
 
 // --- Object cleanup (BigInt conversion, depth limiting) ---
@@ -95,18 +86,16 @@ export function success(data: unknown, meta?: PaginationMeta): void {
     if (meta.hasMore !== undefined) result.hasMore = meta.hasMore;
     if (meta.nextOffset !== undefined) result.nextOffset = meta.nextOffset;
   }
-  process.stdout.write(`${JSON.stringify(result, bigIntReplacer, pretty ? 2 : undefined)}\n`);
+  process.stdout.write(`${JSON.stringify(result, bigIntReplacer)}\n`);
 }
 
 /** Write error to stdout and exit with code 1. */
 export function fail(message: string, code: ErrorCode = 'UNKNOWN'): never {
-  process.stdout.write(
-    `${JSON.stringify({ ok: false, error: message, code }, null, pretty ? 2 : undefined)}\n`,
-  );
+  process.stdout.write(`${JSON.stringify({ ok: false, error: message, code })}\n`);
   throw new CliError(message);
 }
 
-/** Write raw text to stdout (no JSON wrapping). Used by --markdown mode. */
+/** Write raw text to stdout (no JSON wrapping). Used by --text mode. */
 export function stdout(text: string): void {
   process.stdout.write(`${text}\n`);
 }

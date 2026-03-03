@@ -151,7 +151,7 @@ type SlimUser = {
   active_user_count?: number;
 };
 
-type SlimChat = {
+export type SlimChat = {
   id: number;
   type: 'user' | 'group' | 'channel';
   title: string;
@@ -173,6 +173,7 @@ export type SlimMessage = {
   reply_to_message_id?: number;
   reply_in_chat_id?: number;
   forward_info?: Td.messageForwardInfo;
+  forward_sender_name?: string;
   media_album_id?: string;
   content: SlimContent;
   reply_markup?: SlimReplyMarkup;

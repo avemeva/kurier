@@ -6,7 +6,14 @@
  * This eliminates the need for .env files or tg auth setup.
  */
 
-import { readFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  symlinkSync,
+  unlinkSync,
+} from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
@@ -81,3 +88,31 @@ if (result.exitCode !== 0) {
 }
 
 console.log(`Built: ${outfile}`);
+
+// --- Create ~/.tg symlink → media_cache for short file paths in CLI output ---
+// Uses the same cross-platform getAppDir() logic as the daemon.
+// Symlinks don't work reliably on Windows without admin rights — skip there.
+
+if (process.platform !== 'win32') {
+  const { getAppDir } = await import('@tg/protocol/paths');
+  const mediaCacheDir = path.join(getAppDir(), 'media_cache');
+  const symlink = path.join(homedir(), '.tg');
+
+  mkdirSync(mediaCacheDir, { recursive: true });
+
+  try {
+    if (existsSync(symlink)) {
+      const target = readlinkSync(symlink);
+      if (target !== mediaCacheDir) {
+        unlinkSync(symlink);
+        symlinkSync(mediaCacheDir, symlink);
+        console.log(`Updated symlink: ${symlink} → ${mediaCacheDir}`);
+      }
+    } else {
+      symlinkSync(mediaCacheDir, symlink);
+      console.log(`Created symlink: ${symlink} → ${mediaCacheDir}`);
+    }
+  } catch (err) {
+    console.warn(`Could not create symlink ${symlink}: ${err}`);
+  }
+}

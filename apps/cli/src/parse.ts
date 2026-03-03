@@ -14,14 +14,14 @@ export const BOOLEAN_FLAGS = new Set([
   '--md',
   '--html',
   '--big',
-  '--pretty',
   '--stdin',
   '--remove',
   '--incoming',
   '--download-media',
   '--full',
   '--unread',
-  '--markdown',
+  '--text',
+  '--transcribe',
 ]);
 
 export function parseArgs(raw: string[]): {

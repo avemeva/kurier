@@ -9,19 +9,12 @@ import { copyFileSync } from 'node:fs';
 import path from 'node:path';
 import type { TelegramClient } from '@tg/protocol';
 import type * as Td from 'tdlib-types';
-import { formatMessages } from './markdown';
+import { flattenChats, flattenMessage, flattenMessages } from './flatten';
+import { formatDialogs, formatMessages } from './format-md';
+import { addSenderNames, enrichMessage, enrichMessages, transcribeMessages } from './helpers';
 import { fail, stdout, strip, success, warn } from './output';
 import { resolveChatId, resolveEntity } from './resolve';
-import {
-  type SlimMessage,
-  slimAuthState,
-  slimChat,
-  slimChats,
-  slimMembers,
-  slimMessage,
-  slimMessages,
-  slimUser,
-} from './slim';
+import { slimAuthState, slimChat, slimMembers, slimMessage, slimMessages, slimUser } from './slim';
 
 // --- Flag parsing helpers ---
 
@@ -75,44 +68,6 @@ export interface Command {
   /** If true, this is a streaming command (long-lived NDJSON output) */
   streaming?: boolean;
   run: (client: TelegramClient, args: string[], flags: Record<string, string>) => Promise<void>;
-}
-
-// --- TDLib helper: get chat type string (used for --type filtering) ---
-
-// --- Helper: enrich slim messages with sender names ---
-
-async function addSenderNames(client: TelegramClient, msgs: SlimMessage[]): Promise<void> {
-  const cache = new Map<string, string>();
-  for (const m of msgs) {
-    const key = `${m.sender_type}:${m.sender_id}`;
-    if (cache.has(key)) {
-      m.sender_name = cache.get(key);
-      continue;
-    }
-    try {
-      if (m.sender_type === 'user') {
-        const user = await client.invoke({ _: 'getUser', user_id: m.sender_id });
-        const name = [user.first_name, user.last_name].filter(Boolean).join(' ');
-        cache.set(key, name);
-        m.sender_name = name;
-      } else {
-        const chat = await client.invoke({ _: 'getChat', chat_id: m.sender_id });
-        cache.set(key, chat.title);
-        m.sender_name = chat.title;
-      }
-    } catch {
-      // skip if we can't resolve
-    }
-  }
-}
-
-async function slimMessagesWithNames(
-  client: TelegramClient,
-  msgs: Td.message[],
-): Promise<SlimMessage[]> {
-  const slim = slimMessages(msgs);
-  await addSenderNames(client, slim);
-  return slim;
 }
 
 function getChatType(chat: Td.chat): 'user' | 'group' | 'channel' | 'unknown' {
@@ -328,7 +283,7 @@ async function enrichWithContext(
         limit: contextN * 2 + 1,
         only_local: false,
       });
-      const context = strip(
+      const context = flattenMessages(
         slimMessages(ctx.messages.filter((m): m is Td.message => m != null && m.id !== msgId)),
       );
       enriched.push({ ...hit, context });
@@ -342,31 +297,8 @@ async function enrichWithContext(
 // --- Truncation helper for search results ---
 
 function truncateContent(result: Record<string, unknown>, maxLen = 500): Record<string, unknown> {
-  const content = result.content as Record<string, unknown> | undefined;
-  if (!content) return result;
-  const type = (content.type ?? content._) as string;
-  if (type === 'messageText' && typeof content.text === 'string' && content.text.length > maxLen) {
-    return {
-      ...result,
-      content: { ...content, text: content.text.slice(0, maxLen) },
-      truncated: true,
-    };
-  }
-  if (
-    (type === 'messagePhoto' ||
-      type === 'messageVideo' ||
-      type === 'messageDocument' ||
-      type === 'messageAudio' ||
-      type === 'messageAnimation' ||
-      type === 'messageVoiceNote') &&
-    typeof content.caption === 'string' &&
-    content.caption.length > maxLen
-  ) {
-    return {
-      ...result,
-      content: { ...content, caption: content.caption.slice(0, maxLen) },
-      truncated: true,
-    };
+  if (typeof result.text === 'string' && result.text.length > maxLen) {
+    return { ...result, text: result.text.slice(0, maxLen), truncated: true };
   }
   return result;
 }
@@ -472,10 +404,10 @@ export const commands: Command[] = [
         const lastChat = filtered[filtered.length - 1];
         const lastDate = lastChat?.last_message?.date;
 
-        success(strip(slimChats(filtered)), {
-          hasMore,
-          nextOffset: hasMore && lastDate ? lastDate : undefined,
-        });
+        const flatF = flattenChats(filtered);
+        const metaF = { hasMore, nextOffset: hasMore && lastDate ? lastDate : undefined };
+        if ('--text' in flags) return stdout(formatDialogs(flatF, metaF));
+        success(flatF, metaF);
       } else {
         // No filter — single fetch
         try {
@@ -508,10 +440,10 @@ export const commands: Command[] = [
         const lastChat = chatObjects[chatObjects.length - 1];
         const lastDate = lastChat?.last_message?.date;
 
-        success(strip(slimChats(chatObjects)), {
-          hasMore,
-          nextOffset: hasMore && lastDate ? lastDate : undefined,
-        });
+        const flatU = flattenChats(chatObjects);
+        const metaU = { hasMore, nextOffset: hasMore && lastDate ? lastDate : undefined };
+        if ('--text' in flags) return stdout(formatDialogs(flatU, metaU));
+        success(flatU, metaU);
       }
     },
   },
@@ -591,7 +523,7 @@ export const commands: Command[] = [
       const totalUnread = unread.length;
       unread = unread.slice(0, limit);
 
-      success(strip(slimChats(unread)), { hasMore: totalUnread > limit });
+      success(flattenChats(unread), { hasMore: totalUnread > limit });
     },
   },
 
@@ -612,6 +544,7 @@ export const commands: Command[] = [
       '--since': 'Only messages after this unix timestamp (server-side filter)',
       '--reverse': 'Oldest messages first',
       '--download-media': 'Auto-download photos, stickers, voice messages; adds localPath to media',
+      '--transcribe': 'Auto-transcribe voice/video notes (Telegram Premium)',
     },
     minArgs: 1,
     run: async (client, args, flags) => {
@@ -687,17 +620,16 @@ export const commands: Command[] = [
         }
 
         await autoDownloadSmall(client, matched);
-        if ('--download-media' in flags) {
-          await autoDownloadMessages(client, matched);
-        }
-        const slim = await slimMessagesWithNames(client, matched);
+        if ('--download-media' in flags) await autoDownloadMessages(client, matched);
+        if ('--transcribe' in flags) await transcribeMessages(client, matched);
+        const flat = await enrichMessages(client, matched);
         const hasMore = matched.length >= limit;
         const meta = {
           hasMore,
           ...(hasMore && matched.length > 0 ? { nextOffset: matched[matched.length - 1]?.id } : {}),
         };
-        if ('--markdown' in flags) return stdout(formatMessages(slim, meta));
-        success(strip(slim), meta);
+        if ('--text' in flags) return stdout(formatMessages(flat, meta));
+        success(flat, meta);
         return;
       }
 
@@ -776,10 +708,9 @@ export const commands: Command[] = [
         }
 
         await autoDownloadSmall(client, matched);
-        if ('--download-media' in flags) {
-          await autoDownloadMessages(client, matched);
-        }
-        const slim2 = await slimMessagesWithNames(client, matched);
+        if ('--download-media' in flags) await autoDownloadMessages(client, matched);
+        if ('--transcribe' in flags) await transcribeMessages(client, matched);
+        const flat2 = await enrichMessages(client, matched);
         const hasMore2 = matched.length >= limit;
         const meta2 = {
           hasMore: hasMore2,
@@ -787,8 +718,8 @@ export const commands: Command[] = [
             ? { nextOffset: matched[matched.length - 1]?.id }
             : {}),
         };
-        if ('--markdown' in flags) return stdout(formatMessages(slim2, meta2));
-        success(strip(slim2), meta2);
+        if ('--text' in flags) return stdout(formatMessages(flat2, meta2));
+        success(flat2, meta2);
         return;
       }
 
@@ -828,21 +759,20 @@ export const commands: Command[] = [
       if (isReverse) matched.reverse();
 
       await autoDownloadSmall(client, matched);
-      if ('--download-media' in flags) {
-        await autoDownloadMessages(client, matched);
-      }
+      if ('--download-media' in flags) await autoDownloadMessages(client, matched);
+      if ('--transcribe' in flags) await transcribeMessages(client, matched);
       const hasMore = matched.length >= limit;
       // When reversed, messages are [oldest...newest]. The next page needs messages
       // older than the oldest in this batch, so nextOffset = messages[0].id (the oldest).
       // When not reversed, messages are [newest...oldest], so nextOffset = last element.
       const nextOffsetMsg = isReverse ? matched[0] : matched[matched.length - 1];
-      const slim3 = await slimMessagesWithNames(client, matched);
+      const flat3 = await enrichMessages(client, matched);
       const meta3 = {
         hasMore,
         ...(hasMore && nextOffsetMsg ? { nextOffset: nextOffsetMsg.id } : {}),
       };
-      if ('--markdown' in flags) return stdout(formatMessages(slim3, meta3));
-      success(strip(slim3), meta3);
+      if ('--text' in flags) return stdout(formatMessages(flat3, meta3));
+      success(flat3, meta3);
     },
   },
   {
@@ -861,10 +791,9 @@ export const commands: Command[] = [
         message_id: messageId,
       });
       await autoDownloadSmall(client, [msg]);
-      const slim = slimMessage(msg);
-      await addSenderNames(client, [slim]);
-      if ('--markdown' in flags) return stdout(formatMessages([slim]));
-      success(strip(slim));
+      const flat = await enrichMessage(client, msg);
+      if ('--text' in flags) return stdout(formatMessages([flat]));
+      success(flat);
     },
   },
 
@@ -995,9 +924,8 @@ export const commands: Command[] = [
           );
       });
 
-      const slim = slimMessage(serverMessage);
-      await addSenderNames(client, [slim]);
-      success(strip(slim));
+      const flat = await enrichMessage(client, serverMessage);
+      success(flat);
     },
   },
 
@@ -1108,10 +1036,11 @@ export const commands: Command[] = [
         const full = '--full' in flags;
         const slimMsgs = slimMessages(messages);
         await addSenderNames(client, slimMsgs);
-        let results: Record<string, unknown>[] = slimMsgs.map((sm) => {
-          const obj = {
-            ...(strip(sm) as Record<string, unknown>),
-            chat_id: sm.chat_id,
+        const flatMsgs = slimMsgs.map(flattenMessage);
+        let results: Record<string, unknown>[] = flatMsgs.map((fm, idx) => {
+          const obj: Record<string, unknown> = {
+            ...fm,
+            chat_id: (messages[idx] as Td.message).chat_id,
           };
           return full ? obj : truncateContent(obj);
         });
@@ -1186,20 +1115,22 @@ export const commands: Command[] = [
         const full = '--full' in flags;
         const slimMsgs = slimMessages(messages);
         await addSenderNames(client, slimMsgs);
-        const formattedPromises = slimMsgs.map(async (sm) => {
+        const flatMsgs = slimMsgs.map(flattenMessage);
+        const formattedPromises = flatMsgs.map(async (fm, idx) => {
+          const msg = messages[idx] as Td.message;
           let chatTitle = '';
           try {
             const chat = await client.invoke({
               _: 'getChat',
-              chat_id: sm.chat_id,
+              chat_id: msg.chat_id,
             });
             chatTitle = chat.title;
           } catch {
             // skip
           }
-          const obj = {
-            ...(strip(sm) as Record<string, unknown>),
-            chat_id: sm.chat_id,
+          const obj: Record<string, unknown> = {
+            ...fm,
+            chat_id: msg.chat_id,
             chat_title: chatTitle,
           };
           return full ? obj : truncateContent(obj);
@@ -1228,7 +1159,7 @@ export const commands: Command[] = [
                 limit: contextN * 2 + 1,
                 only_local: false,
               });
-              const context = strip(
+              const context = flattenMessages(
                 slimMessages(
                   ctx.messages.filter((cm): cm is Td.message => cm != null && cm.id !== msgId),
                 ),
@@ -1525,9 +1456,8 @@ export const commands: Command[] = [
         },
       } satisfies Td.editMessageText as Td.editMessageText);
 
-      const slim = slimMessage(result);
-      await addSenderNames(client, [slim]);
-      success(strip(slim));
+      const flat = await enrichMessage(client, result);
+      success(flat);
     },
   },
 
@@ -1679,7 +1609,7 @@ export const commands: Command[] = [
           );
       });
 
-      success(strip(slimMessages(confirmedMessages)));
+      success(flattenMessages(slimMessages(confirmedMessages)));
     },
   },
 
@@ -2350,22 +2280,20 @@ export const commands: Command[] = [
                   } catch {
                     // emit even if download fails
                   }
-                  const slimDl = slimMessage(msg);
-                  await addSenderNames(client, [slimDl]);
+                  const flatDl = await enrichMessage(client, msg);
                   emit({
                     type: 'new_message',
                     chat_id: msg.chat_id,
-                    message: slimDl,
+                    message: flatDl,
                   });
                   return;
                 }
               }
-              const slimMsg = slimMessage(msg);
-              await addSenderNames(client, [slimMsg]);
+              const flatMsg = await enrichMessage(client, msg);
               emit({
                 type: 'new_message',
                 chat_id: msg.chat_id,
-                message: slimMsg,
+                message: flatMsg,
               });
             }
 
@@ -2381,7 +2309,7 @@ export const commands: Command[] = [
                 emit({
                   type: 'edit_message',
                   chat_id: update.chat_id,
-                  message: slimMessage(msg),
+                  message: flattenMessage(slimMessage(msg)),
                 });
               } catch {
                 /* skip errors */
@@ -2400,7 +2328,7 @@ export const commands: Command[] = [
                 emit({
                   type: 'edit_message',
                   chat_id: update.chat_id,
-                  message: slimMessage(msg),
+                  message: flattenMessage(slimMessage(msg)),
                 });
               } catch {
                 /* skip errors */
@@ -2469,7 +2397,7 @@ export const commands: Command[] = [
                 type: 'message_send_succeeded',
                 chat_id: msg.chat_id,
                 old_message_id: update.old_message_id,
-                message: slimMessage(msg),
+                message: flattenMessage(slimMessage(msg)),
               });
             }
           } catch {
