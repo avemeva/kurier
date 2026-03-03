@@ -1023,6 +1023,17 @@ export const commands: Command[] = [
         }
       }
 
+      if (flags['--since'] !== undefined) {
+        const since = Number(flags['--since']);
+        if (!Number.isFinite(since) || since < 0 || since !== Math.floor(since))
+          fail('--since must be a non-negative unix timestamp (integer)', 'INVALID_ARGS');
+      }
+      if (flags['--until'] !== undefined) {
+        const until = Number(flags['--until']);
+        if (!Number.isFinite(until) || until < 0 || until !== Math.floor(until))
+          fail('--until must be a non-negative unix timestamp (integer)', 'INVALID_ARGS');
+      }
+
       if (flags['--chat']) {
         // Per-chat search
         if (flags['--type'])
@@ -1265,7 +1276,7 @@ export const commands: Command[] = [
   // --- Find ---
   {
     name: 'find',
-    description: 'Find bots, channels, groups, or users by name',
+    description: 'Find bots, channels, groups, users, or contacts by name',
     usage: 'tg find "<query>" [--type bot|channel|group|user|contact] [--limit N]',
     flags: {
       '--type': 'Filter: bot, channel, group, user, or contact',
@@ -1391,13 +1402,16 @@ export const commands: Command[] = [
         : dedupedEntities;
 
       // Slim, strip, limit
-      const results = filtered.slice(0, limit).map(({ chat, user }) => {
+      const sliced = filtered.slice(0, limit);
+      const results = sliced.map(({ chat, user }) => {
         const slim = strip(slimChat(chat)) as Record<string, unknown>;
         if (user) slim.user = strip(slimUser(user));
         return slim;
       });
 
-      success(results);
+      success(results, {
+        hasMore: filtered.length > limit ? true : undefined,
+      });
     },
   },
 

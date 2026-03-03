@@ -337,7 +337,7 @@ describe('slimUser', () => {
     expect('active_user_count' in result).toBe(false);
   });
 
-  test('omits active_user_count for bots with 0 users', () => {
+  test('includes active_user_count 0 for bots with 0 users', () => {
     const result = slimUser(
       makeUser({
         type: {
@@ -355,7 +355,7 @@ describe('slimUser', () => {
         },
       }),
     );
-    expect('active_user_count' in result).toBe(false);
+    expect(result.active_user_count).toBe(0);
   });
 });
 
