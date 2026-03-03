@@ -1401,6 +1401,17 @@ export const commands: Command[] = [
           })
         : dedupedEntities;
 
+      // Sort bots by popularity (active_user_count descending)
+      if (typeFilter === 'bot') {
+        filtered.sort((a, b) => {
+          const aCount =
+            a.user?.type._ === 'userTypeBot' ? (a.user.type.active_user_count ?? 0) : 0;
+          const bCount =
+            b.user?.type._ === 'userTypeBot' ? (b.user.type.active_user_count ?? 0) : 0;
+          return bCount - aCount;
+        });
+      }
+
       // Slim, strip, limit
       const sliced = filtered.slice(0, limit);
       const results = sliced.map(({ chat, user }) => {

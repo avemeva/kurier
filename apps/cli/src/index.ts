@@ -30,7 +30,7 @@ const MAX_FLOOD_WAIT_SEC = 30;
 
 const COMMAND_GROUPS: [string, string[]][] = [
   ['Identity', ['me', 'resolve', 'contacts']],
-  ['Chats', ['dialogs', 'unread', 'chat', 'members']],
+  ['Chats', ['find', 'dialogs', 'unread', 'chat', 'members']],
   ['Messages', ['message', 'messages', 'search', 'send', 'edit']],
   ['Actions', ['read', 'delete', 'forward', 'pin', 'unpin', 'react', 'click']],
   ['Real-time', ['listen']],
