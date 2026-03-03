@@ -103,6 +103,7 @@ tg unpin <chat> --all                    # Unpin all messages
 tg react <chat> <msgId> <emoji>          # Add reaction
 tg react <chat> <msgId> <emoji> --remove # Remove reaction
 tg react <chat> <msgId> <emoji> --big    # Big animation
+tg click <chat> <msgId> <button>          # Click inline keyboard button (index or text)
 
 # Real-time
 tg listen --type user                        # Stream all user chat events (NDJSON)
@@ -179,6 +180,9 @@ Unknown flags are rejected with `INVALID_ARGS` — never silently ignored. Rate 
 - **`listen` default events**: `new_message`, `edit_message`, `delete_messages`, `message_reactions`. Additional: `read_outbox`, `user_typing`, `user_status`, `message_send_succeeded`.
 - **`search` truncates text to 500 chars by default**: Use `--full` to get complete content.
 - **`search` without a query requires `--filter`**: Media-only search is supported per-chat.
+- **`click` uses flat button indexing**: Buttons are numbered 0, 1, 2... left-to-right, top-to-bottom across all rows.
+- **`click` callback buttons may timeout**: Bots have ~30 seconds to respond to callback queries.
+- **`reply_markup` in message output**: Messages with inline keyboards include a `reply_markup` field showing button text, type, and data.
 
 ## Common Patterns
 
@@ -227,6 +231,19 @@ tg contacts --search "Alex"       # Searches saved contacts only
 tg listen --chat -1001731417779
 # Each event is a JSON line; parse with jq
 tg listen --type user | while read line; do echo "$line" | jq .type; done
+```
+
+### Interact with bot inline keyboards
+```bash
+# View a bot message with its inline keyboard
+tg message <chat> <msgId>
+# Output includes reply_markup.rows with button text, type, and data
+
+# Click by flat index (0 = first button across all rows)
+tg click <chat> <msgId> 0
+
+# Click by button text (case-insensitive exact match)
+tg click <chat> <msgId> "Записаться"
 ```
 
 ### Custom TDLib calls

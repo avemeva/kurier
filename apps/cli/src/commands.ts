@@ -1888,6 +1888,101 @@ export const commands: Command[] = [
     },
   },
 
+  // --- Click inline keyboard button ---
+  {
+    name: 'click',
+    description: 'Click an inline keyboard button',
+    usage: 'tg click <chat> <messageId> <button>',
+    flags: {},
+    minArgs: 3,
+    run: async (client, args) => {
+      if (!args[0]) fail('Missing required argument: <chat>', 'INVALID_ARGS');
+      if (!args[1]) fail('Missing required argument: <messageId>', 'INVALID_ARGS');
+      if (!args[2]) fail('Missing required argument: <button>', 'INVALID_ARGS');
+      const chatId = await resolveChatId(client, args[0]);
+      const messageId = Number(args[1]);
+      if (!Number.isFinite(messageId) || messageId <= 0) fail('Invalid message ID', 'INVALID_ARGS');
+      const buttonArg = args[2];
+
+      const msg = await client.invoke({
+        _: 'getMessage',
+        chat_id: chatId,
+        message_id: messageId,
+      });
+
+      if (!msg.reply_markup || msg.reply_markup._ !== 'replyMarkupInlineKeyboard') {
+        fail('Message has no inline keyboard', 'INVALID_ARGS');
+      }
+
+      // Flatten buttons across all rows
+      const allButtons: Td.inlineKeyboardButton[] = [];
+      for (const row of msg.reply_markup.rows) {
+        for (const btn of row) allButtons.push(btn);
+      }
+
+      if (allButtons.length === 0) fail('Inline keyboard has no buttons', 'INVALID_ARGS');
+
+      // Resolve: numeric index or text match
+      let target: Td.inlineKeyboardButton | undefined;
+      const idx = Number(buttonArg);
+      if (Number.isFinite(idx) && idx >= 0 && idx === Math.floor(idx)) {
+        target = allButtons[idx];
+        if (!target)
+          fail(`Button index ${idx} out of range (0-${allButtons.length - 1})`, 'INVALID_ARGS');
+      } else {
+        const lower = buttonArg.toLowerCase();
+        target = allButtons.find((b) => b.text.toLowerCase() === lower);
+        if (!target) {
+          const available = allButtons.map((b, i) => `${i}: "${b.text}"`).join(', ');
+          fail(`No button matching "${buttonArg}". Available: ${available}`, 'NOT_FOUND');
+        }
+      }
+
+      const btnType = target.type;
+      switch (btnType._) {
+        case 'inlineKeyboardButtonTypeCallback': {
+          const answer = await client.invoke({
+            _: 'getCallbackQueryAnswer',
+            chat_id: chatId,
+            message_id: messageId,
+            payload: { _: 'callbackQueryPayloadData', data: btnType.data },
+          });
+          return success(
+            strip({
+              clicked: target.text,
+              type: 'callback',
+              answer: strip({
+                text: answer.text || undefined,
+                show_alert: answer.show_alert || undefined,
+                url: answer.url || undefined,
+              }),
+            }),
+          );
+        }
+        case 'inlineKeyboardButtonTypeUrl':
+          return success({ clicked: target.text, type: 'url', url: btnType.url });
+        case 'inlineKeyboardButtonTypeWebApp':
+          return success({ clicked: target.text, type: 'web_app', url: btnType.url });
+        case 'inlineKeyboardButtonTypeLoginUrl':
+          return success({ clicked: target.text, type: 'login_url', url: btnType.url });
+        case 'inlineKeyboardButtonTypeSwitchInline':
+          return success({ clicked: target.text, type: 'switch_inline', query: btnType.query });
+        case 'inlineKeyboardButtonTypeCopyText':
+          return success({ clicked: target.text, type: 'copy_text', text: btnType.text });
+        case 'inlineKeyboardButtonTypeUser':
+          return success({ clicked: target.text, type: 'user', user_id: btnType.user_id });
+        case 'inlineKeyboardButtonTypeBuy':
+          return fail('Buy buttons cannot be clicked via CLI', 'INVALID_ARGS');
+        case 'inlineKeyboardButtonTypeCallbackGame':
+          return fail('Game buttons cannot be clicked via CLI', 'INVALID_ARGS');
+        case 'inlineKeyboardButtonTypeCallbackWithPassword':
+          return fail('Password-protected buttons are not supported via CLI', 'INVALID_ARGS');
+        default:
+          return fail('Unsupported button type', 'INVALID_ARGS');
+      }
+    },
+  },
+
   // --- Eval ---
   {
     name: 'eval',

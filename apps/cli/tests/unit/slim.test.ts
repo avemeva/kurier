@@ -448,7 +448,6 @@ describe('slimMessage', () => {
     'can_be_saved',
     'interaction_info',
     'unread_reactions',
-    'reply_markup',
     'via_bot_user_id',
     'author_signature',
     'effect_id',
@@ -464,6 +463,74 @@ describe('slimMessage', () => {
     for (const key of absentKeys) {
       expect(key in result).toBe(false);
     }
+  });
+
+  test('omits reply_markup when message has none', () => {
+    const result = slimMessage(makeMessage());
+    expect('reply_markup' in result).toBe(false);
+  });
+
+  test('includes reply_markup for inline keyboard with callback button', () => {
+    const result = slimMessage(
+      makeMessage({
+        reply_markup: {
+          _: 'replyMarkupInlineKeyboard',
+          rows: [
+            [
+              {
+                _: 'inlineKeyboardButton',
+                text: 'Click me',
+                icon_custom_emoji_id: '0',
+                style: { _: 'buttonStyleDefault' },
+                type: { _: 'inlineKeyboardButtonTypeCallback', data: 'Y2FsbGJhY2s=' },
+              },
+            ],
+          ],
+        },
+      }),
+    );
+    expect(result.reply_markup).toBeDefined();
+    expect(result.reply_markup?.type).toBe('inline_keyboard');
+    expect(result.reply_markup?.rows).toHaveLength(1);
+    expect(result.reply_markup?.rows[0]?.[0]?.text).toBe('Click me');
+    expect(result.reply_markup?.rows[0]?.[0]?.type).toBe('callback');
+    expect(result.reply_markup?.rows[0]?.[0]?.data).toBe('Y2FsbGJhY2s=');
+  });
+
+  test('includes reply_markup for inline keyboard with url button', () => {
+    const result = slimMessage(
+      makeMessage({
+        reply_markup: {
+          _: 'replyMarkupInlineKeyboard',
+          rows: [
+            [
+              {
+                _: 'inlineKeyboardButton',
+                text: 'Open link',
+                icon_custom_emoji_id: '0',
+                style: { _: 'buttonStyleDefault' },
+                type: { _: 'inlineKeyboardButtonTypeUrl', url: 'https://example.com' },
+              },
+            ],
+          ],
+        },
+      }),
+    );
+    expect(result.reply_markup?.rows[0]?.[0]?.type).toBe('url');
+    expect(result.reply_markup?.rows[0]?.[0]?.url).toBe('https://example.com');
+  });
+
+  test('omits reply_markup for non-inline keyboard types', () => {
+    const result = slimMessage(
+      makeMessage({
+        reply_markup: {
+          _: 'replyMarkupForceReply',
+          is_personal: false,
+          input_field_placeholder: '',
+        } as unknown as Td.ReplyMarkup,
+      }),
+    );
+    expect('reply_markup' in result).toBe(false);
   });
 
   test('flattens messageSenderUser', () => {

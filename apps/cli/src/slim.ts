@@ -174,6 +174,7 @@ export type SlimMessage = {
   forward_info?: Td.messageForwardInfo;
   media_album_id?: string;
   content: SlimContent;
+  reply_markup?: SlimReplyMarkup;
 };
 
 // TDLib types are outdated — runtime uses reply_to object instead of reply_to_message_id
@@ -269,10 +270,60 @@ type SlimChatMember = {
   custom_title?: string;
 };
 
+type SlimInlineButton = {
+  text: string;
+  type: string;
+  data?: string;
+  url?: string;
+};
+
+type SlimReplyMarkup = {
+  type: 'inline_keyboard';
+  rows: SlimInlineButton[][];
+};
+
 // --- Helper: flatten caption ---
 
 function slimCaption(caption: Td.formattedText): { caption?: string } {
   return clean({ caption: unparse(caption.text, caption.entities) || undefined });
+}
+
+// --- Inline keyboard ---
+
+function slimInlineButton(btn: Td.inlineKeyboardButton): SlimInlineButton {
+  const base = { text: btn.text };
+  switch (btn.type._) {
+    case 'inlineKeyboardButtonTypeCallback':
+      return { ...base, type: 'callback', data: btn.type.data };
+    case 'inlineKeyboardButtonTypeCallbackWithPassword':
+      return { ...base, type: 'callback_password', data: btn.type.data };
+    case 'inlineKeyboardButtonTypeUrl':
+      return { ...base, type: 'url', url: btn.type.url };
+    case 'inlineKeyboardButtonTypeWebApp':
+      return { ...base, type: 'web_app', url: btn.type.url };
+    case 'inlineKeyboardButtonTypeLoginUrl':
+      return { ...base, type: 'login_url', url: btn.type.url };
+    case 'inlineKeyboardButtonTypeSwitchInline':
+      return { ...base, type: 'switch_inline' };
+    case 'inlineKeyboardButtonTypeBuy':
+      return { ...base, type: 'buy' };
+    case 'inlineKeyboardButtonTypeCallbackGame':
+      return { ...base, type: 'callback_game' };
+    case 'inlineKeyboardButtonTypeCopyText':
+      return { ...base, type: 'copy_text' };
+    case 'inlineKeyboardButtonTypeUser':
+      return { ...base, type: 'user' };
+    default:
+      return { ...base, type: 'unknown' };
+  }
+}
+
+function slimReplyMarkup(rm: Td.ReplyMarkup | undefined): SlimReplyMarkup | undefined {
+  if (!rm || rm._ !== 'replyMarkupInlineKeyboard') return undefined;
+  return {
+    type: 'inline_keyboard',
+    rows: rm.rows.map((row) => row.map(slimInlineButton)),
+  };
 }
 
 // --- Shaping functions ---
@@ -347,6 +398,7 @@ export function slimMessage(m: Td.message): SlimMessage {
     media_album_id:
       m.media_album_id && m.media_album_id !== '0' ? String(m.media_album_id) : undefined,
     content: slimContent(m.content),
+    reply_markup: slimReplyMarkup(m.reply_markup),
   });
 }
 

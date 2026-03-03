@@ -32,7 +32,7 @@ const COMMAND_GROUPS: [string, string[]][] = [
   ['Identity', ['me', 'resolve', 'contacts']],
   ['Chats', ['dialogs', 'unread', 'chat', 'members']],
   ['Messages', ['message', 'messages', 'search', 'send', 'edit']],
-  ['Actions', ['read', 'delete', 'forward', 'pin', 'unpin', 'react']],
+  ['Actions', ['read', 'delete', 'forward', 'pin', 'unpin', 'react', 'click']],
   ['Real-time', ['listen']],
   ['Media', ['download', 'transcribe']],
   ['Advanced', ['eval', 'list']],
