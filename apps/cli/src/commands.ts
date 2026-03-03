@@ -10,9 +10,8 @@ import path from 'node:path';
 import type { TelegramClient } from '@tg/protocol';
 import type * as Td from 'tdlib-types';
 import { flattenChats, flattenMessage, flattenMessages } from './flatten';
-import { formatDialogs, formatMessages } from './format-md';
 import { addSenderNames, enrichMessage, enrichMessages, transcribeMessages } from './helpers';
-import { fail, stdout, strip, success, warn } from './output';
+import { fail, strip, success, warn } from './output';
 import { resolveChatId, resolveEntity } from './resolve';
 import { slimAuthState, slimChat, slimMembers, slimMessage, slimMessages, slimUser } from './slim';
 
@@ -406,7 +405,7 @@ export const commands: Command[] = [
 
         const flatF = flattenChats(filtered);
         const metaF = { hasMore, nextOffset: hasMore && lastDate ? lastDate : undefined };
-        if ('--text' in flags) return stdout(formatDialogs(flatF, metaF));
+
         success(flatF, metaF);
       } else {
         // No filter — single fetch
@@ -442,7 +441,7 @@ export const commands: Command[] = [
 
         const flatU = flattenChats(chatObjects);
         const metaU = { hasMore, nextOffset: hasMore && lastDate ? lastDate : undefined };
-        if ('--text' in flags) return stdout(formatDialogs(flatU, metaU));
+
         success(flatU, metaU);
       }
     },
@@ -628,7 +627,7 @@ export const commands: Command[] = [
           hasMore,
           ...(hasMore && matched.length > 0 ? { nextOffset: matched[matched.length - 1]?.id } : {}),
         };
-        if ('--text' in flags) return stdout(formatMessages(flat, meta));
+
         success(flat, meta);
         return;
       }
@@ -718,7 +717,7 @@ export const commands: Command[] = [
             ? { nextOffset: matched[matched.length - 1]?.id }
             : {}),
         };
-        if ('--text' in flags) return stdout(formatMessages(flat2, meta2));
+
         success(flat2, meta2);
         return;
       }
@@ -771,7 +770,7 @@ export const commands: Command[] = [
         hasMore,
         ...(hasMore && nextOffsetMsg ? { nextOffset: nextOffsetMsg.id } : {}),
       };
-      if ('--text' in flags) return stdout(formatMessages(flat3, meta3));
+
       success(flat3, meta3);
     },
   },
@@ -781,7 +780,7 @@ export const commands: Command[] = [
     usage: 'tg message <chat> <message_id>',
     flags: {},
     minArgs: 2,
-    run: async (client, args, flags) => {
+    run: async (client, args, _flags) => {
       const chatId = await resolveChatId(client, args[0] as string);
       const messageId = Number(args[1]);
       if (!messageId) fail('Invalid message ID', 'INVALID_ARGS');
@@ -792,7 +791,7 @@ export const commands: Command[] = [
       });
       await autoDownloadSmall(client, [msg]);
       const flat = await enrichMessage(client, msg);
-      if ('--text' in flags) return stdout(formatMessages([flat]));
+
       success(flat);
     },
   },
@@ -2100,26 +2099,6 @@ export const commands: Command[] = [
           fail('eval returned a non-serializable value', 'INVALID_ARGS');
         }
       }
-    },
-  },
-
-  // --- List ---
-  {
-    name: 'list',
-    description: 'List all available commands as JSON',
-    usage: 'tg list',
-    run: async () => {
-      success(
-        commands
-          .filter((c) => c.name !== 'list')
-          .map((c) => ({
-            name: c.name,
-            description: c.description,
-            usage: c.usage,
-            options: c.flags,
-            minArgs: c.minArgs ?? 0,
-          })),
-      );
     },
   },
 

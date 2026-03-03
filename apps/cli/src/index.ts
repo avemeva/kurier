@@ -35,7 +35,7 @@ const COMMAND_GROUPS: [string, string[]][] = [
   ['Actions', ['read', 'delete', 'forward', 'pin', 'unpin', 'react', 'click']],
   ['Real-time', ['listen']],
   ['Media', ['download', 'transcribe']],
-  ['Advanced', ['eval', 'list']],
+  ['Advanced', ['eval']],
   ['Auth', ['auth']],
 ];
 
@@ -51,7 +51,6 @@ function printHelp(): void {
     'Entities: numeric ID | @username | +phone | t.me/link | "me"',
     '',
     'Global flags:',
-    '  --text        Human-readable text output (instead of JSON)',
     '  --timeout N   Timeout in seconds',
     '',
   ];
@@ -229,7 +228,7 @@ async function run(): Promise<void> {
   }
 
   // Reject unknown flags
-  const GLOBAL_FLAGS = new Set(['--timeout', '--help', '--file', '--stdin', '--text']);
+  const GLOBAL_FLAGS = new Set(['--timeout', '--help', '--file', '--stdin']);
   const knownFlags = new Set([...GLOBAL_FLAGS, ...Object.keys(cmd.flags ?? {})]);
   const unknownFlags = Object.keys(flags).filter((f) => !knownFlags.has(f));
   if (unknownFlags.length > 0) {

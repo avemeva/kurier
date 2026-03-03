@@ -20,7 +20,7 @@ export const BOOLEAN_FLAGS = new Set([
   '--download-media',
   '--full',
   '--unread',
-  '--text',
+
   '--transcribe',
 ]);
 
