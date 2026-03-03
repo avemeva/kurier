@@ -230,7 +230,14 @@ async function run(): Promise<void> {
   }
 
   // Reject unknown flags
-  const GLOBAL_FLAGS = new Set(['--pretty', '--timeout', '--help', '--file', '--stdin']);
+  const GLOBAL_FLAGS = new Set([
+    '--pretty',
+    '--timeout',
+    '--help',
+    '--file',
+    '--stdin',
+    '--markdown',
+  ]);
   const knownFlags = new Set([...GLOBAL_FLAGS, ...Object.keys(cmd.flags ?? {})]);
   const unknownFlags = Object.keys(flags).filter((f) => !knownFlags.has(f));
   if (unknownFlags.length > 0) {

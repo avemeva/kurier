@@ -128,7 +128,11 @@ tg download --file-id <id> [--output path]  # Download by TDLib file ID
 tg transcribe <chat> <msgId>                # Transcribe voice/video note (Premium)
 
 # Advanced
-tg eval "<javascript>"                   # Run JS with connected client
+tg eval '<javascript>'                   # Run JS with connected client
+tg eval --file script.js                 # Run JS from file
+tg eval <<'EOF'                          # Run JS via heredoc (recommended)
+<code>
+EOF
 
 # Daemon
 tg daemon start                          # Start background daemon
@@ -261,9 +265,33 @@ tg click <chat> <msgId> "Записаться"
 ```
 
 ### Custom TDLib calls
+
+**Shell quoting can corrupt complex expressions** — use heredoc or `--file` to avoid issues with `!`, nested quotes, template literals, etc.
+
 ```bash
-tg eval 'const me = await client.invoke({ _: "getMe" }); return { id: me.id, name: me.first_name };'
+# Simple expressions work with single quotes
+tg eval 'const me = await client.invoke({ _: "getMe" }); success({ id: me.id, name: me.first_name })'
+
+# Complex JS: use heredoc (RECOMMENDED)
+tg eval <<'EOF'
+const me = await client.invoke({ _: "getMe" });
+const chats = await client.invoke({ _: "getChats", chat_list: { _: "chatListMain" }, limit: 5 });
+const titles = [];
+for (const id of chats.chat_ids) {
+  const chat = await client.invoke({ _: "getChat", chat_id: id });
+  if (chat.title !== "") titles.push(chat.title);
+}
+success({ user: me.first_name, top_chats: titles });
+EOF
+
+# Or from a file
+tg eval --file /tmp/my-script.js
 ```
+
+**Rules of thumb:**
+- Single-line, no `!` or nested quotes → `tg eval 'expression'` is fine
+- Anything with `!==`, `!flag`, nested quotes, multiline → use heredoc `<<'EOF'`
+- Reusable scripts → use `--file`
 
 `eval` scope: `client` (.invoke()), `fs`, `path`, `success()`, `fail()`, `strip()`.
 

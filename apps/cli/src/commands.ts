@@ -9,7 +9,8 @@ import { copyFileSync } from 'node:fs';
 import path from 'node:path';
 import type { TelegramClient } from '@tg/protocol';
 import type * as Td from 'tdlib-types';
-import { fail, strip, success, warn } from './output';
+import { formatMessages } from './markdown';
+import { fail, stdout, strip, success, warn } from './output';
 import { resolveChatId, resolveEntity } from './resolve';
 import {
   type SlimMessage,
@@ -689,11 +690,14 @@ export const commands: Command[] = [
         if ('--download-media' in flags) {
           await autoDownloadMessages(client, matched);
         }
+        const slim = await slimMessagesWithNames(client, matched);
         const hasMore = matched.length >= limit;
-        success(strip(await slimMessagesWithNames(client, matched)), {
+        const meta = {
           hasMore,
           ...(hasMore && matched.length > 0 ? { nextOffset: matched[matched.length - 1]?.id } : {}),
-        });
+        };
+        if ('--markdown' in flags) return stdout(formatMessages(slim, meta));
+        success(strip(slim), meta);
         return;
       }
 
@@ -775,11 +779,16 @@ export const commands: Command[] = [
         if ('--download-media' in flags) {
           await autoDownloadMessages(client, matched);
         }
-        const hasMore = matched.length >= limit;
-        success(strip(await slimMessagesWithNames(client, matched)), {
-          hasMore,
-          ...(hasMore && matched.length > 0 ? { nextOffset: matched[matched.length - 1]?.id } : {}),
-        });
+        const slim2 = await slimMessagesWithNames(client, matched);
+        const hasMore2 = matched.length >= limit;
+        const meta2 = {
+          hasMore: hasMore2,
+          ...(hasMore2 && matched.length > 0
+            ? { nextOffset: matched[matched.length - 1]?.id }
+            : {}),
+        };
+        if ('--markdown' in flags) return stdout(formatMessages(slim2, meta2));
+        success(strip(slim2), meta2);
         return;
       }
 
@@ -827,10 +836,13 @@ export const commands: Command[] = [
       // older than the oldest in this batch, so nextOffset = messages[0].id (the oldest).
       // When not reversed, messages are [newest...oldest], so nextOffset = last element.
       const nextOffsetMsg = isReverse ? matched[0] : matched[matched.length - 1];
-      success(strip(await slimMessagesWithNames(client, matched)), {
+      const slim3 = await slimMessagesWithNames(client, matched);
+      const meta3 = {
         hasMore,
         ...(hasMore && nextOffsetMsg ? { nextOffset: nextOffsetMsg.id } : {}),
-      });
+      };
+      if ('--markdown' in flags) return stdout(formatMessages(slim3, meta3));
+      success(strip(slim3), meta3);
     },
   },
   {
@@ -839,7 +851,7 @@ export const commands: Command[] = [
     usage: 'tg message <chat> <message_id>',
     flags: {},
     minArgs: 2,
-    run: async (client, args) => {
+    run: async (client, args, flags) => {
       const chatId = await resolveChatId(client, args[0] as string);
       const messageId = Number(args[1]);
       if (!messageId) fail('Invalid message ID', 'INVALID_ARGS');
@@ -851,6 +863,7 @@ export const commands: Command[] = [
       await autoDownloadSmall(client, [msg]);
       const slim = slimMessage(msg);
       await addSenderNames(client, [slim]);
+      if ('--markdown' in flags) return stdout(formatMessages([slim]));
       success(strip(slim));
     },
   },
@@ -2114,11 +2127,31 @@ export const commands: Command[] = [
   {
     name: 'eval',
     description: 'Execute JavaScript with a connected TDLib client',
-    usage: 'tg eval "<code>"',
-    flags: {},
-    minArgs: 1,
+    usage: [
+      "tg eval '<code>'",
+      'tg eval --file script.js',
+      "tg eval <<'EOF'\n  <code>\n  EOF",
+    ].join('\n  '),
+    flags: {
+      '--file': 'Read code from a file path',
+    },
     run: async (client, args) => {
-      const code = args.join(' ');
+      let code: string;
+      if (args.length > 0) {
+        code = args.join(' ');
+      } else if (!process.stdin.isTTY) {
+        const chunks: Buffer[] = [];
+        for await (const chunk of process.stdin) {
+          chunks.push(chunk as Buffer);
+        }
+        code = Buffer.concat(chunks).toString('utf-8').trimEnd();
+        if (!code) fail('No code received from stdin', 'INVALID_ARGS');
+      } else {
+        fail(
+          'No code provided. Pass code as argument, via stdin (heredoc), or --file.',
+          'INVALID_ARGS',
+        );
+      }
       const fn = new Function(
         'client',
         'success',

@@ -106,6 +106,11 @@ export function fail(message: string, code: ErrorCode = 'UNKNOWN'): never {
   throw new CliError(message);
 }
 
+/** Write raw text to stdout (no JSON wrapping). Used by --markdown mode. */
+export function stdout(text: string): void {
+  process.stdout.write(`${text}\n`);
+}
+
 /** Write a warning to stderr. */
 export function warn(message: string): void {
   console.error(`[warn] ${message}`);

@@ -21,6 +21,7 @@ export const BOOLEAN_FLAGS = new Set([
   '--download-media',
   '--full',
   '--unread',
+  '--markdown',
 ]);
 
 export function parseArgs(raw: string[]): {
