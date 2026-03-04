@@ -27,7 +27,7 @@ function parseLimit(flags: Record<string, string>, defaultVal: number): number {
   return n;
 }
 
-const VALID_CHAT_TYPES = new Set(['user', 'group', 'channel']);
+const VALID_CHAT_TYPES = new Set(['user', 'bot', 'group', 'channel']);
 
 const VALID_FIND_TYPES = new Set(['bot', 'channel', 'group', 'user', 'contact']);
 
@@ -69,9 +69,13 @@ export interface Command {
   run: (client: TelegramClient, args: string[], flags: Record<string, string>) => Promise<void>;
 }
 
-function getChatType(chat: Td.chat): 'user' | 'group' | 'channel' | 'unknown' {
+function getChatType(
+  chat: Td.chat,
+  botChatIds?: Set<number>,
+): 'user' | 'bot' | 'group' | 'channel' | 'unknown' {
   switch (chat.type._) {
     case 'chatTypePrivate':
+      return botChatIds?.has(chat.id) ? 'bot' : 'user';
     case 'chatTypeSecret':
       return 'user';
     case 'chatTypeBasicGroup':
@@ -81,6 +85,22 @@ function getChatType(chat: Td.chat): 'user' | 'group' | 'channel' | 'unknown' {
     default:
       return 'unknown';
   }
+}
+
+/** Resolve which private chats are bots. Returns a set of chat IDs. */
+async function resolveBotChatIds(client: TelegramClient, chats: Td.chat[]): Promise<Set<number>> {
+  const botIds = new Set<number>();
+  for (const chat of chats) {
+    if (chat.type._ === 'chatTypePrivate') {
+      try {
+        const user = await client.invoke({ _: 'getUser', user_id: chat.type.user_id });
+        if (user.type._ === 'userTypeBot') botIds.add(chat.id);
+      } catch {
+        /* skip */
+      }
+    }
+  }
+  return botIds;
 }
 
 const AUTO_DOWNLOAD_MAX_SIZE = 1_048_576; // 1MB
@@ -321,12 +341,12 @@ export const commands: Command[] = [
     name: 'dialogs',
     description: 'List chats and conversations',
     usage:
-      'tg dialogs [--limit N] [--archived] [--unread] [--type user|group|channel] [--search text] [--offset-date N]',
+      'tg dialogs [--limit N] [--archived] [--unread] [--type user|bot|group|channel] [--search text] [--offset-date N]',
     flags: {
       '--limit': 'Max chats to return (default: 40)',
       '--archived': 'Show archived chats',
       '--unread': 'Only show chats with unread messages',
-      '--type': 'Filter by chat type: user, group, or channel',
+      '--type': 'Filter by chat type: user, bot, group, or channel',
       '--search': 'Filter by chat title (client-side substring match)',
       '--offset-date': "Paginate: unix timestamp from previous response's nextOffset",
     },
@@ -341,7 +361,10 @@ export const commands: Command[] = [
         fail('--offset-date must be a non-negative unix timestamp', 'INVALID_ARGS');
       }
       if (typeFilter && !VALID_CHAT_TYPES.has(typeFilter)) {
-        fail(`Invalid --type "${typeFilter}". Expected: user, group, or channel`, 'INVALID_ARGS');
+        fail(
+          `Invalid --type "${typeFilter}". Expected: user, bot, group, or channel`,
+          'INVALID_ARGS',
+        );
       }
       const chatList: Td.ChatList = archived ? { _: 'chatListArchive' } : { _: 'chatListMain' };
       const isFiltered = !!(typeFilter || unreadOnly || searchQuery || offsetDate);
@@ -351,6 +374,7 @@ export const commands: Command[] = [
         const BATCH_SIZE = 50;
         const MAX_SCAN = 500;
         const matched: Td.chat[] = [];
+        const botChatIds = new Set<number>();
         let totalLoaded = 0;
         let exhausted = false;
 
@@ -383,11 +407,25 @@ export const commands: Command[] = [
           for (const id of newIds) {
             try {
               const chat = await client.invoke({ _: 'getChat', chat_id: id });
+
+              // Resolve bot status for private chats
+              let isBot = false;
+              if (chat.type._ === 'chatTypePrivate') {
+                try {
+                  const user = await client.invoke({ _: 'getUser', user_id: chat.type.user_id });
+                  isBot = user.type._ === 'userTypeBot';
+                  if (isBot) botChatIds.add(chat.id);
+                } catch {
+                  /* skip */
+                }
+              }
+
               let passes = true;
               // offset-date: skip chats whose last message is at or after the offset
               if (offsetDate && (chat.last_message?.date ?? 0) >= offsetDate) passes = false;
               if (passes && unreadOnly && chat.unread_count === 0) passes = false;
-              if (passes && typeFilter && getChatType(chat) !== typeFilter) passes = false;
+              if (passes && typeFilter && getChatType(chat, botChatIds) !== typeFilter)
+                passes = false;
               if (passes && searchQuery && !chat.title.toLowerCase().includes(searchQuery))
                 passes = false;
               if (passes) matched.push(chat);
@@ -403,7 +441,7 @@ export const commands: Command[] = [
         const lastChat = filtered[filtered.length - 1];
         const lastDate = lastChat?.last_message?.date;
 
-        const flatF = flattenChats(filtered);
+        const flatF = flattenChats(filtered, botChatIds);
         const metaF = { hasMore, nextOffset: hasMore && lastDate ? lastDate : undefined };
 
         success(flatF, metaF);
@@ -435,11 +473,13 @@ export const commands: Command[] = [
           }
         }
 
+        const botChatIds = await resolveBotChatIds(client, chatObjects);
+
         const hasMore = chatIds.chat_ids.length >= limit;
         const lastChat = chatObjects[chatObjects.length - 1];
         const lastDate = lastChat?.last_message?.date;
 
-        const flatU = flattenChats(chatObjects);
+        const flatU = flattenChats(chatObjects, botChatIds);
         const metaU = { hasMore, nextOffset: hasMore && lastDate ? lastDate : undefined };
 
         success(flatU, metaU);
@@ -451,17 +491,20 @@ export const commands: Command[] = [
   {
     name: 'unread',
     description: 'List chats with unread messages',
-    usage: 'tg unread [--all] [--type user|group|channel] [--limit N]',
+    usage: 'tg unread [--all] [--type user|bot|group|channel] [--limit N]',
     flags: {
       '--all': 'Include archived chats',
-      '--type': 'Filter by chat type: user, group, or channel',
+      '--type': 'Filter by chat type: user, bot, group, or channel',
       '--limit': 'Max chats to return',
     },
     run: async (client, _args, flags) => {
       const includeArchived = '--all' in flags;
       const typeFilter = flags['--type'];
       if (typeFilter && !VALID_CHAT_TYPES.has(typeFilter)) {
-        fail(`Invalid --type "${typeFilter}". Expected: user, group, or channel`, 'INVALID_ARGS');
+        fail(
+          `Invalid --type "${typeFilter}". Expected: user, bot, group, or channel`,
+          'INVALID_ARGS',
+        );
       }
       const limit = parseLimit(flags, 50);
       const scanLimit = 500;
@@ -514,15 +557,17 @@ export const commands: Command[] = [
         }
       }
 
+      const botChatIds = await resolveBotChatIds(client, chatObjects);
+
       let unread = chatObjects;
       if (typeFilter) {
-        unread = unread.filter((c) => getChatType(c) === typeFilter);
+        unread = unread.filter((c) => getChatType(c, botChatIds) === typeFilter);
       }
 
       const totalUnread = unread.length;
       unread = unread.slice(0, limit);
 
-      success(flattenChats(unread), { hasMore: totalUnread > limit });
+      success(flattenChats(unread, botChatIds), { hasMore: totalUnread > limit });
     },
   },
 
@@ -592,7 +637,9 @@ export const commands: Command[] = [
         let cursor = flags['--offset-id'] ? Number(flags['--offset-id']) : 0;
         let scanned = 0;
 
-        while (matched.length < limit && scanned < MAX_SCAN) {
+        let exhaustedSearch = false;
+
+        while (scanned < MAX_SCAN && !exhaustedSearch) {
           const result = await client.invoke({
             _: 'searchChatMessages',
             chat_id: chatId,
@@ -600,35 +647,44 @@ export const commands: Command[] = [
             sender_id: senderOption,
             from_message_id: cursor,
             offset: 0,
-            limit: since ? BATCH : limit,
+            limit: BATCH,
             filter,
           } satisfies Td.searchChatMessages as Td.searchChatMessages);
 
           const batch = result.messages.filter(
             (m: Td.message | null): m is Td.message => m !== null,
           );
-          if (batch.length === 0) break;
+          if (batch.length === 0) {
+            exhaustedSearch = true;
+            break;
+          }
           scanned += batch.length;
           for (const m of batch) {
             if (since && m.date < since) continue;
             matched.push(m);
-            if (matched.length >= limit) break;
           }
           cursor = (batch.at(-1) as Td.message).id;
-          if (!since) break;
+
+          const flatCount = flattenMessages(slimMessages(matched)).length;
+          if (flatCount >= limit) break;
+          if (!since && batch.length < BATCH) {
+            exhaustedSearch = true;
+            break;
+          }
         }
 
         await autoDownloadSmall(client, matched);
         if ('--download-media' in flags) await autoDownloadMessages(client, matched);
         if ('--transcribe' in flags) await transcribeMessages(client, matched);
         const flat = await enrichMessages(client, matched);
-        const hasMore = matched.length >= limit;
+        const sliced = flat.slice(0, limit);
+        const hasMore = flat.length > limit || (!exhaustedSearch && scanned < MAX_SCAN);
         const meta = {
           hasMore,
           ...(hasMore && matched.length > 0 ? { nextOffset: matched[matched.length - 1]?.id } : {}),
         };
 
-        success(flat, meta);
+        success(sliced, meta);
         return;
       }
 
@@ -679,46 +735,54 @@ export const commands: Command[] = [
         const matched: Td.message[] = [];
         let cursor = fromMessageId;
         let scanned = 0;
+        let exhausted = false;
 
-        while (matched.length < limit && scanned < MAX_SCAN) {
+        // Fetch enough raw messages so that after album grouping we have >= limit flat entries.
+        // Albums collapse multiple raw messages into one flat entry, so we may need to over-fetch.
+        while (scanned < MAX_SCAN && !exhausted) {
           const result = await client.invoke({
             _: 'searchChatMessages',
             chat_id: chatId,
             query: ' ',
             from_message_id: cursor,
             offset: 0,
-            limit: hasClientFilter ? BATCH : limit,
+            limit: BATCH,
             filter: f,
           } satisfies Td.searchChatMessages as Td.searchChatMessages);
 
           const batch = result.messages.filter(
             (m: Td.message | null): m is Td.message => m !== null,
           );
-          if (batch.length === 0) break;
+          if (batch.length === 0) {
+            exhausted = true;
+            break;
+          }
           scanned += batch.length;
           for (const m of batch) {
-            if (clientFilter(m)) {
-              matched.push(m);
-              if (matched.length >= limit) break;
-            }
+            if (clientFilter(m)) matched.push(m);
           }
           cursor = (batch.at(-1) as Td.message).id;
-          if (!hasClientFilter) break;
+
+          // Check if flat output has enough entries (album grouping reduces count)
+          const flatCount = flattenMessages(slimMessages(matched)).length;
+          if (flatCount >= limit) break;
+          if (!hasClientFilter && batch.length < BATCH) {
+            exhausted = true;
+            break;
+          }
         }
 
         await autoDownloadSmall(client, matched);
         if ('--download-media' in flags) await autoDownloadMessages(client, matched);
         if ('--transcribe' in flags) await transcribeMessages(client, matched);
-        const flat2 = await enrichMessages(client, matched);
-        const hasMore2 = matched.length >= limit;
-        const meta2 = {
-          hasMore: hasMore2,
-          ...(hasMore2 && matched.length > 0
-            ? { nextOffset: matched[matched.length - 1]?.id }
-            : {}),
-        };
+        const flatFiltered = await enrichMessages(client, matched);
+        const output = flatFiltered.slice(0, limit);
+        const more = flatFiltered.length > limit || (!exhausted && scanned < MAX_SCAN);
 
-        success(flat2, meta2);
+        success(output, {
+          hasMore: more,
+          ...(more && matched.length > 0 ? { nextOffset: matched[matched.length - 1]?.id } : {}),
+        });
         return;
       }
 
@@ -730,28 +794,36 @@ export const commands: Command[] = [
       const BATCH = 50;
       const MAX_SCAN = 500;
       const matched: Td.message[] = [];
-      let left = hasClientFilter ? MAX_SCAN : limit;
+      let scannedHistory = 0;
+      let exhaustedHistory = false;
 
-      while (matched.length < limit && left > 0) {
+      while (scannedHistory < MAX_SCAN && !exhaustedHistory) {
         const result = await client.invoke({
           _: 'getChatHistory',
           chat_id: chatId,
           from_message_id: fromMessageId,
           offset: 0,
-          limit: Math.min(BATCH, left),
+          limit: BATCH,
           only_local: false,
         });
 
         const batch = result.messages.filter((m): m is Td.message => m != null);
-        if (batch.length === 0) break;
-        left -= batch.length;
+        if (batch.length === 0) {
+          exhaustedHistory = true;
+          break;
+        }
+        scannedHistory += batch.length;
         for (const m of batch) {
-          if (clientFilter(m)) {
-            matched.push(m);
-            if (matched.length >= limit) break;
-          }
+          if (clientFilter(m)) matched.push(m);
         }
         fromMessageId = (batch.at(-1) as Td.message).id;
+
+        const flatCount = flattenMessages(slimMessages(matched)).length;
+        if (flatCount >= limit) break;
+        if (!hasClientFilter && batch.length < BATCH) {
+          exhaustedHistory = true;
+          break;
+        }
       }
 
       const isReverse = '--reverse' in flags;
@@ -760,18 +832,18 @@ export const commands: Command[] = [
       await autoDownloadSmall(client, matched);
       if ('--download-media' in flags) await autoDownloadMessages(client, matched);
       if ('--transcribe' in flags) await transcribeMessages(client, matched);
-      const hasMore = matched.length >= limit;
+      const flatHistory = await enrichMessages(client, matched);
+      const output = flatHistory.slice(0, limit);
+      const more = flatHistory.length > limit || (!exhaustedHistory && scannedHistory < MAX_SCAN);
       // When reversed, messages are [oldest...newest]. The next page needs messages
       // older than the oldest in this batch, so nextOffset = messages[0].id (the oldest).
       // When not reversed, messages are [newest...oldest], so nextOffset = last element.
       const nextOffsetMsg = isReverse ? matched[0] : matched[matched.length - 1];
-      const flat3 = await enrichMessages(client, matched);
-      const meta3 = {
-        hasMore,
-        ...(hasMore && nextOffsetMsg ? { nextOffset: nextOffsetMsg.id } : {}),
-      };
 
-      success(flat3, meta3);
+      success(output, {
+        hasMore: more,
+        ...(more && nextOffsetMsg ? { nextOffset: nextOffsetMsg.id } : {}),
+      });
     },
   },
   {
@@ -2107,12 +2179,12 @@ export const commands: Command[] = [
     name: 'listen',
     description: 'Stream real-time events (NDJSON). Requires --chat or --type.',
     usage:
-      'tg listen --type user|group|channel [--chat <ids>] [--exclude-chat <ids>] [--exclude-type <type>] [--event <types>] [--incoming] [--download-media]',
+      'tg listen --type user|bot|group|channel [--chat <ids>] [--exclude-chat <ids>] [--exclude-type <type>] [--event <types>] [--incoming] [--download-media]',
     flags: {
       '--chat': 'Comma-separated chat IDs to include',
       '--type': 'Include entire category: user, group, or channel',
       '--exclude-chat': 'Comma-separated chat IDs to exclude from included set',
-      '--exclude-type': 'Exclude category: user, group, or channel',
+      '--exclude-type': 'Exclude category: user, bot, group, or channel',
       '--event':
         'Comma-separated event types (default: new_message,edit_message,delete_messages,message_reactions). Also: read_outbox, user_typing, user_status, message_send_succeeded',
       '--incoming': 'Only include incoming messages (filter out outgoing)',
@@ -2170,21 +2242,25 @@ export const commands: Command[] = [
       }
 
       if (typeFilter && !VALID_CHAT_TYPES.has(typeFilter)) {
-        fail(`Invalid --type "${typeFilter}". Expected: user, group, or channel`, 'INVALID_ARGS');
+        fail(
+          `Invalid --type "${typeFilter}". Expected: user, bot, group, or channel`,
+          'INVALID_ARGS',
+        );
       }
       if (excludeType && !VALID_CHAT_TYPES.has(excludeType)) {
         fail(
-          `Invalid --exclude-type "${excludeType}". Expected: user, group, or channel`,
+          `Invalid --exclude-type "${excludeType}". Expected: user, bot, group, or channel`,
           'INVALID_ARGS',
         );
       }
 
       // Cache for chat type lookups to avoid repeated network calls
-      const chatTypeCache = new Map<number, 'user' | 'group' | 'channel' | 'unknown'>();
+      const chatTypeCache = new Map<number, 'user' | 'bot' | 'group' | 'channel' | 'unknown'>();
+      const botChatIds = new Set<number>();
 
       const getCachedChatType = async (
         chatIdNum: number,
-      ): Promise<'user' | 'group' | 'channel' | 'unknown'> => {
+      ): Promise<'user' | 'bot' | 'group' | 'channel' | 'unknown'> => {
         const cached = chatTypeCache.get(chatIdNum);
         if (cached) return cached;
         try {
@@ -2192,7 +2268,16 @@ export const commands: Command[] = [
             _: 'getChat',
             chat_id: chatIdNum,
           });
-          const t = getChatType(chat);
+          // Resolve bot status for private chats
+          if (chat.type._ === 'chatTypePrivate') {
+            try {
+              const user = await client.invoke({ _: 'getUser', user_id: chat.type.user_id });
+              if (user.type._ === 'userTypeBot') botChatIds.add(chat.id);
+            } catch {
+              /* skip */
+            }
+          }
+          const t = getChatType(chat, botChatIds);
           chatTypeCache.set(chatIdNum, t);
           return t;
         } catch {
