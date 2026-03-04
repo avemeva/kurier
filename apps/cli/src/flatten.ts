@@ -206,7 +206,8 @@ export function flattenMessage(msg: SlimMessage): FlatMessage {
     case 'messageDocument': {
       const df = c.file as SlimFile;
       result.content = 'doc';
-      result.doc = df.downloaded && df.local_path ? df.local_path : (c.file_name as string);
+      result.doc =
+        df.downloaded && df.local_path ? shortenPath(df.local_path) : (c.file_name as string);
       if (caption) result.text = caption;
       break;
     }
@@ -235,7 +236,7 @@ export function flattenMessage(msg: SlimMessage): FlatMessage {
     case 'messageVoiceNote': {
       const vnf = c.file as SlimFile;
       result.content = 'voice';
-      if (vnf.downloaded && vnf.local_path) result.voice = vnf.local_path;
+      if (vnf.downloaded && vnf.local_path) result.voice = shortenPath(vnf.local_path);
       result.duration = formatDuration(c.duration as number);
       if (c.transcript) result.transcript = c.transcript as string;
       if (caption) result.text = caption;
@@ -344,7 +345,9 @@ function flattenAlbum(group: SlimMessage[]): FlatMessage {
     album.content = 'doc';
     album.docs = group.map((m) => {
       const dc = m.content as { type: 'messageDocument'; file: SlimFile; file_name: string };
-      return dc.file.downloaded && dc.file.local_path ? dc.file.local_path : dc.file_name;
+      return dc.file.downloaded && dc.file.local_path
+        ? shortenPath(dc.file.local_path)
+        : dc.file_name;
     });
   } else {
     album.content = firstType.replace(/^message/, '').toLowerCase();
