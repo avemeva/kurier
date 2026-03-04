@@ -228,45 +228,37 @@ function getContentMimeType(content: Td.MessageContent): string {
 // --- Helper: should auto-download ---
 
 function shouldAutoDownloadContent(content: Td.MessageContent): boolean {
-  switch (content._) {
-    case 'messagePhoto':
-      return true;
-    case 'messageSticker':
-      return true;
-    case 'messageVoiceNote':
-      return true;
-    case 'messageVideoNote':
-      return true;
-    default:
-      return false;
-  }
+  return getFileId(content) !== null;
 }
 
 // --- Helper: auto-download media for messages ---
 
 async function autoDownloadMessages(client: TelegramClient, rawMsgs: Td.message[]): Promise<void> {
-  const downloadable: Array<{ fileId: number }> = [];
+  const targets: { file: Td.file }[] = [];
   for (const msg of rawMsgs) {
     if (!shouldAutoDownloadContent(msg.content)) continue;
-    const fileId = getFileId(msg.content);
-    if (!fileId) continue;
-    downloadable.push({ fileId });
+    const file = getFile(msg.content);
+    if (!file) continue;
+    if (file.local.is_downloading_completed) continue;
+    targets.push({ file });
   }
 
   const CONCURRENCY = 3;
-  for (let batch = 0; batch < downloadable.length; batch += CONCURRENCY) {
-    const chunk = downloadable.slice(batch, batch + CONCURRENCY);
+  for (let batch = 0; batch < targets.length; batch += CONCURRENCY) {
+    const chunk = targets.slice(batch, batch + CONCURRENCY);
     await Promise.all(
-      chunk.map(async ({ fileId }) => {
+      chunk.map(async (target) => {
         try {
-          await client.invoke({
+          const updated = await client.invoke({
             _: 'downloadFile',
-            file_id: fileId,
+            file_id: target.file.id,
             priority: 1,
             offset: 0,
             limit: 0,
             synchronous: true,
           });
+          // Patch the original file object so slim/flatten sees the download
+          target.file.local = updated.local;
         } catch {
           /* skip failed downloads */
         }

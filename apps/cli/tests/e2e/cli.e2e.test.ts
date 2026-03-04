@@ -1525,3 +1525,150 @@ describe('voice note transcript in output', () => {
     TIMEOUT,
   );
 });
+
+// ─── Smart date formatting ───
+
+describe('smart date formatting', () => {
+  it(
+    'today messages show HH:MM format',
+    async () => {
+      // Send a message so we guarantee a "today" date
+      const s = await tg('send', 'me', `date-test-${Date.now()}`);
+      expect(s.ok).toBe(true);
+      track(s.data.id);
+      const r = await tg('messages', 'me', '--limit', '1');
+      expect(r.ok).toBe(true);
+      expect(r.data[0].date).toMatch(/^\d{2}:\d{2}$/);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'older messages show date labels not HH:MM',
+    async () => {
+      // Fetch enough messages to find one older than today
+      const r = await tg('messages', 'me', '--limit', '50');
+      expect(r.ok).toBe(true);
+      const timePattern = /^\d{2}:\d{2}$/;
+      const nonToday = r.data.filter((m: { date: string }) => !timePattern.test(m.date));
+      // If we have older messages, they should be Yesterday, day name, or Mon DD format
+      const validFormats =
+        /^(Yesterday|Mon|Tue|Wed|Thu|Fri|Sat|Sun|[A-Z][a-z]{2} \d{1,2}(, \d{4})?)$/;
+      for (const m of nonToday) {
+        expect(m.date).toMatch(validFormats);
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'dialog last_date uses smart formatting',
+    async () => {
+      const r = await tg('dialogs', '--limit', '5');
+      expect(r.ok).toBe(true);
+      const validFormats =
+        /^(\d{2}:\d{2}|Yesterday|Mon|Tue|Wed|Thu|Fri|Sat|Sun|[A-Z][a-z]{2} \d{1,2}(, \d{4})?)$/;
+      for (const d of r.data) {
+        if (d.last_date) {
+          expect(d.last_date).toMatch(validFormats);
+        }
+      }
+    },
+    TIMEOUT,
+  );
+});
+
+// ─── Media paths in output ───
+
+describe('media paths in message output', () => {
+  it(
+    'photos have path or true indicator',
+    async () => {
+      const r = await tg('messages', 'me', '--filter', 'photo', '--limit', '3');
+      expect(r.ok).toBe(true);
+      for (const m of r.data) {
+        const photoVal = m.photo ?? m.photos;
+        expect(photoVal).toBeTruthy();
+        // Each photo is either a string path or true (not downloaded)
+        const values = Array.isArray(photoVal) ? photoVal : [photoVal];
+        for (const v of values) {
+          expect(typeof v === 'string' || v === true).toBe(true);
+        }
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    '--download-media adds paths to photos',
+    async () => {
+      const r = await tg('messages', 'me', '--filter', 'photo', '--limit', '2', '--download-media');
+      expect(r.ok).toBe(true);
+      for (const m of r.data) {
+        const values = m.photos ?? [m.photo];
+        for (const v of values) {
+          // With --download-media, photos should have string paths (starting with ~ or /)
+          expect(v).toBeString();
+          expect(v.startsWith('~') || v.startsWith('/')).toBe(true);
+        }
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'document albums show docs array with filenames',
+    async () => {
+      const r = await tg('messages', 'me', '--filter', 'document', '--limit', '5');
+      expect(r.ok).toBe(true);
+      for (const m of r.data) {
+        if (m.ids) {
+          // Album: should have docs array
+          expect(m.content).toBe('doc');
+          expect(Array.isArray(m.docs)).toBe(true);
+          expect(m.docs.length).toBe(m.ids.length);
+          for (const d of m.docs) {
+            expect(d).toBeString();
+            expect(d.length).toBeGreaterThan(0);
+          }
+        } else {
+          // Single doc: should have doc field
+          expect(m.doc).toBeString();
+          expect(m.doc.length).toBeGreaterThan(0);
+        }
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    '--download-media downloads documents and shows paths',
+    async () => {
+      const r = await tg(
+        'messages',
+        'me',
+        '--filter',
+        'document',
+        '--limit',
+        '1',
+        '--download-media',
+      );
+      expect(r.ok).toBe(true);
+      if (r.data.length > 0) {
+        const m = r.data[0];
+        // Single doc should have a file path, not just filename
+        if (m.doc) {
+          // After download, doc should be a path (contains / or ~)
+          expect(m.doc.includes('/') || m.doc.startsWith('~')).toBe(true);
+        }
+        // Album docs should also have paths
+        if (m.docs) {
+          for (const d of m.docs) {
+            expect(d.includes('/') || d.startsWith('~')).toBe(true);
+          }
+        }
+      }
+    },
+    TIMEOUT,
+  );
+});

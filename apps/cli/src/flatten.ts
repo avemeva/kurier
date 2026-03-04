@@ -7,7 +7,7 @@
  * - Content type implicit from field presence; explicit `content` tag for non-text
  * - Media paths as strings (downloaded) or `true` (not downloaded)
  * - Albums pre-grouped into ids[] + photos[]/videos[]
- * - Dates as "HH:MM", outgoing as "You"
+ * - Dates: smart (today→HH:MM, yesterday→Yesterday, week→Mon, older→Mar 1)
  */
 
 import { homedir } from 'node:os';
@@ -41,6 +41,7 @@ export type FlatMessage = {
   videos?: (string | true)[];
   voice?: string;
   doc?: string;
+  docs?: string[];
   gif?: string | true;
   audio?: string;
   sticker?: string;
@@ -57,7 +58,7 @@ export type FlatMessage = {
 export type FlatChat = {
   id: number;
   title: string;
-  type: 'user' | 'group' | 'channel';
+  type: 'user' | 'bot' | 'group' | 'channel';
   unread: number;
   last?: string;
   last_date?: string;
@@ -72,9 +73,42 @@ function clean<T extends Record<string, unknown>>(obj: T): T {
   return obj;
 }
 
+const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const SHORT_MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+function startOfDay(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
 function formatTime(unix: number): string {
   const d = new Date(unix * 1000);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const now = new Date();
+  const todayStart = startOfDay(now);
+  const msgStart = startOfDay(d);
+  const dayDiff = Math.floor((todayStart - msgStart) / 86_400_000);
+
+  if (dayDiff === 0) {
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  }
+  if (dayDiff === 1) return 'Yesterday';
+  if (dayDiff >= 2 && dayDiff <= 6) return SHORT_DAYS[d.getDay()] as string;
+  if (d.getFullYear() === now.getFullYear()) {
+    return `${SHORT_MONTHS[d.getMonth()]} ${d.getDate()}`;
+  }
+  return `${SHORT_MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
 function formatDuration(seconds: number): string {
@@ -97,9 +131,10 @@ function filePath(file: SlimFile): string | true {
   return file.downloaded && file.local_path ? shortenPath(file.local_path) : true;
 }
 
-function flattenChatType(t: Td.ChatType): 'user' | 'group' | 'channel' {
+function flattenChatType(t: Td.ChatType, isBot?: boolean): 'user' | 'bot' | 'group' | 'channel' {
   switch (t._) {
     case 'chatTypePrivate':
+      return isBot ? 'bot' : 'user';
     case 'chatTypeSecret':
       return 'user';
     case 'chatTypeBasicGroup':
@@ -305,6 +340,12 @@ function flattenAlbum(group: SlimMessage[]): FlatMessage {
     });
     const dur = (first.content as { duration: number }).duration;
     album.duration = formatDuration(dur);
+  } else if (firstType === 'messageDocument') {
+    album.content = 'doc';
+    album.docs = group.map((m) => {
+      const dc = m.content as { type: 'messageDocument'; file: SlimFile; file_name: string };
+      return dc.file.downloaded && dc.file.local_path ? dc.file.local_path : dc.file_name;
+    });
   } else {
     album.content = firstType.replace(/^message/, '').toLowerCase();
   }
@@ -357,18 +398,18 @@ export function flattenMessages(msgs: SlimMessage[]): FlatMessage[] {
 
 // --- Chat flattening ---
 
-export function flattenChat(chat: Td.chat): FlatChat {
+export function flattenChat(chat: Td.chat, botChatIds?: Set<number>): FlatChat {
   const m = chat.last_message;
   return clean({
     id: chat.id,
     title: chat.title,
-    type: flattenChatType(chat.type),
+    type: flattenChatType(chat.type, botChatIds?.has(chat.id)),
     unread: chat.unread_count,
     last: m ? extractPreview(m, 150) : undefined,
     last_date: m ? formatTime(m.date) : undefined,
   }) as FlatChat;
 }
 
-export function flattenChats(chats: Td.chat[]): FlatChat[] {
-  return chats.map(flattenChat);
+export function flattenChats(chats: Td.chat[], botChatIds?: Set<number>): FlatChat[] {
+  return chats.map((c) => flattenChat(c, botChatIds));
 }
