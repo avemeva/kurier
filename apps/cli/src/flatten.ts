@@ -33,6 +33,7 @@ export type FlatMessage = {
   fwd?: string;
   edited?: true;
   text?: string;
+  preview?: string;
   content?: string;
   photo?: string | true;
   photos?: (string | true)[];
@@ -147,6 +148,7 @@ export function flattenMessage(msg: SlimMessage): FlatMessage {
   switch (c.type) {
     case 'messageText':
       result.text = c.text as string;
+      if (c.preview) result.preview = c.preview as string;
       break;
 
     case 'messagePhoto': {

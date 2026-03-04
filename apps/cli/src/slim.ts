@@ -193,7 +193,7 @@ type MessageReplyTo =
     };
 
 type SlimContent =
-  | { type: 'messageText'; text: string }
+  | { type: 'messageText'; text: string; preview?: string }
   | {
       type: 'messagePhoto';
       caption?: string;
@@ -288,6 +288,18 @@ type SlimReplyMarkup = {
 
 function slimCaption(caption: Td.formattedText): { caption?: string } {
   return clean({ caption: unparse(caption.text, caption.entities) || undefined });
+}
+
+// --- Web page preview ---
+
+function slimLinkPreview(lp: Td.linkPreview | undefined): string | undefined {
+  if (!lp) return undefined;
+  const parts: string[] = [];
+  if (lp.site_name) parts.push(lp.site_name);
+  if (lp.title) parts.push(lp.title);
+  const desc = lp.description?.text;
+  if (desc) parts.push(desc);
+  return parts.join(' — ') || undefined;
 }
 
 // --- Inline keyboard ---
@@ -407,8 +419,14 @@ export function slimMessage(m: Td.message): SlimMessage {
 
 function slimContent(c: Td.MessageContent): SlimContent {
   switch (c._) {
-    case 'messageText':
-      return { type: 'messageText', text: unparse(c.text.text, c.text.entities) };
+    case 'messageText': {
+      const preview = slimLinkPreview(c.link_preview);
+      return {
+        type: 'messageText',
+        text: unparse(c.text.text, c.text.entities),
+        ...(preview && { preview }),
+      };
+    }
     case 'messagePhoto': {
       const largest = c.photo.sizes[c.photo.sizes.length - 1] as Td.photoSize;
       return {

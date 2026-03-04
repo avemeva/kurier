@@ -7,7 +7,7 @@ description: Telegram CLI for AI agents. Use when the user needs to interact wit
 
 Telegram CLI for AI agents. Interact with Telegram programmatically — read messages, send messages, search, download media, and more.
 
-All output is JSON to stdout. Warnings go to stderr.
+All output is JSON to stdout. Warnings go to stderr. Prefer `jq` over `python3` for JSON processing — it's faster and preserves Unicode.
 
 ## Setup
 
@@ -33,8 +33,7 @@ Use `--` to separate flags from negative positional arguments if needed: `tg mes
 ## Global Flags
 
 ```
---pretty      Pretty-print JSON output
---timeout N   Timeout in seconds
+--timeout N   Timeout in seconds (applies to command execution, not daemon startup)
 ```
 
 ## Commands
@@ -52,6 +51,7 @@ tg find "query" --type group                 # Groups only
 tg find "query" --type user                  # Users only (non-bot)
 tg find "query" --type contact               # Contacts only
 tg find "query" --limit 10                   # Cap results
+tg find "query" --archived                   # Only archived chats (default: excludes archived)
 
 # Chats
 tg dialogs [--limit N] [--archived]      # List chats (paginated)
@@ -63,6 +63,7 @@ tg unread [--all] [--type user|group|channel] [--limit N]  # Unread chats
 tg chat <id|username>                    # Chat details
 tg members <chat> [--limit N] [--search] [--offset N]     # Group/channel members
 tg members <chat> --type bot|admin|recent                  # Filter by participant type
+tg members <chat> --filter bot|admin|recent                # Alias for --type
 
 # Messages
 tg messages <chat> [--limit N]           # Message history (paginated)
@@ -75,6 +76,7 @@ tg messages <chat> --from <user>         # Filter by sender
 tg messages <chat> --filter photo        # Filter: photo|video|document|url|voice|gif|music
 tg messages <chat> --reverse             # Oldest first
 tg messages <chat> --download-media      # Auto-download photos/stickers/voice
+tg messages <chat> --transcribe          # Auto-transcribe voice/video notes (Premium)
 tg message <chat> <msgId>               # Single message by ID
 
 # Message Search
@@ -82,13 +84,14 @@ tg search "query"                            # Global search across all chats
 tg search "query" --type channel             # Only messages in channels
 tg search "query" --type group               # Only messages in groups
 tg search "query" --type private             # Only messages in private chats
-tg search "query" --filter photo             # Filter by content type
+tg search "query" --filter photo             # Filter: photo|video|document|url|voice|gif|music|media|videonote|mention|pinned
 tg search "query" --since N                  # Messages after unix timestamp
 tg search "query" --until N                  # Messages before unix timestamp
 tg search "query" --chat <id>               # Search within a specific chat
 tg search "query" --chat <id> --from <user>  # Filter by sender (per-chat only)
 tg search "query" --context N                # Include N messages before/after each hit
 tg search "query" --full                     # Disable 500-char text truncation
+tg search "query" --archived                 # Search archived chats only (default: main list)
 
 # Send & Edit (plain text by default — no implicit markdown parsing)
 tg send <chat> "text"                    # Send message (plain text)
@@ -101,6 +104,9 @@ echo "text" | tg send <chat> --stdin     # Read text from stdin
 tg send <chat> --file /path/to/msg.txt   # Read text from file
 tg edit <chat> <msgId> "new text"        # Edit message (plain text)
 tg edit <chat> <msgId> "text" --html     # Edit with formatting
+tg edit <chat> <msgId> "text" --md       # Edit with MarkdownV2
+echo "text" | tg edit <chat> <msgId> --stdin  # Read text from stdin
+tg edit <chat> <msgId> --file /path/to/msg.txt  # Read text from file
 
 # Actions
 tg read <chat>                           # Mark as read
@@ -140,10 +146,15 @@ tg daemon stop                           # Stop daemon
 tg daemon status                         # Check if daemon is running
 tg daemon log                            # Show recent daemon log
 
+# Auth
+tg auth                                  # Show current auth state
+tg auth phone <number>                   # Submit phone number (e.g. +1234567890)
+tg auth code <code>                      # Submit verification code
+tg auth password <password>              # Submit 2FA password
+tg auth logout                           # Log out of Telegram
+
 # Discovery
-tg list                                  # All commands as JSON
 tg <command> --help                      # Per-command help
-tg version                               # CLI version
 ```
 
 ## Pagination
@@ -201,6 +212,15 @@ Unknown flags are rejected with `INVALID_ARGS` — never silently ignored. Rate 
 - **`click` uses flat button indexing**: Buttons are numbered 0, 1, 2... left-to-right, top-to-bottom across all rows.
 - **`click` callback buttons may timeout**: Bots have ~30 seconds to respond to callback queries.
 - **`reply_markup` in message output**: Messages with inline keyboards include a `reply_markup` field showing button text, type, and data.
+
+## Contextual Tasks (summarize, catch up, review, etc.)
+
+When the user asks for a contextual task — summarizing a chat, catching up on messages, reviewing a conversation — **always use `--transcribe`** on message fetches. Voice and video notes are common in Telegram and contain critical context that would otherwise appear as blank `"content": "voice"` entries. Without transcription the summary will have gaps.
+
+```bash
+# Always transcribe when reading for context
+tg messages <chat> --limit 50 --transcribe
+```
 
 ## Common Patterns
 
