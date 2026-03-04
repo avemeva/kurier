@@ -73,7 +73,6 @@ function clean<T extends Record<string, unknown>>(obj: T): T {
   return obj;
 }
 
-const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 const SHORT_MONTHS = [
   'Jan',
   'Feb',
@@ -89,26 +88,14 @@ const SHORT_MONTHS = [
   'Dec',
 ] as const;
 
-function startOfDay(d: Date): number {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-
 function formatTime(unix: number): string {
   const d = new Date(unix * 1000);
   const now = new Date();
-  const todayStart = startOfDay(now);
-  const msgStart = startOfDay(d);
-  const dayDiff = Math.floor((todayStart - msgStart) / 86_400_000);
-
-  if (dayDiff === 0) {
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  }
-  if (dayDiff === 1) return 'Yesterday';
-  if (dayDiff >= 2 && dayDiff <= 6) return SHORT_DAYS[d.getDay()] as string;
+  const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   if (d.getFullYear() === now.getFullYear()) {
-    return `${SHORT_MONTHS[d.getMonth()]} ${d.getDate()}`;
+    return `${SHORT_MONTHS[d.getMonth()]} ${d.getDate()}, ${hhmm}`;
   }
-  return `${SHORT_MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  return `${SHORT_MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}, ${hhmm}`;
 }
 
 function formatDuration(seconds: number): string {

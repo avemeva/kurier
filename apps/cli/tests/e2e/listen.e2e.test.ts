@@ -162,9 +162,6 @@ describe('listen streaming', () => {
       const handle = listenBg('--chat', String(myId));
 
       try {
-        // Wait for SSE connection to establish
-        await new Promise((r) => setTimeout(r, 3000));
-
         const nonce = `listen-new-${Date.now()}`;
         const sent = await tg('send', 'me', nonce);
         expect(sent.ok).toBe(true);
@@ -176,11 +173,11 @@ describe('listen streaming', () => {
         const events = lines.map((l) => JSON.parse(l));
         const match = events.find(
           // biome-ignore lint/suspicious/noExplicitAny: parsed JSON
-          (e: any) => e.type === 'new_message' && e.message?.content?.text === nonce,
+          (e: any) => e.type === 'new_message' && e.message?.text === nonce,
         );
         expect(match).toBeTruthy();
         expect(match.chat_id).toBe(myId);
-        expect(match.message.sender_name).toBeString();
+        expect(match.message.name).toBeString();
       } finally {
         await handle.kill();
       }
@@ -194,8 +191,6 @@ describe('listen streaming', () => {
       const handle = listenBg('--type', 'group');
 
       try {
-        await new Promise((r) => setTimeout(r, 3000));
-
         // Send to Saved Messages (a user/private chat — should be excluded by --type group)
         const nonce = `listen-exclude-${Date.now()}`;
         const sent = await tg('send', 'me', nonce);
@@ -216,7 +211,7 @@ describe('listen streaming', () => {
           .filter(Boolean);
         const match = events.find(
           // biome-ignore lint/suspicious/noExplicitAny: parsed JSON
-          (e: any) => e.type === 'new_message' && e.message?.content?.text === nonce,
+          (e: any) => e.type === 'new_message' && e.message?.text === nonce,
         );
         expect(match).toBeUndefined();
       } finally {
@@ -232,8 +227,6 @@ describe('listen streaming', () => {
       const handle = listenBg('--chat', String(myId));
 
       try {
-        await new Promise((r) => setTimeout(r, 3000));
-
         const nonce = `listen-chat-${Date.now()}`;
         const sent = await tg('send', 'me', nonce);
         expect(sent.ok).toBe(true);
@@ -245,7 +238,7 @@ describe('listen streaming', () => {
         const events = lines.map((l) => JSON.parse(l));
         const match = events.find(
           // biome-ignore lint/suspicious/noExplicitAny: parsed JSON
-          (e: any) => e.type === 'new_message' && e.message?.content?.text === nonce,
+          (e: any) => e.type === 'new_message' && e.message?.text === nonce,
         );
         expect(match).toBeTruthy();
         expect(match.chat_id).toBe(myId);
@@ -262,8 +255,6 @@ describe('listen streaming', () => {
       const handle = listenBg('--chat', 'me');
 
       try {
-        await new Promise((r) => setTimeout(r, 3000));
-
         const nonce = `listen-resolve-${Date.now()}`;
         const sent = await tg('send', 'me', nonce);
         expect(sent.ok).toBe(true);
@@ -275,7 +266,7 @@ describe('listen streaming', () => {
         const events = lines.map((l) => JSON.parse(l));
         const match = events.find(
           // biome-ignore lint/suspicious/noExplicitAny: parsed JSON
-          (e: any) => e.type === 'new_message' && e.message?.content?.text === nonce,
+          (e: any) => e.type === 'new_message' && e.message?.text === nonce,
         );
         expect(match).toBeTruthy();
       } finally {
@@ -291,8 +282,6 @@ describe('listen streaming', () => {
       const handle = listenBg('--type', 'user');
 
       try {
-        await new Promise((r) => setTimeout(r, 3000));
-
         const nonce = `listen-user-${Date.now()}`;
         const sent = await tg('send', 'me', nonce);
         expect(sent.ok).toBe(true);
@@ -305,7 +294,7 @@ describe('listen streaming', () => {
         expect(
           events.find(
             // biome-ignore lint/suspicious/noExplicitAny: parsed JSON
-            (e: any) => e.type === 'new_message' && e.message?.content?.text === nonce,
+            (e: any) => e.type === 'new_message' && e.message?.text === nonce,
           ),
         ).toBeTruthy();
       } finally {

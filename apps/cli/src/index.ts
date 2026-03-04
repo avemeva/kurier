@@ -246,7 +246,7 @@ async function run(): Promise<void> {
   // --- Execute command ---
 
   async function execute(): Promise<void> {
-    const timeoutSec = flags['--timeout'] ? Number(flags['--timeout']) : 0;
+    const timeoutSec = flags['--timeout'] ? Number(flags['--timeout']) : 3;
 
     // Streaming commands handle their own lifecycle (never-resolving promise + signal handlers)
     if (cmd?.streaming) {
@@ -254,21 +254,11 @@ async function run(): Promise<void> {
       return;
     }
 
-    const runner = () => cmd?.run(client, positional, flags);
-
     if (timeoutSec > 0) {
-      await Promise.race([
-        runner(),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error(`Command timed out after ${timeoutSec}s`)),
-            timeoutSec * 1000,
-          ),
-        ),
-      ]);
-    } else {
-      await runner();
+      client.signal = AbortSignal.timeout(timeoutSec * 1000);
     }
+
+    await cmd?.run(client, positional, flags);
   }
 
   try {

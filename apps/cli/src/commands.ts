@@ -336,7 +336,7 @@ export const commands: Command[] = [
       'tg dialogs [--limit N] [--archived] [--unread] [--type user|bot|group|channel] [--search text] [--offset-date N]',
     flags: {
       '--limit': 'Max chats to return (default: 40)',
-      '--archived': 'Show archived chats',
+      '--archived': 'Include archived chats (shows both main and archived)',
       '--unread': 'Only show chats with unread messages',
       '--type': 'Filter by chat type: user, bot, group, or channel',
       '--search': 'Filter by chat title (client-side substring match)',
@@ -358,77 +358,92 @@ export const commands: Command[] = [
           'INVALID_ARGS',
         );
       }
-      const chatList: Td.ChatList = archived ? { _: 'chatListArchive' } : { _: 'chatListMain' };
+      // When --archived is set, fetch from both main and archive lists
+      const chatLists: Td.ChatList[] = [{ _: 'chatListMain' }];
+      if (archived) chatLists.push({ _: 'chatListArchive' });
       const isFiltered = !!(typeFilter || unreadOnly || searchQuery || offsetDate);
 
       if (isFiltered) {
-        // Iterative fetch: keep loading batches until we have enough matching chats
+        // Iterative fetch: scan each list up to `limit` matches, merge by date
         const BATCH_SIZE = 50;
         const MAX_SCAN = 500;
         const matched: Td.chat[] = [];
         const botChatIds = new Set<number>();
-        let totalLoaded = 0;
-        let exhausted = false;
+        const seenIds = new Set<number>();
 
-        while (matched.length < limit && totalLoaded < MAX_SCAN && !exhausted) {
-          try {
-            await client.invoke({
-              _: 'loadChats',
-              chat_list: chatList,
-              limit: BATCH_SIZE,
-            });
-          } catch {
-            // loadChats throws 404 when there are no more chats
-            exhausted = true;
-          }
+        for (const chatList of chatLists) {
+          let totalLoaded = 0;
+          let exhausted = false;
 
-          const chatIds = await client.invoke({
-            _: 'getChats',
-            chat_list: chatList,
-            limit: totalLoaded + BATCH_SIZE,
-          });
-
-          // Only process newly loaded chats (skip already-seen ones)
-          const newIds = chatIds.chat_ids.slice(totalLoaded);
-          if (newIds.length === 0) {
-            exhausted = true;
-            break;
-          }
-          totalLoaded = chatIds.chat_ids.length;
-
-          for (const id of newIds) {
+          while (totalLoaded < MAX_SCAN && !exhausted) {
             try {
-              const chat = await client.invoke({ _: 'getChat', chat_id: id });
-
-              // Resolve bot status for private chats
-              let isBot = false;
-              if (chat.type._ === 'chatTypePrivate') {
-                try {
-                  const user = await client.invoke({ _: 'getUser', user_id: chat.type.user_id });
-                  isBot = user.type._ === 'userTypeBot';
-                  if (isBot) botChatIds.add(chat.id);
-                } catch {
-                  /* skip */
-                }
-              }
-
-              let passes = true;
-              // offset-date: skip chats whose last message is at or after the offset
-              if (offsetDate && (chat.last_message?.date ?? 0) >= offsetDate) passes = false;
-              if (passes && unreadOnly && chat.unread_count === 0) passes = false;
-              if (passes && typeFilter && getChatType(chat, botChatIds) !== typeFilter)
-                passes = false;
-              if (passes && searchQuery && !chat.title.toLowerCase().includes(searchQuery))
-                passes = false;
-              if (passes) matched.push(chat);
+              await client.invoke({
+                _: 'loadChats',
+                chat_list: chatList,
+                limit: BATCH_SIZE,
+              });
             } catch {
-              /* skip chats we can't load */
+              // loadChats throws 404 when there are no more chats
+              exhausted = true;
+            }
+
+            // When exhausted, all chats are cached — fetch up to MAX_SCAN
+            const fetchLimit = exhausted ? MAX_SCAN : totalLoaded + BATCH_SIZE;
+            const chatIds = await client.invoke({
+              _: 'getChats',
+              chat_list: chatList,
+              limit: fetchLimit,
+            });
+
+            // Only process newly loaded chats (skip already-seen ones)
+            const newIds = chatIds.chat_ids.slice(totalLoaded);
+            if (newIds.length === 0) {
+              exhausted = true;
+              break;
+            }
+            totalLoaded = chatIds.chat_ids.length;
+
+            for (const id of newIds) {
+              if (seenIds.has(id)) continue;
+              seenIds.add(id);
+              try {
+                const chat = await client.invoke({ _: 'getChat', chat_id: id });
+
+                // Resolve bot status for private chats
+                let isBot = false;
+                if (chat.type._ === 'chatTypePrivate') {
+                  try {
+                    const user = await client.invoke({
+                      _: 'getUser',
+                      user_id: chat.type.user_id,
+                    });
+                    isBot = user.type._ === 'userTypeBot';
+                    if (isBot) botChatIds.add(chat.id);
+                  } catch {
+                    /* skip */
+                  }
+                }
+
+                let passes = true;
+                // offset-date: skip chats whose last message is at or after the offset
+                if (offsetDate && (chat.last_message?.date ?? 0) >= offsetDate) passes = false;
+                if (passes && unreadOnly && chat.unread_count === 0) passes = false;
+                if (passes && typeFilter && getChatType(chat, botChatIds) !== typeFilter)
+                  passes = false;
+                if (passes && searchQuery && !chat.title.toLowerCase().includes(searchQuery))
+                  passes = false;
+                if (passes) matched.push(chat);
+              } catch {
+                /* skip chats we can't load */
+              }
             }
           }
         }
 
+        // Sort by last message date descending, then take top `limit`
+        matched.sort((a, b) => (b.last_message?.date ?? 0) - (a.last_message?.date ?? 0));
         const filtered = matched.slice(0, limit);
-        const hasMore = !exhausted && filtered.length >= limit;
+        const hasMore = filtered.length >= limit;
 
         const lastChat = filtered[filtered.length - 1];
         const lastDate = lastChat?.last_message?.date;
@@ -438,25 +453,37 @@ export const commands: Command[] = [
 
         success(flatF, metaF);
       } else {
-        // No filter — single fetch
-        try {
-          await client.invoke({
-            _: 'loadChats',
+        // No filter — fetch from all applicable lists
+        const allChatIds: number[] = [];
+        const seenIds = new Set<number>();
+
+        for (const chatList of chatLists) {
+          try {
+            await client.invoke({
+              _: 'loadChats',
+              chat_list: chatList,
+              limit,
+            });
+          } catch {
+            // loadChats throws when there are no more chats — that's ok
+          }
+
+          const chatIds = await client.invoke({
+            _: 'getChats',
             chat_list: chatList,
             limit,
           });
-        } catch {
-          // loadChats throws when there are no more chats — that's ok
+
+          for (const id of chatIds.chat_ids) {
+            if (!seenIds.has(id)) {
+              seenIds.add(id);
+              allChatIds.push(id);
+            }
+          }
         }
 
-        const chatIds = await client.invoke({
-          _: 'getChats',
-          chat_list: chatList,
-          limit,
-        });
-
         const chatObjects: Td.chat[] = [];
-        for (const id of chatIds.chat_ids) {
+        for (const id of allChatIds) {
           try {
             const chat = await client.invoke({ _: 'getChat', chat_id: id });
             chatObjects.push(chat);
@@ -467,7 +494,7 @@ export const commands: Command[] = [
 
         const botChatIds = await resolveBotChatIds(client, chatObjects);
 
-        const hasMore = chatIds.chat_ids.length >= limit;
+        const hasMore = allChatIds.length >= limit;
         const lastChat = chatObjects[chatObjects.length - 1];
         const lastDate = lastChat?.last_message?.date;
 

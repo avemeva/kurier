@@ -206,6 +206,36 @@ describe('dialogs', () => {
   );
 
   it(
+    '--archived includes both main and archived chats',
+    async () => {
+      const main = await tg('dialogs', '--limit', '5');
+      const withArchived = await tg('dialogs', '--limit', '40', '--archived');
+      expect(main.ok).toBe(true);
+      expect(withArchived.ok).toBe(true);
+      // Archived should return at least as many chats as main-only
+      expect(withArchived.data.length).toBeGreaterThanOrEqual(main.data.length);
+      // All main chat IDs should be present in the archived+main result
+      const archivedIds = new Set(withArchived.data.map((d: Record<string, unknown>) => d.id));
+      for (const d of main.data) {
+        expect(archivedIds.has(d.id)).toBe(true);
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    '--archived with --type still filters correctly',
+    async () => {
+      const r = await tg('dialogs', '--archived', '--type', 'user', '--limit', '10');
+      expect(r.ok).toBe(true);
+      for (const d of r.data) {
+        expect(d.type).toBe('user');
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
     'invalid --type returns INVALID_ARGS',
     async () => {
       const r = await tg('dialogs', '--type', 'dm');
@@ -337,8 +367,8 @@ describe('messages', () => {
       const r = await tg('messages', 'me', '--filter', 'document', '--limit', '5');
       expect(r.ok).toBe(true);
       for (const m of r.data) {
-        // Single docs have `doc`, albums have `content === 'document'`
-        expect(m.doc ?? m.content === 'document').toBeTruthy();
+        // Single docs have `doc` field, all have `content === 'doc'`
+        expect(m.doc || m.content === 'doc').toBeTruthy();
       }
     },
     TIMEOUT,
@@ -1530,7 +1560,7 @@ describe('voice note transcript in output', () => {
 
 describe('smart date formatting', () => {
   it(
-    'today messages show HH:MM format',
+    'today messages show absolute format with time',
     async () => {
       // Send a message so we guarantee a "today" date
       const s = await tg('send', 'me', `date-test-${Date.now()}`);
@@ -1538,39 +1568,35 @@ describe('smart date formatting', () => {
       track(s.data.id);
       const r = await tg('messages', 'me', '--limit', '1');
       expect(r.ok).toBe(true);
-      expect(r.data[0].date).toMatch(/^\d{2}:\d{2}$/);
+      // Format: "Mar 4, 14:30" (this year) or "Mar 4, 2025, 14:30" (other year)
+      expect(r.data[0].date).toMatch(/^[A-Z][a-z]{2} \d{1,2}, (\d{4}, )?\d{2}:\d{2}$/);
     },
     TIMEOUT,
   );
 
   it(
-    'older messages show date labels not HH:MM',
+    'dates use absolute format (MMM D, HH:MM)',
     async () => {
-      // Fetch enough messages to find one older than today
       const r = await tg('messages', 'me', '--limit', '50');
       expect(r.ok).toBe(true);
-      const timePattern = /^\d{2}:\d{2}$/;
-      const nonToday = r.data.filter((m: { date: string }) => !timePattern.test(m.date));
-      // If we have older messages, they should be Yesterday, day name, or Mon DD format
-      const validFormats =
-        /^(Yesterday|Mon|Tue|Wed|Thu|Fri|Sat|Sun|[A-Z][a-z]{2} \d{1,2}(, \d{4})?)$/;
-      for (const m of nonToday) {
-        expect(m.date).toMatch(validFormats);
+      // Format: "Mar 4, 14:30" (this year) or "Mar 4, 2025, 14:30" (other year)
+      const validFormat = /^[A-Z][a-z]{2} \d{1,2}, (\d{4}, )?\d{2}:\d{2}$/;
+      for (const m of r.data) {
+        expect(m.date).toMatch(validFormat);
       }
     },
     TIMEOUT,
   );
 
   it(
-    'dialog last_date uses smart formatting',
+    'dialog last_date uses absolute format',
     async () => {
       const r = await tg('dialogs', '--limit', '5');
       expect(r.ok).toBe(true);
-      const validFormats =
-        /^(\d{2}:\d{2}|Yesterday|Mon|Tue|Wed|Thu|Fri|Sat|Sun|[A-Z][a-z]{2} \d{1,2}(, \d{4})?)$/;
+      const validFormat = /^[A-Z][a-z]{2} \d{1,2}, (\d{4}, )?\d{2}:\d{2}$/;
       for (const d of r.data) {
         if (d.last_date) {
-          expect(d.last_date).toMatch(validFormats);
+          expect(d.last_date).toMatch(validFormat);
         }
       }
     },

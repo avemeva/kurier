@@ -14,6 +14,9 @@ export class TelegramClient {
   private abortController: AbortController | null = null;
   private sseConnected = false;
 
+  /** Optional signal to abort all non-SSE requests. */
+  signal: AbortSignal | undefined;
+
   constructor(opts: TelegramClientOptions | string) {
     this.baseUrl = typeof opts === 'string' ? opts : opts.baseUrl;
     // Strip trailing slash
@@ -33,6 +36,7 @@ export class TelegramClient {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
+      signal: this.signal,
     });
 
     if (!res.ok) {
@@ -67,7 +71,7 @@ export class TelegramClient {
   // --- Auth helpers ---
 
   async getAuthState(): Promise<AuthState> {
-    const res = await fetch(`${this.baseUrl}/api/tg/auth/state`);
+    const res = await fetch(`${this.baseUrl}/api/tg/auth/state`, { signal: this.signal });
     const json = (await res.json()) as DaemonResponse<AuthState>;
     if (!json.ok) throw new TelegramError(json.error);
     return json.data;
@@ -78,6 +82,7 @@ export class TelegramClient {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone }),
+      signal: this.signal,
     });
     const json = (await res.json()) as DaemonResponse<AuthState>;
     if (!json.ok) throw new TelegramError(json.error);
@@ -89,6 +94,7 @@ export class TelegramClient {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code }),
+      signal: this.signal,
     });
     const json = (await res.json()) as DaemonResponse<AuthState>;
     if (!json.ok) throw new TelegramError(json.error);
@@ -100,6 +106,7 @@ export class TelegramClient {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password }),
+      signal: this.signal,
     });
     const json = (await res.json()) as DaemonResponse<AuthState>;
     if (!json.ok) throw new TelegramError(json.error);
