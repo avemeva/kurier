@@ -785,40 +785,120 @@ describe('action forward', () => {
 
 // ─── Resolve (chat info) ───
 
-describe('resolve (chat info)', () => {
+// ─── Info ───
+
+describe('info', () => {
   it(
-    'returns info for a user',
+    'returns structured info for a user by username',
     async () => {
-      const r = await tg('resolve', myUsername);
+      const r = await tg('info', myUsername);
       expect(r.ok).toBe(true);
+      expect(r.data.entity.id).toBe(myId);
+      expect(r.data.entity.type).toBe('user');
+      expect(r.data.entity.username).toBe(myUsername);
       expect(r.data.chat.id).toBe(myId);
-      expect(r.data.chat.type).toBe('user');
-      expect(r.data.user).toBeTruthy();
+      expect(typeof r.data.chat.unread).toBe('number');
     },
     TIMEOUT,
   );
 
   it(
-    'returns info for Saved Messages',
+    'returns info for "me"',
     async () => {
-      const r = await tg('resolve', 'me');
+      const r = await tg('info', 'me');
       expect(r.ok).toBe(true);
+      expect(r.data.entity.id).toBe(myId);
       expect(r.data.chat.id).toBe(myId);
     },
     TIMEOUT,
   );
-});
 
-// ─── Resolve ───
-
-describe('resolve', () => {
   it(
-    'resolves a username',
+    'user entity has user-specific fields only',
     async () => {
-      const r = await tg('resolve', myUsername);
+      const r = await tg('info', myUsername);
       expect(r.ok).toBe(true);
-      expect(r.data.chat.id).toBe(myId);
-      expect(r.data.user.username).toBe(myUsername);
+      expect(r.data.entity.type).toBe('user');
+      // user fields present
+      expect('username' in r.data.entity || 'phone' in r.data.entity).toBe(true);
+      // group/channel fields absent
+      expect(r.data.entity.member_count).toBeUndefined();
+      expect(r.data.entity.description).toBeUndefined();
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'bot entity has bot-specific fields',
+    async () => {
+      const r = await tg('info', '@BotFather');
+      expect(r.ok).toBe(true);
+      expect(r.data.entity.type).toBe('bot');
+      expect(r.data.entity.username).toBe('BotFather');
+      expect(typeof r.data.entity.description).toBe('string');
+      // user-only fields absent
+      expect(r.data.entity.phone).toBeUndefined();
+      expect(r.data.entity.is_premium).toBeUndefined();
+      expect(r.data.entity.is_contact).toBeUndefined();
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'channel entity has channel-specific fields',
+    async () => {
+      const r = await tg('info', '@telegram');
+      expect(r.ok).toBe(true);
+      expect(r.data.entity.type).toBe('channel');
+      expect(r.data.entity.username).toBe('telegram');
+      expect(typeof r.data.entity.member_count).toBe('number');
+      // user-only fields absent
+      expect(r.data.entity.phone).toBeUndefined();
+      expect(r.data.entity.is_premium).toBeUndefined();
+      expect(r.data.entity.bio).toBeUndefined();
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'shared groups are included for users with common groups',
+    async () => {
+      // Find a contact we share groups with
+      const contacts = await tg('chats', 'list', '--type', 'user', '--limit', '10');
+      expect(contacts.ok).toBe(true);
+      const contactId = contacts.data.find((c: { id: number }) => c.id !== myId)?.id;
+      if (!contactId) return; // skip if no contacts
+      const r = await tg('info', String(contactId));
+      expect(r.ok).toBe(true);
+      // groups is either absent or an array
+      if (r.data.groups) {
+        expect(Array.isArray(r.data.groups)).toBe(true);
+        for (const g of r.data.groups) {
+          expect(typeof g.id).toBe('number');
+          expect(typeof g.title).toBe('string');
+          expect(typeof g.last_active).toBe('string');
+          if (g.member_count) expect(typeof g.member_count).toBe('number');
+        }
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'shared groups only contain real message activity (no service messages)',
+    async () => {
+      const contacts = await tg('chats', 'list', '--type', 'user', '--limit', '10');
+      expect(contacts.ok).toBe(true);
+      const contactId = contacts.data.find((c: { id: number }) => c.id !== myId)?.id;
+      if (!contactId) return;
+      const r = await tg('info', String(contactId));
+      expect(r.ok).toBe(true);
+      if (r.data.groups) {
+        // Every group must have last_active (we filter out groups without it)
+        for (const g of r.data.groups) {
+          expect(g.last_active).toBeTruthy();
+        }
+      }
     },
     TIMEOUT,
   );
@@ -826,7 +906,7 @@ describe('resolve', () => {
   it(
     'missing arg returns INVALID_ARGS',
     async () => {
-      const r = await tg('resolve');
+      const r = await tg('info');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('INVALID_ARGS');
     },
