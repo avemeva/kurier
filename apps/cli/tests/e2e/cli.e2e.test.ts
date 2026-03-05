@@ -840,6 +840,9 @@ describe('info', () => {
       expect(r.data.entity.phone).toBeUndefined();
       expect(r.data.entity.is_premium).toBeUndefined();
       expect(r.data.entity.is_contact).toBeUndefined();
+      expect(r.data.entity.bio).toBeUndefined();
+      // group/channel fields absent
+      expect(r.data.entity.member_count).toBeUndefined();
     },
     TIMEOUT,
   );
@@ -855,7 +858,29 @@ describe('info', () => {
       // user-only fields absent
       expect(r.data.entity.phone).toBeUndefined();
       expect(r.data.entity.is_premium).toBeUndefined();
+      expect(r.data.entity.is_contact).toBeUndefined();
       expect(r.data.entity.bio).toBeUndefined();
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'group entity has group-specific fields',
+    async () => {
+      // Find a group to test with
+      const groups = await tg('chats', 'list', '--type', 'group', '--limit', '1');
+      expect(groups.ok).toBe(true);
+      if (!groups.data.length) return; // skip if no groups
+      const r = await tg('info', '--', String(groups.data[0].id));
+      expect(r.ok).toBe(true);
+      expect(r.data.entity.type).toBe('group');
+      expect(typeof r.data.entity.member_count).toBe('number');
+      // user-only fields absent
+      expect(r.data.entity.phone).toBeUndefined();
+      expect(r.data.entity.is_premium).toBeUndefined();
+      expect(r.data.entity.is_contact).toBeUndefined();
+      expect(r.data.entity.bio).toBeUndefined();
+      expect(r.data.entity.username).toBeUndefined();
     },
     TIMEOUT,
   );
