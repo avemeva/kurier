@@ -8,27 +8,9 @@ Bun monorepo. Workspaces: `packages/*`, `apps/*`.
 TDLib (C++) → daemon (HTTP+SSE) → cli | app | web
 ```
 
-The daemon is the **only** process that talks to TDLib. Everything else is an HTTP client.
+Daemon is the **only** process that talks to TDLib. Everything else is an HTTP client.
 
-## Daemon Responsibility
-
-The daemon is a **thin transport layer** between TDLib and its HTTP clients. It:
-
-1. **Owns the TDLib client** — single persistent connection, manages lifecycle
-2. **Exposes TDLib over HTTP** — translates commands to `client.invoke()` calls
-3. **Streams updates over SSE** — bridges `client.on('update')` to EventSource
-4. **Serves media files** — returns files that TDLib has already downloaded
-5. **Manages its own process** — PID files, idle timeout, graceful shutdown
-
-The daemon does NOT:
-
-- **Cache TDLib data** — TDLib has its own database; `getUser`/`getChat` are instant local lookups
-- **Make policy decisions** — no auto-download, no "download if small", no prefetching
-- **Transform data for UI** — it returns raw TDLib responses; clients transform as needed
-- **Handle authentication UI** — it reports auth state; the UI/app drives the auth flow
-- **Contain business logic** — commands are thin wrappers around TDLib API calls
-
-If a behavior could live in the client, it belongs in the client. The daemon stays dumb.
+Daemon does NOT: cache TDLib data, make policy decisions, transform data for UI, handle auth UI, contain business logic. If it could live in the client, it belongs in the client.
 
 ## Packages
 
@@ -49,9 +31,10 @@ If a behavior could live in the client, it belongs in the client. The daemon sta
 | `app` | Electrobun desktop app |
 | `web` | Vite web app |
 
-## Commits
+## TDLib Types
 
-When lint/type/test errors block a commit: understand the root cause, fix it properly. No `// @ts-ignore`, no `any` casts, no disabling lint rules, no skipping tests to unblock a commit.
+Source of truth: `node_modules/@prebuilt-tdlib/types/tdlib-types.d.ts`
+Always grep that file — do not search across `node_modules`.
 
 ## Conventions
 
@@ -62,3 +45,12 @@ When lint/type/test errors block a commit: understand the root cause, fix it pro
 - **State:** Zustand
 - **Components:** pure where possible (props → JSX, no hooks)
 - **Tests:** Vitest
+
+## Certainty Labels
+
+ALWAYS label statements with certainty level when explaining, reporting findings, diagnosing issues, or making architectural assessments:
+- `[fact]` — verified from code, docs, or output
+- `[assumption]` — educated guess, not yet verified
+- `[inference]` — logical conclusion derived from facts
+
+No exceptions. Every claim gets a label.
