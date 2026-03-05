@@ -9,11 +9,18 @@ import { copyFileSync } from 'node:fs';
 import path from 'node:path';
 import type { TelegramClient } from '@tg/protocol';
 import type * as Td from 'tdlib-types';
-import { flattenChats, flattenFindResult, flattenMessage, flattenMessages } from './flatten';
+import {
+  type CommonGroupInfo,
+  flattenChats,
+  flattenFindResult,
+  flattenInfo,
+  flattenMessage,
+  flattenMessages,
+} from './flatten';
 import { addSenderNames, enrichMessage, enrichMessages, transcribeMessages } from './helpers';
 import { fail, strip, success, warn } from './output';
 import { resolveChatId, resolveEntity } from './resolve';
-import { slimAuthState, slimChat, slimMembers, slimMessage, slimMessages, slimUser } from './slim';
+import { slimAuthState, slimMembers, slimMessage, slimMessages, slimUser } from './slim';
 
 // --- Flag parsing helpers ---
 
@@ -85,6 +92,27 @@ function getChatType(
     default:
       return 'unknown';
   }
+}
+
+const USER_CONTENT_TYPES = new Set([
+  'messageText',
+  'messagePhoto',
+  'messageVideo',
+  'messageDocument',
+  'messageVoiceNote',
+  'messageVideoNote',
+  'messageAudio',
+  'messageSticker',
+  'messageAnimation',
+  'messageLocation',
+  'messageContact',
+  'messagePoll',
+  'messageDice',
+  'messageStory',
+]);
+
+function isUserContent(m: Td.message): boolean {
+  return USER_CONTENT_TYPES.has(m.content._);
 }
 
 /** Resolve which private chats are bots. Returns a set of chat IDs. */
@@ -1181,25 +1209,71 @@ export const commands: Command[] = [
     },
   },
 
-  // --- Resolve ---
+  // --- Info ---
   {
-    name: 'resolve',
-    description: 'Resolve a username, phone, or t.me link to entity info',
-    usage: 'tg resolve <username|phone|link>',
+    name: 'info',
+    description: 'Get detailed info about a user, group, or channel',
+    usage: 'tg info <id|username|phone|link>',
     minArgs: 1,
     run: async (client, args) => {
-      if (!args[0]) fail('Missing required argument: <username|phone|link>', 'INVALID_ARGS');
+      if (!args[0]) fail('Missing required argument: <id|username|phone|link>', 'INVALID_ARGS');
       const chatId = await resolveChatId(client, args[0]);
       const chat = await client.invoke({ _: 'getChat', chat_id: chatId });
+      let user: Td.user | undefined;
+      let bio: string | undefined;
+      let groups: CommonGroupInfo[] | undefined;
       if (chat.type._ === 'chatTypePrivate') {
-        const user = await client.invoke({
-          _: 'getUser',
-          user_id: chat.type.user_id,
-        });
-        success(strip({ chat: slimChat(chat), user: slimUser(user) }));
-      } else {
-        success(strip({ chat: slimChat(chat) }));
+        const userId = chat.type.user_id;
+        user = await client.invoke({ _: 'getUser', user_id: userId });
+        const fullInfo = await client.invoke({ _: 'getUserFullInfo', user_id: userId });
+        bio = fullInfo.bio?.text || undefined;
+        if (fullInfo.group_in_common_count > 0) {
+          const common = await client.invoke({
+            _: 'getGroupsInCommon',
+            user_id: userId,
+            offset_chat_id: 0,
+            limit: 100,
+          });
+          const chats = await Promise.all(
+            common.chat_ids.map((id) => client.invoke({ _: 'getChat', chat_id: id })),
+          );
+          groups = await Promise.all(
+            chats.map(async (g): Promise<CommonGroupInfo> => {
+              let description: string | undefined;
+              if (g.type._ === 'chatTypeSupergroup') {
+                const sgInfo = await client.invoke({
+                  _: 'getSupergroupFullInfo',
+                  supergroup_id: g.type.supergroup_id,
+                });
+                description = sgInfo.description || undefined;
+              } else if (g.type._ === 'chatTypeBasicGroup') {
+                const bgInfo = await client.invoke({
+                  _: 'getBasicGroupFullInfo',
+                  basic_group_id: g.type.basic_group_id,
+                });
+                description = bgInfo.description || undefined;
+              }
+              let lastActiveDate: number | undefined;
+              try {
+                const msgs = await client.invoke({
+                  _: 'searchChatMessages',
+                  chat_id: g.id,
+                  sender_id: { _: 'messageSenderUser', user_id: userId },
+                  from_message_id: 0,
+                  offset: 0,
+                  limit: 5,
+                });
+                const real = msgs.messages.find((m) => m && isUserContent(m));
+                if (real) lastActiveDate = real.date;
+              } catch {
+                /* search may fail in some groups */
+              }
+              return { chat: g, description, last_active_date: lastActiveDate };
+            }),
+          );
+        }
       }
+      success(flattenInfo(chat, { user, bio, groups_in_common: groups }));
     },
   },
 

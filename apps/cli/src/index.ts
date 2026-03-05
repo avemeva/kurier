@@ -35,7 +35,7 @@ const ENTITY_PREFIXES = new Set(['chats', 'msg', 'action', 'media']);
 // --- Help (all to stdout — structured for agent consumption) ---
 
 const COMMAND_GROUPS: [string, string[]][] = [
-  ['Identity', ['me', 'resolve']],
+  ['Identity', ['me', 'info']],
   ['Chats', ['chats list', 'chats search', 'chats members']],
   ['Messages', ['msg list', 'msg get', 'msg search']],
   [

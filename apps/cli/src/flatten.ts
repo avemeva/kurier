@@ -64,6 +64,44 @@ export type FlatChat = {
   last_date?: string;
 };
 
+export type FlatFindResult = {
+  id: number;
+  title: string;
+  type: 'user' | 'bot' | 'group' | 'channel';
+  last_date?: string;
+  description?: string;
+  bio?: string;
+  personal_channel?: { id: number; title: string; username: string | null };
+};
+
+export type FlatInfoGroup = {
+  id: number;
+  title: string;
+  description?: string;
+  last_active?: string;
+  last_date?: string;
+};
+
+export type FlatInfo = {
+  entity: {
+    id: number;
+    title: string;
+    type: 'user' | 'bot' | 'group' | 'channel';
+    username?: string;
+    phone?: string;
+    bio?: string;
+    is_contact?: boolean;
+    is_premium?: boolean;
+  };
+  chat: {
+    id: number;
+    unread: number;
+    last?: string;
+    last_date?: string;
+  };
+  groups?: FlatInfoGroup[];
+};
+
 // --- Helpers ---
 
 function clean<T extends Record<string, unknown>>(obj: T): T {
@@ -402,4 +440,84 @@ export function flattenChat(chat: Td.chat, botChatIds?: Set<number>): FlatChat {
 
 export function flattenChats(chats: Td.chat[], botChatIds?: Set<number>): FlatChat[] {
   return chats.map((c) => flattenChat(c, botChatIds));
+}
+
+// --- Find result flattening ---
+
+export function flattenFindResult(
+  chat: Td.chat,
+  extra: {
+    isBot?: boolean;
+    description?: string;
+    bio?: string;
+    personalChannel?: { id: number; title: string; username: string | null };
+  },
+): FlatFindResult {
+  const m = chat.last_message;
+  return clean({
+    id: chat.id,
+    title: chat.title,
+    type: flattenChatType(chat.type, extra.isBot),
+    last_date: m ? formatTime(m.date) : undefined,
+    description: extra.description || undefined,
+    bio: extra.bio || undefined,
+    personal_channel: extra.personalChannel || undefined,
+  }) as FlatFindResult;
+}
+
+// --- Info flattening ---
+
+export type CommonGroupInfo = {
+  chat: Td.chat;
+  description?: string;
+  last_active_date?: number;
+};
+
+export function flattenInfo(
+  chat: Td.chat,
+  extra: {
+    user?: Td.user;
+    bio?: string;
+    groups_in_common?: CommonGroupInfo[];
+  },
+): FlatInfo {
+  const m = chat.last_message;
+  const u = extra.user;
+  const isBot = u?.type._ === 'userTypeBot';
+
+  const FIVE_MONTHS_AGO = Math.floor(Date.now() / 1000) - 5 * 30 * 24 * 60 * 60;
+  const recentGroups = extra.groups_in_common
+    ?.filter((g) => g.last_active_date && g.last_active_date >= FIVE_MONTHS_AGO)
+    .sort((a, b) => (b.last_active_date ?? 0) - (a.last_active_date ?? 0))
+    .map(
+      (g) =>
+        clean({
+          id: g.chat.id,
+          title: g.chat.title,
+          description: g.description || undefined,
+          last_active: g.last_active_date ? formatTime(g.last_active_date) : undefined,
+          last_date: g.chat.last_message ? formatTime(g.chat.last_message.date) : undefined,
+        }) as FlatInfoGroup,
+    );
+
+  const result: FlatInfo = {
+    entity: clean({
+      id: chat.id,
+      title: chat.title,
+      type: flattenChatType(chat.type, isBot),
+      username: u?.usernames?.active_usernames?.[0] ?? undefined,
+      phone: u?.phone_number || undefined,
+      bio: extra.bio || undefined,
+      is_contact: u?.is_contact || undefined,
+      is_premium: u?.is_premium || undefined,
+    }) as FlatInfo['entity'],
+    chat: clean({
+      id: chat.id,
+      unread: chat.unread_count,
+      last: m ? extractPreview(m, 150) : undefined,
+      last_date: m ? formatTime(m.date) : undefined,
+    }) as FlatInfo['chat'],
+  };
+  if (recentGroups?.length) result.groups = recentGroups;
+  return result;
 }
