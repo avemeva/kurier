@@ -12,7 +12,8 @@
     "build": "bun run scripts/build.ts && bun run scripts/install-tdjson.ts"
   },
   "dependencies": {
-    "@tg/protocol": "workspace:*"
+    "@tg/protocol": "workspace:*",
+    "commander": "^14.0.3"
   },
   "devDependencies": {
     "@types/bun": "latest",

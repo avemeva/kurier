@@ -13,139 +13,38 @@
 import { homedir } from 'node:os';
 import { FILES_DIR } from '@tg/protocol/paths';
 import type * as Td from 'tdlib-types';
-import type { SlimMessage } from './slim';
 import { extractPreview } from './slim';
+import type {
+  CommonGroupInfo,
+  ContentAny,
+  FlatButton,
+  FlatChat,
+  FlatCommonGroup,
+  FlatFindResult,
+  FlatInfo,
+  FlatInfoBot,
+  FlatInfoChannel,
+  FlatInfoEntity,
+  FlatInfoGroup,
+  FlatInfoUser,
+  FlatMessage,
+  SlimFile,
+  SlimMessage,
+} from './types';
+
+export type {
+  CommonGroupInfo,
+  FlatButton,
+  FlatChat,
+  FlatCommonGroup,
+  FlatFindResult,
+  FlatInfo,
+  FlatMember,
+  FlatMessage,
+} from './types';
 
 const HOME = homedir();
 const SYMLINK_PREFIX = '~/.tg';
-
-// --- Types ---
-
-export type FlatButton = { id: number; text: string; url?: string };
-
-export type FlatMessage = {
-  id?: number;
-  ids?: number[];
-  date: string;
-  name: string;
-  re?: number;
-  re_chat?: number;
-  fwd?: string;
-  edited?: true;
-  text?: string;
-  preview?: string;
-  content?: string;
-  photo?: string | true;
-  photos?: (string | true)[];
-  video?: string | true;
-  videos?: (string | true)[];
-  voice?: string;
-  doc?: string;
-  docs?: string[];
-  gif?: string | true;
-  audio?: string;
-  sticker?: string;
-  location?: string;
-  contact?: string;
-  poll?: string;
-  options?: string[];
-  pinned?: number;
-  duration?: string;
-  transcript?: string;
-  buttons?: FlatButton[][];
-};
-
-export type FlatChat = {
-  id: number;
-  title: string;
-  type: 'user' | 'bot' | 'group' | 'channel';
-  unread: number;
-  last?: string;
-  last_date?: string;
-};
-
-export type FlatFindResult = {
-  id: number;
-  title: string;
-  type: 'user' | 'bot' | 'group' | 'channel';
-  last_date?: string;
-  description?: string;
-  link_preview?: string;
-  personal_channel?: {
-    id: number;
-    title: string;
-    username: string | null;
-    description?: string;
-    link_preview?: string;
-  };
-};
-
-export type FlatCommonGroup = {
-  id: number;
-  title: string;
-  description?: string;
-  member_count?: number;
-  last_active?: string;
-  last_date?: string;
-};
-
-type FlatInfoUser = {
-  id: number;
-  title: string;
-  type: 'user';
-  username?: string;
-  phone?: string;
-  description?: string;
-  link_preview?: string;
-  personal_channel?: {
-    id: number;
-    title: string;
-    username: string | null;
-    description?: string;
-    link_preview?: string;
-  };
-  is_contact?: boolean;
-  is_premium?: boolean;
-};
-
-type FlatInfoBot = {
-  id: number;
-  title: string;
-  type: 'bot';
-  username?: string;
-  description?: string;
-  link_preview?: string;
-};
-
-type FlatInfoGroup = {
-  id: number;
-  title: string;
-  type: 'group';
-  description?: string;
-  member_count?: number;
-};
-
-type FlatInfoChannel = {
-  id: number;
-  title: string;
-  type: 'channel';
-  username?: string;
-  description?: string;
-  member_count?: number;
-};
-
-type FlatInfoEntity = FlatInfoUser | FlatInfoBot | FlatInfoGroup | FlatInfoChannel;
-
-export type FlatInfo = {
-  entity: FlatInfoEntity;
-  chat: {
-    id: number;
-    unread: number;
-    last?: string;
-    last_date?: string;
-  };
-  groups?: FlatCommonGroup[];
-};
 
 // --- Helpers ---
 
@@ -187,8 +86,6 @@ function formatDuration(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-type SlimFile = { downloaded: boolean; local_path?: string };
-
 function shortenPath(p: string): string {
   // ~/.tg symlink points to FILES_DIR (media_cache) — use short form
   if (p.startsWith(FILES_DIR)) return SYMLINK_PREFIX + p.slice(FILES_DIR.length);
@@ -213,10 +110,6 @@ function flattenChatType(t: Td.ChatType, isBot?: boolean): 'user' | 'bot' | 'gro
       return t.is_channel ? 'channel' : 'group';
   }
 }
-
-// --- Content-any alias for default-case access ---
-
-type ContentAny = { type: string; [key: string]: unknown };
 
 // --- Inline buttons ---
 
@@ -487,25 +380,6 @@ export function flattenChats(chats: Td.chat[], botChatIds?: Set<number>): FlatCh
   return chats.map((c) => flattenChat(c, botChatIds));
 }
 
-// --- Member flattening ---
-
-export type FlatMember = {
-  user_id: number;
-  name?: string;
-  username?: string;
-  status: 'creator' | 'admin' | 'member' | 'restricted' | 'banned' | 'left';
-  custom_title?: string;
-  description?: string;
-  link_preview?: string;
-  personal_channel?: {
-    id: number;
-    title: string;
-    username: string | null;
-    description?: string;
-    link_preview?: string;
-  };
-};
-
 // --- Find result flattening ---
 
 export function flattenFindResult(
@@ -536,13 +410,6 @@ export function flattenFindResult(
 }
 
 // --- Info flattening ---
-
-export type CommonGroupInfo = {
-  chat: Td.chat;
-  description?: string;
-  member_count?: number;
-  last_active_date?: number;
-};
 
 export function flattenInfo(
   chat: Td.chat,
@@ -592,7 +459,7 @@ export function flattenInfo(
         type,
         username: u?.usernames?.active_usernames?.[0] ?? undefined,
         phone: u?.phone_number || undefined,
-        description: extra.description || undefined,
+        bio: extra.description || undefined,
         link_preview: extra.link_preview || undefined,
         personal_channel: extra.personal_channel || undefined,
         is_contact: u?.is_contact || undefined,
