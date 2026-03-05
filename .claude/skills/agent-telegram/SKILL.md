@@ -100,6 +100,8 @@ tg msg search "query" --until N                  # Messages before unix timestam
 tg msg search "query" --chat <id>                # Search within a specific chat
 tg msg search "query" --chat <id> --from <user>  # Filter by sender (per-chat only)
 tg msg search "query" --context N                # Include N before + hit + N after in context array
+tg msg search "query" --auto-download            # Auto-download photos/stickers/voice
+tg msg search "query" --auto-transcribe          # Auto-transcribe voice/video notes (Premium)
 tg msg search "query" --full                     # Disable 500-char text truncation
 tg msg search "query" --archived                 # Search archived chats only (default: main list)
 

@@ -17,7 +17,7 @@ import {
   flattenMessage,
   flattenMessages,
 } from './flatten';
-import { addSenderNames, enrichMessage, enrichMessages, transcribeMessages } from './helpers';
+import { enrichMessage, enrichMessages, enrichOpts, getFileId } from './helpers';
 import { fail, strip, success, warn } from './output';
 import { resolveChatId, resolveEntity } from './resolve';
 import { slimAuthState, slimMembers, slimMessage, slimMessages, slimUser } from './slim';
@@ -131,103 +131,6 @@ async function resolveBotChatIds(client: TelegramClient, chats: Td.chat[]): Prom
   return botIds;
 }
 
-const AUTO_DOWNLOAD_MAX_SIZE = 1_048_576; // 1MB
-
-// --- Helper: get file from message content ---
-
-function getFile(content: Td.MessageContent): Td.file | null {
-  switch (content._) {
-    case 'messagePhoto': {
-      const sizes = content.photo.sizes;
-      if (!sizes.length) return null;
-      return sizes[sizes.length - 1]?.photo ?? null;
-    }
-    case 'messageDocument':
-      return content.document.document;
-    case 'messageVideo':
-      return content.video.video;
-    case 'messageAudio':
-      return content.audio.audio;
-    case 'messageAnimation':
-      return content.animation.animation;
-    case 'messageVoiceNote':
-      return content.voice_note.voice;
-    case 'messageVideoNote':
-      return content.video_note.video;
-    case 'messageSticker':
-      return content.sticker.sticker;
-    default:
-      return null;
-  }
-}
-
-// --- Helper: auto-download small files (≤1MB, not yet downloaded) ---
-
-async function autoDownloadSmall(client: TelegramClient, rawMsgs: Td.message[]): Promise<void> {
-  const targets: { file: Td.file }[] = [];
-  for (const msg of rawMsgs) {
-    const file = getFile(msg.content);
-    if (!file) continue;
-    if (file.local.is_downloading_completed) continue;
-    const size = file.size || file.expected_size;
-    if (size > 0 && size <= AUTO_DOWNLOAD_MAX_SIZE) {
-      targets.push({ file });
-    }
-  }
-  if (!targets.length) return;
-
-  const CONCURRENCY = 3;
-  for (let i = 0; i < targets.length; i += CONCURRENCY) {
-    const chunk = targets.slice(i, i + CONCURRENCY);
-    await Promise.all(
-      chunk.map(async (target) => {
-        try {
-          const updated = await client.invoke({
-            _: 'downloadFile',
-            file_id: target.file.id,
-            priority: 1,
-            offset: 0,
-            limit: 0,
-            synchronous: true,
-          });
-          // Patch the original file object so slimFile sees the download
-          target.file.local = updated.local;
-        } catch {}
-      }),
-    );
-  }
-}
-
-// --- Helper: get file_id from message content ---
-
-function getFileId(content: Td.MessageContent): number | null {
-  switch (content._) {
-    case 'messagePhoto': {
-      // Get largest photo size
-      const sizes = content.photo.sizes;
-      if (!sizes.length) return null;
-      const largest = sizes[sizes.length - 1];
-      return largest ? largest.photo.id : null;
-    }
-    case 'messageDocument':
-      return content.document.document.id;
-    case 'messageVideo':
-      return content.video.video.id;
-    case 'messageAudio':
-      return content.audio.audio.id;
-    case 'messageAnimation':
-      return content.animation.animation.id;
-    case 'messageVoiceNote':
-      return content.voice_note.voice.id;
-    case 'messageVideoNote':
-      return content.video_note.video.id;
-    case 'messageSticker':
-      return content.sticker.sticker.id;
-    default:
-      return null;
-  }
-}
-
 // --- Helper: get MIME type from content ---
 
 function getContentMimeType(content: Td.MessageContent): string {
@@ -250,48 +153,6 @@ function getContentMimeType(content: Td.MessageContent): string {
       return 'image/webp';
     default:
       return 'application/octet-stream';
-  }
-}
-
-// --- Helper: should auto-download ---
-
-function shouldAutoDownloadContent(content: Td.MessageContent): boolean {
-  return getFileId(content) !== null;
-}
-
-// --- Helper: auto-download media for messages ---
-
-async function autoDownloadMessages(client: TelegramClient, rawMsgs: Td.message[]): Promise<void> {
-  const targets: { file: Td.file }[] = [];
-  for (const msg of rawMsgs) {
-    if (!shouldAutoDownloadContent(msg.content)) continue;
-    const file = getFile(msg.content);
-    if (!file) continue;
-    if (file.local.is_downloading_completed) continue;
-    targets.push({ file });
-  }
-
-  const CONCURRENCY = 3;
-  for (let batch = 0; batch < targets.length; batch += CONCURRENCY) {
-    const chunk = targets.slice(batch, batch + CONCURRENCY);
-    await Promise.all(
-      chunk.map(async (target) => {
-        try {
-          const updated = await client.invoke({
-            _: 'downloadFile',
-            file_id: target.file.id,
-            priority: 1,
-            offset: 0,
-            limit: 0,
-            synchronous: true,
-          });
-          // Patch the original file object so slim/flatten sees the download
-          target.file.local = updated.local;
-        } catch {
-          /* skip failed downloads */
-        }
-      }),
-    );
   }
 }
 
@@ -322,8 +183,9 @@ async function enrichWithContext(
         limit: contextN * 2 + 1,
         only_local: false,
       });
-      const context = flattenMessages(
-        slimMessages(ctx.messages.filter((m): m is Td.message => m != null)),
+      const context = await enrichMessages(
+        client,
+        ctx.messages.filter((m): m is Td.message => m != null),
       );
       enriched.push({ ...hit, context });
     } catch {
@@ -630,10 +492,7 @@ export const commands: Command[] = [
           }
         }
 
-        await autoDownloadSmall(client, matched);
-        if ('--auto-download' in flags) await autoDownloadMessages(client, matched);
-        if ('--auto-transcribe' in flags) await transcribeMessages(client, matched);
-        const flat = await enrichMessages(client, matched);
+        const flat = await enrichMessages(client, matched, enrichOpts(flags));
         const sliced = flat.slice(0, limit);
         const hasMore = flat.length > limit || (!exhaustedSearch && scanned < MAX_SCAN);
         const meta = {
@@ -727,10 +586,7 @@ export const commands: Command[] = [
           }
         }
 
-        await autoDownloadSmall(client, matched);
-        if ('--auto-download' in flags) await autoDownloadMessages(client, matched);
-        if ('--auto-transcribe' in flags) await transcribeMessages(client, matched);
-        const flatFiltered = await enrichMessages(client, matched);
+        const flatFiltered = await enrichMessages(client, matched, enrichOpts(flags));
         const output = flatFiltered.slice(0, limit);
         const more = flatFiltered.length > limit || (!exhausted && scanned < MAX_SCAN);
 
@@ -781,10 +637,7 @@ export const commands: Command[] = [
         }
       }
 
-      await autoDownloadSmall(client, matched);
-      if ('--auto-download' in flags) await autoDownloadMessages(client, matched);
-      if ('--auto-transcribe' in flags) await transcribeMessages(client, matched);
-      const flatHistory = await enrichMessages(client, matched);
+      const flatHistory = await enrichMessages(client, matched, enrichOpts(flags));
       const output = flatHistory.slice(0, limit);
       const more = flatHistory.length > limit || (!exhaustedHistory && scannedHistory < MAX_SCAN);
       const nextOffsetMsg = matched[matched.length - 1];
@@ -810,7 +663,6 @@ export const commands: Command[] = [
         chat_id: chatId,
         message_id: messageId,
       });
-      await autoDownloadSmall(client, [msg]);
       const flat = await enrichMessage(client, msg);
 
       success(flat);
@@ -968,6 +820,8 @@ export const commands: Command[] = [
       '--offset': 'Pagination cursor from previous nextOffset',
       '--full': 'Return full message text (default: truncated to 500 chars)',
       '--archived': 'Search in archived chats only (default: main chat list)',
+      '--auto-download': 'Auto-download photos, stickers, voice messages; adds localPath to media',
+      '--auto-transcribe': 'Auto-transcribe voice/video notes (requires Premium)',
     },
     run: async (client, args, flags) => {
       const filterValue = flags['--filter'];
@@ -1054,10 +908,8 @@ export const commands: Command[] = [
         const messages = matched;
 
         const full = '--full' in flags;
-        const slimMsgs = slimMessages(messages);
-        await addSenderNames(client, slimMsgs);
-        const flatMsgs = slimMsgs.map(flattenMessage);
-        let results: Record<string, unknown>[] = flatMsgs.map((fm, idx) => {
+        const flat = await enrichMessages(client, messages, enrichOpts(flags));
+        let results: Record<string, unknown>[] = flat.map((fm, idx) => {
           const obj: Record<string, unknown> = {
             ...fm,
             chat_id: (messages[idx] as Td.message).chat_id,
@@ -1133,10 +985,8 @@ export const commands: Command[] = [
         const messages = matched;
 
         const full = '--full' in flags;
-        const slimMsgs = slimMessages(messages);
-        await addSenderNames(client, slimMsgs);
-        const flatMsgs = slimMsgs.map(flattenMessage);
-        const formattedPromises = flatMsgs.map(async (fm, idx) => {
+        const flat = await enrichMessages(client, messages, enrichOpts(flags));
+        const formattedPromises = flat.map(async (fm, idx) => {
           const msg = messages[idx] as Td.message;
           let chatTitle = '';
           try {
@@ -2346,32 +2196,7 @@ export const commands: Command[] = [
               const msg = update.message;
               if (await shouldSkip(msg.chat_id)) return;
               if (incomingOnly && msg.is_outgoing) return;
-              await autoDownloadSmall(client, [msg]);
-              if (downloadMedia && shouldAutoDownloadContent(msg.content)) {
-                const fileId = getFileId(msg.content);
-                if (fileId) {
-                  try {
-                    await client.invoke({
-                      _: 'downloadFile',
-                      file_id: fileId,
-                      priority: 1,
-                      offset: 0,
-                      limit: 0,
-                      synchronous: true,
-                    });
-                  } catch {
-                    // emit even if download fails
-                  }
-                  const flatDl = await enrichMessage(client, msg);
-                  emit({
-                    type: 'new_message',
-                    chat_id: msg.chat_id,
-                    message: flatDl,
-                  });
-                  return;
-                }
-              }
-              const flatMsg = await enrichMessage(client, msg);
+              const flatMsg = await enrichMessage(client, msg, { autoDownload: downloadMedia });
               emit({
                 type: 'new_message',
                 chat_id: msg.chat_id,
