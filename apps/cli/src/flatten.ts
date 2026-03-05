@@ -74,32 +74,62 @@ export type FlatFindResult = {
   personal_channel?: { id: number; title: string; username: string | null };
 };
 
-export type FlatInfoGroup = {
+export type FlatCommonGroup = {
   id: number;
   title: string;
   description?: string;
+  member_count?: number;
   last_active?: string;
   last_date?: string;
 };
 
+type FlatInfoUser = {
+  id: number;
+  title: string;
+  type: 'user';
+  username?: string;
+  phone?: string;
+  bio?: string;
+  is_contact?: boolean;
+  is_premium?: boolean;
+};
+
+type FlatInfoBot = {
+  id: number;
+  title: string;
+  type: 'bot';
+  username?: string;
+  description?: string;
+};
+
+type FlatInfoGroup = {
+  id: number;
+  title: string;
+  type: 'group';
+  description?: string;
+  member_count?: number;
+};
+
+type FlatInfoChannel = {
+  id: number;
+  title: string;
+  type: 'channel';
+  username?: string;
+  description?: string;
+  member_count?: number;
+};
+
+type FlatInfoEntity = FlatInfoUser | FlatInfoBot | FlatInfoGroup | FlatInfoChannel;
+
 export type FlatInfo = {
-  entity: {
-    id: number;
-    title: string;
-    type: 'user' | 'bot' | 'group' | 'channel';
-    username?: string;
-    phone?: string;
-    bio?: string;
-    is_contact?: boolean;
-    is_premium?: boolean;
-  };
+  entity: FlatInfoEntity;
   chat: {
     id: number;
     unread: number;
     last?: string;
     last_date?: string;
   };
-  groups?: FlatInfoGroup[];
+  groups?: FlatCommonGroup[];
 };
 
 // --- Helpers ---
@@ -470,6 +500,7 @@ export function flattenFindResult(
 export type CommonGroupInfo = {
   chat: Td.chat;
   description?: string;
+  member_count?: number;
   last_active_date?: number;
 };
 
@@ -478,6 +509,9 @@ export function flattenInfo(
   extra: {
     user?: Td.user;
     bio?: string;
+    description?: string;
+    member_count?: number;
+    username?: string;
     groups_in_common?: CommonGroupInfo[];
   },
 ): FlatInfo {
@@ -495,22 +529,59 @@ export function flattenInfo(
           id: g.chat.id,
           title: g.chat.title,
           description: g.description || undefined,
+          member_count: g.member_count || undefined,
           last_active: g.last_active_date ? formatTime(g.last_active_date) : undefined,
           last_date: g.chat.last_message ? formatTime(g.chat.last_message.date) : undefined,
-        }) as FlatInfoGroup,
+        }) as FlatCommonGroup,
     );
 
+  const type = flattenChatType(chat.type, isBot);
+  let entity: FlatInfoEntity;
+  switch (type) {
+    case 'user':
+      entity = clean({
+        id: chat.id,
+        title: chat.title,
+        type,
+        username: u?.usernames?.active_usernames?.[0] ?? undefined,
+        phone: u?.phone_number || undefined,
+        bio: extra.bio || undefined,
+        is_contact: u?.is_contact || undefined,
+        is_premium: u?.is_premium || undefined,
+      }) as FlatInfoUser;
+      break;
+    case 'bot':
+      entity = clean({
+        id: chat.id,
+        title: chat.title,
+        type,
+        username: u?.usernames?.active_usernames?.[0] ?? undefined,
+        description: extra.description || extra.bio || undefined,
+      }) as FlatInfoBot;
+      break;
+    case 'group':
+      entity = clean({
+        id: chat.id,
+        title: chat.title,
+        type,
+        description: extra.description || undefined,
+        member_count: extra.member_count || undefined,
+      }) as FlatInfoGroup;
+      break;
+    case 'channel':
+      entity = clean({
+        id: chat.id,
+        title: chat.title,
+        type,
+        username: extra.username || undefined,
+        description: extra.description || undefined,
+        member_count: extra.member_count || undefined,
+      }) as FlatInfoChannel;
+      break;
+  }
+
   const result: FlatInfo = {
-    entity: clean({
-      id: chat.id,
-      title: chat.title,
-      type: flattenChatType(chat.type, isBot),
-      username: u?.usernames?.active_usernames?.[0] ?? undefined,
-      phone: u?.phone_number || undefined,
-      bio: extra.bio || undefined,
-      is_contact: u?.is_contact || undefined,
-      is_premium: u?.is_premium || undefined,
-    }) as FlatInfo['entity'],
+    entity,
     chat: clean({
       id: chat.id,
       unread: chat.unread_count,

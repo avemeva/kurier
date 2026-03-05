@@ -1221,12 +1221,38 @@ export const commands: Command[] = [
       const chat = await client.invoke({ _: 'getChat', chat_id: chatId });
       let user: Td.user | undefined;
       let bio: string | undefined;
+      let description: string | undefined;
+      let memberCount: number | undefined;
+      let username: string | undefined;
       let groups: CommonGroupInfo[] | undefined;
-      if (chat.type._ === 'chatTypePrivate') {
+      if (chat.type._ === 'chatTypeSupergroup') {
+        const sgInfo = await client.invoke({
+          _: 'getSupergroupFullInfo',
+          supergroup_id: chat.type.supergroup_id,
+        });
+        const sg = await client.invoke({
+          _: 'getSupergroup',
+          supergroup_id: chat.type.supergroup_id,
+        });
+        description = sgInfo.description || undefined;
+        memberCount = sgInfo.member_count || undefined;
+        username = sg.usernames?.active_usernames?.[0] ?? undefined;
+      } else if (chat.type._ === 'chatTypeBasicGroup') {
+        const bgInfo = await client.invoke({
+          _: 'getBasicGroupFullInfo',
+          basic_group_id: chat.type.basic_group_id,
+        });
+        description = bgInfo.description || undefined;
+        memberCount = bgInfo.members.length || undefined;
+      } else if (chat.type._ === 'chatTypePrivate') {
         const userId = chat.type.user_id;
         user = await client.invoke({ _: 'getUser', user_id: userId });
         const fullInfo = await client.invoke({ _: 'getUserFullInfo', user_id: userId });
         bio = fullInfo.bio?.text || undefined;
+        if (fullInfo.bot_info) {
+          description =
+            fullInfo.bot_info.short_description || fullInfo.bot_info.description || undefined;
+        }
         if (fullInfo.group_in_common_count > 0) {
           const common = await client.invoke({
             _: 'getGroupsInCommon',
@@ -1240,18 +1266,21 @@ export const commands: Command[] = [
           groups = await Promise.all(
             chats.map(async (g): Promise<CommonGroupInfo> => {
               let description: string | undefined;
+              let groupMemberCount: number | undefined;
               if (g.type._ === 'chatTypeSupergroup') {
                 const sgInfo = await client.invoke({
                   _: 'getSupergroupFullInfo',
                   supergroup_id: g.type.supergroup_id,
                 });
                 description = sgInfo.description || undefined;
+                groupMemberCount = sgInfo.member_count || undefined;
               } else if (g.type._ === 'chatTypeBasicGroup') {
                 const bgInfo = await client.invoke({
                   _: 'getBasicGroupFullInfo',
                   basic_group_id: g.type.basic_group_id,
                 });
                 description = bgInfo.description || undefined;
+                groupMemberCount = bgInfo.members.length || undefined;
               }
               let lastActiveDate: number | undefined;
               try {
@@ -1268,12 +1297,26 @@ export const commands: Command[] = [
               } catch {
                 /* search may fail in some groups */
               }
-              return { chat: g, description, last_active_date: lastActiveDate };
+              return {
+                chat: g,
+                description,
+                member_count: groupMemberCount,
+                last_active_date: lastActiveDate,
+              };
             }),
           );
         }
       }
-      success(flattenInfo(chat, { user, bio, groups_in_common: groups }));
+      success(
+        flattenInfo(chat, {
+          user,
+          bio,
+          description,
+          member_count: memberCount,
+          username,
+          groups_in_common: groups,
+        }),
+      );
     },
   },
 
