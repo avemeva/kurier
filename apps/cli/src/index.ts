@@ -26,15 +26,33 @@ if (process.argv.includes('--daemon')) {
 
 const MAX_FLOOD_WAIT_SEC = 30;
 
-// --- Help (all to stderr — never pollutes JSON stdout) ---
+// --- Entity-prefix dispatch ---
+// Commands like `chats list`, `msg get`, `action send`, `media download`
+// are dispatched by joining the entity prefix with the subcommand.
+
+const ENTITY_PREFIXES = new Set(['chats', 'msg', 'action', 'media']);
+
+// --- Help (all to stdout — structured for agent consumption) ---
 
 const COMMAND_GROUPS: [string, string[]][] = [
-  ['Identity', ['me', 'resolve', 'contacts']],
-  ['Chats', ['find', 'dialogs', 'unread', 'chat', 'members']],
-  ['Messages', ['message', 'messages', 'search', 'send', 'edit']],
-  ['Actions', ['read', 'delete', 'forward', 'pin', 'unpin', 'react', 'click']],
+  ['Identity', ['me', 'resolve']],
+  ['Chats', ['chats list', 'chats search', 'chats members']],
+  ['Messages', ['msg list', 'msg get', 'msg search']],
+  [
+    'Actions',
+    [
+      'action send',
+      'action edit',
+      'action delete',
+      'action forward',
+      'action pin',
+      'action unpin',
+      'action react',
+      'action click',
+    ],
+  ],
   ['Real-time', ['listen']],
-  ['Media', ['download', 'transcribe']],
+  ['Media', ['media download', 'media transcribe']],
   ['Advanced', ['eval']],
   ['Auth', ['auth']],
 ];
@@ -91,7 +109,7 @@ function printCommandHelp(cmd: Command): void {
 
 // --- Daemon subcommands ---
 
-async function handleDaemonSubcommand(sub: string): Promise<never> {
+async function handleDaemonSubcommand(sub: string, flags: Record<string, string>): Promise<never> {
   if (sub === 'start') {
     const existingPid = getDaemonPid();
     if (existingPid) {
@@ -139,12 +157,30 @@ async function handleDaemonSubcommand(sub: string): Promise<never> {
   process.exit(0);
 }
 
-// --- Main ---
+// --- Main: resolve entity-prefix commands ---
 
-const [cmdName, ...rest] = process.argv.slice(2);
-const { positional, flags } = parseArgs(rest ?? []);
+const rawArgs = process.argv.slice(2);
+const first = rawArgs[0];
 
-// Global flags applied in command handlers (--simple, --timeout, etc.)
+let cmdName: string | undefined;
+let parseTarget: string[];
+
+if (first && ENTITY_PREFIXES.has(first)) {
+  const sub = rawArgs[1];
+  if (sub && !sub.startsWith('--')) {
+    cmdName = `${first} ${sub}`;
+    parseTarget = rawArgs.slice(2);
+  } else {
+    // Entity prefix without subcommand — show help for that entity
+    cmdName = first;
+    parseTarget = rawArgs.slice(1);
+  }
+} else {
+  cmdName = first;
+  parseTarget = rawArgs.slice(1);
+}
+
+const { positional, flags } = parseArgs(parseTarget ?? []);
 
 // Help (no connect needed)
 if (!cmdName || cmdName === 'help' || cmdName === '--help') {
@@ -162,7 +198,7 @@ if (cmdName === 'version' || cmdName === '--version') {
 // Daemon subcommands (no connect needed)
 if (cmdName === 'daemon') {
   try {
-    await handleDaemonSubcommand(positional[0] ?? '');
+    await handleDaemonSubcommand(positional[0] ?? '', flags);
   } catch (e) {
     if (e instanceof CliError) {
       process.exitCode = 1;
@@ -176,6 +212,26 @@ if (cmdName === 'daemon') {
     }
     process.exit();
   }
+}
+
+// Entity prefix without subcommand — show available subcommands
+if (ENTITY_PREFIXES.has(cmdName)) {
+  const group = COMMAND_GROUPS.find(([, names]) => names.some((n) => n.startsWith(`${cmdName} `)));
+  if (group) {
+    const cmdMap = new Map(commands.map((c) => [c.name, c]));
+    const names = group[1];
+    const maxLen = Math.max(...names.map((n) => n.length));
+    const lines = [`Available ${cmdName} commands:`, ''];
+    for (const name of names) {
+      const cmd = cmdMap.get(name);
+      if (cmd) lines.push(`  ${name.padEnd(maxLen + 2)}${cmd.description}`);
+    }
+    lines.push('', `Run 'tg ${cmdName} <command> --help' for usage.`);
+    process.stdout.write(`${lines.join('\n')}\n`);
+  } else {
+    fail(`Unknown command: "${cmdName}". Run 'tg --help' for available commands.`, 'INVALID_ARGS');
+  }
+  process.exit(0);
 }
 
 // --- Run command (wrapped to catch CliError at every stage) ---
@@ -195,7 +251,7 @@ async function run(): Promise<void> {
   if ('--stdin' in flags) {
     if (process.stdin.isTTY) {
       fail(
-        "--stdin requires piped input (e.g., echo 'text' | tg send me --stdin --html)",
+        "--stdin requires piped input (e.g., echo 'text' | tg action send me --stdin --html)",
         'INVALID_ARGS',
       );
     }

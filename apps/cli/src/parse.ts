@@ -17,11 +17,12 @@ export const BOOLEAN_FLAGS = new Set([
   '--stdin',
   '--remove',
   '--incoming',
-  '--download-media',
+  '--auto-download',
   '--full',
   '--unread',
 
-  '--transcribe',
+  '--auto-transcribe',
+  '--global',
 ]);
 
 export function parseArgs(raw: string[]): {

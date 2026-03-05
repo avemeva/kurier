@@ -112,7 +112,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   for (const id of cleanupMsgIds) {
-    await tg('delete', 'me', String(id));
+    await tg('action', 'delete', 'me', String(id));
   }
 }, TIMEOUT);
 
@@ -163,7 +163,7 @@ describe('listen streaming', () => {
 
       try {
         const nonce = `listen-new-${Date.now()}`;
-        const sent = await tg('send', 'me', nonce);
+        const sent = await tg('action', 'send', 'me', nonce);
         expect(sent.ok).toBe(true);
         cleanupMsgIds.push(sent.data.id);
 
@@ -193,7 +193,7 @@ describe('listen streaming', () => {
       try {
         // Send to Saved Messages (a user/private chat — should be excluded by --type group)
         const nonce = `listen-exclude-${Date.now()}`;
-        const sent = await tg('send', 'me', nonce);
+        const sent = await tg('action', 'send', 'me', nonce);
         expect(sent.ok).toBe(true);
         cleanupMsgIds.push(sent.data.id);
 
@@ -228,7 +228,7 @@ describe('listen streaming', () => {
 
       try {
         const nonce = `listen-chat-${Date.now()}`;
-        const sent = await tg('send', 'me', nonce);
+        const sent = await tg('action', 'send', 'me', nonce);
         expect(sent.ok).toBe(true);
         cleanupMsgIds.push(sent.data.id);
 
@@ -256,7 +256,7 @@ describe('listen streaming', () => {
 
       try {
         const nonce = `listen-resolve-${Date.now()}`;
-        const sent = await tg('send', 'me', nonce);
+        const sent = await tg('action', 'send', 'me', nonce);
         expect(sent.ok).toBe(true);
         cleanupMsgIds.push(sent.data.id);
 
@@ -283,7 +283,7 @@ describe('listen streaming', () => {
 
       try {
         const nonce = `listen-user-${Date.now()}`;
-        const sent = await tg('send', 'me', nonce);
+        const sent = await tg('action', 'send', 'me', nonce);
         expect(sent.ok).toBe(true);
         cleanupMsgIds.push(sent.data.id);
 

@@ -9,7 +9,7 @@ import { copyFileSync } from 'node:fs';
 import path from 'node:path';
 import type { TelegramClient } from '@tg/protocol';
 import type * as Td from 'tdlib-types';
-import { flattenChats, flattenMessage, flattenMessages } from './flatten';
+import { flattenChats, flattenFindResult, flattenMessage, flattenMessages } from './flatten';
 import { addSenderNames, enrichMessage, enrichMessages, transcribeMessages } from './helpers';
 import { fail, strip, success, warn } from './output';
 import { resolveChatId, resolveEntity } from './resolve';
@@ -29,7 +29,7 @@ function parseLimit(flags: Record<string, string>, defaultVal: number): number {
 
 const VALID_CHAT_TYPES = new Set(['user', 'bot', 'group', 'channel']);
 
-const VALID_FIND_TYPES = new Set(['bot', 'channel', 'group', 'user', 'contact']);
+const VALID_FIND_TYPES = new Set(['chat', 'bot', 'group', 'channel']);
 
 const VALID_SEARCH_TYPES = new Set(['private', 'group', 'channel']);
 
@@ -47,7 +47,7 @@ const FILTER_MAP: Record<string, string> = {
   pinned: 'searchMessagesFilterPinned',
 };
 
-const GLOBAL_UNSUPPORTED_FILTERS = new Set(['mention', 'pinned']);
+const CROSS_CHAT_UNSUPPORTED_FILTERS = new Set(['mention', 'pinned']);
 
 const CHAT_TYPE_FILTER_MAP: Record<string, string> = {
   private: 'searchMessagesChatTypeFilterPrivate',
@@ -330,16 +330,15 @@ export const commands: Command[] = [
 
   // --- Dialogs ---
   {
-    name: 'dialogs',
-    description: 'List chats and conversations',
+    name: 'chats list',
+    description: 'List your conversations',
     usage:
-      'tg dialogs [--limit N] [--archived] [--unread] [--type user|bot|group|channel] [--search text] [--offset-date N]',
+      'tg chats list [--limit N] [--archived] [--unread] [--type user|bot|group|channel] [--offset-date N]',
     flags: {
       '--limit': 'Max chats to return (default: 40)',
       '--archived': 'Include archived chats (shows both main and archived)',
       '--unread': 'Only show chats with unread messages',
       '--type': 'Filter by chat type: user, bot, group, or channel',
-      '--search': 'Filter by chat title (client-side substring match)',
       '--offset-date': "Paginate: unix timestamp from previous response's nextOffset",
     },
     run: async (client, _args, flags) => {
@@ -347,7 +346,6 @@ export const commands: Command[] = [
       const archived = '--archived' in flags;
       const typeFilter = flags['--type'];
       const unreadOnly = '--unread' in flags;
-      const searchQuery = flags['--search']?.toLowerCase();
       const offsetDate = flags['--offset-date'] ? Number(flags['--offset-date']) : undefined;
       if (offsetDate !== undefined && (!Number.isFinite(offsetDate) || offsetDate < 0)) {
         fail('--offset-date must be a non-negative unix timestamp', 'INVALID_ARGS');
@@ -361,7 +359,7 @@ export const commands: Command[] = [
       // When --archived is set, fetch from both main and archive lists
       const chatLists: Td.ChatList[] = [{ _: 'chatListMain' }];
       if (archived) chatLists.push({ _: 'chatListArchive' });
-      const isFiltered = !!(typeFilter || unreadOnly || searchQuery || offsetDate);
+      const isFiltered = !!(typeFilter || unreadOnly || offsetDate);
 
       if (isFiltered) {
         // Iterative fetch: scan each list up to `limit` matches, merge by date
@@ -429,8 +427,6 @@ export const commands: Command[] = [
                 if (offsetDate && (chat.last_message?.date ?? 0) >= offsetDate) passes = false;
                 if (passes && unreadOnly && chat.unread_count === 0) passes = false;
                 if (passes && typeFilter && getChatType(chat, botChatIds) !== typeFilter)
-                  passes = false;
-                if (passes && searchQuery && !chat.title.toLowerCase().includes(searchQuery))
                   passes = false;
                 if (passes) matched.push(chat);
               } catch {
@@ -506,108 +502,24 @@ export const commands: Command[] = [
     },
   },
 
-  // --- Unread ---
-  {
-    name: 'unread',
-    description: 'List chats with unread messages',
-    usage: 'tg unread [--all] [--type user|bot|group|channel] [--limit N]',
-    flags: {
-      '--all': 'Include archived chats',
-      '--type': 'Filter by chat type: user, bot, group, or channel',
-      '--limit': 'Max chats to return',
-    },
-    run: async (client, _args, flags) => {
-      const includeArchived = '--all' in flags;
-      const typeFilter = flags['--type'];
-      if (typeFilter && !VALID_CHAT_TYPES.has(typeFilter)) {
-        fail(
-          `Invalid --type "${typeFilter}". Expected: user, bot, group, or channel`,
-          'INVALID_ARGS',
-        );
-      }
-      const limit = parseLimit(flags, 50);
-      const scanLimit = 500;
-
-      // Load chats from main list
-      try {
-        await client.invoke({
-          _: 'loadChats',
-          chat_list: { _: 'chatListMain' },
-          limit: scanLimit,
-        });
-      } catch {
-        // no more chats
-      }
-
-      const chatIds = await client.invoke({
-        _: 'getChats',
-        chat_list: { _: 'chatListMain' },
-        limit: scanLimit,
-      });
-
-      // Also load archived if --all
-      let archivedIds: number[] = [];
-      if (includeArchived) {
-        try {
-          await client.invoke({
-            _: 'loadChats',
-            chat_list: { _: 'chatListArchive' },
-            limit: scanLimit,
-          });
-        } catch {
-          // no more chats
-        }
-        const archived = await client.invoke({
-          _: 'getChats',
-          chat_list: { _: 'chatListArchive' },
-          limit: scanLimit,
-        });
-        archivedIds = archived.chat_ids;
-      }
-
-      const allIds = [...chatIds.chat_ids, ...archivedIds];
-      const chatObjects: Td.chat[] = [];
-      for (const id of allIds) {
-        try {
-          const chat = await client.invoke({ _: 'getChat', chat_id: id });
-          if (chat.unread_count > 0) chatObjects.push(chat);
-        } catch {
-          // skip
-        }
-      }
-
-      const botChatIds = await resolveBotChatIds(client, chatObjects);
-
-      let unread = chatObjects;
-      if (typeFilter) {
-        unread = unread.filter((c) => getChatType(c, botChatIds) === typeFilter);
-      }
-
-      const totalUnread = unread.length;
-      unread = unread.slice(0, limit);
-
-      success(flattenChats(unread, botChatIds), { hasMore: totalUnread > limit });
-    },
-  },
-
   // --- Messages ---
   {
-    name: 'messages',
+    name: 'msg list',
     description: 'Get message history from a chat',
     usage:
-      'tg messages <chat> [--limit N] [--offset-id N] [--from <user>] [--search text] [--filter photo|video|document|url|voice|gif] [--since N] [--reverse]',
+      'tg msg list <chat> [--limit N] [--offset-id N] [--from <user>] [--query text] [--filter photo|video|document|url|voice|gif] [--since N] [--reverse]',
     flags: {
       '--limit': 'Max messages (default: 20)',
       '--offset-id': 'Start from this message ID',
       '--from': 'Filter by sender (username or ID)',
-      '--search': 'Search text within this chat',
+      '--query': 'Search text within this chat',
       '--filter': 'Filter by media type: photo, video, document, url, voice, gif, music',
       '--min-id': 'Minimum message ID (exclusive)',
       '--max-id': 'Maximum message ID (exclusive)',
       '--since': 'Only messages after this unix timestamp (server-side filter)',
       '--reverse': 'Oldest messages first',
-      '--download-media': 'Auto-download photos, stickers, voice messages; adds localPath to media',
-      '--transcribe': 'Auto-transcribe voice/video notes (Telegram Premium)',
+      '--auto-download': 'Auto-download photos, stickers, voice messages; adds localPath to media',
+      '--auto-transcribe': 'Auto-transcribe voice/video notes (Telegram Premium)',
     },
     minArgs: 1,
     run: async (client, args, flags) => {
@@ -615,9 +527,9 @@ export const commands: Command[] = [
       const chatId = await resolveChatId(client, args[0]);
       const limit = parseLimit(flags, 20);
 
-      // Search mode (--search or --since)
-      if (flags['--search'] || flags['--since']) {
-        const query = flags['--search'] ?? '';
+      // Search mode (--query or --since)
+      if (flags['--query'] || flags['--since']) {
+        const query = flags['--query'] ?? '';
         let filter: Td.SearchMessagesFilter$Input = { _: 'searchMessagesFilterEmpty' };
         if (flags['--filter']) {
           const filterMap: Record<string, Td.SearchMessagesFilter$Input> = {
@@ -693,8 +605,8 @@ export const commands: Command[] = [
         }
 
         await autoDownloadSmall(client, matched);
-        if ('--download-media' in flags) await autoDownloadMessages(client, matched);
-        if ('--transcribe' in flags) await transcribeMessages(client, matched);
+        if ('--auto-download' in flags) await autoDownloadMessages(client, matched);
+        if ('--auto-transcribe' in flags) await transcribeMessages(client, matched);
         const flat = await enrichMessages(client, matched);
         const sliced = flat.slice(0, limit);
         const hasMore = flat.length > limit || (!exhaustedSearch && scanned < MAX_SCAN);
@@ -792,8 +704,8 @@ export const commands: Command[] = [
         }
 
         await autoDownloadSmall(client, matched);
-        if ('--download-media' in flags) await autoDownloadMessages(client, matched);
-        if ('--transcribe' in flags) await transcribeMessages(client, matched);
+        if ('--auto-download' in flags) await autoDownloadMessages(client, matched);
+        if ('--auto-transcribe' in flags) await transcribeMessages(client, matched);
         const flatFiltered = await enrichMessages(client, matched);
         const output = flatFiltered.slice(0, limit);
         const more = flatFiltered.length > limit || (!exhausted && scanned < MAX_SCAN);
@@ -849,8 +761,8 @@ export const commands: Command[] = [
       if (isReverse) matched.reverse();
 
       await autoDownloadSmall(client, matched);
-      if ('--download-media' in flags) await autoDownloadMessages(client, matched);
-      if ('--transcribe' in flags) await transcribeMessages(client, matched);
+      if ('--auto-download' in flags) await autoDownloadMessages(client, matched);
+      if ('--auto-transcribe' in flags) await transcribeMessages(client, matched);
       const flatHistory = await enrichMessages(client, matched);
       const output = flatHistory.slice(0, limit);
       const more = flatHistory.length > limit || (!exhaustedHistory && scannedHistory < MAX_SCAN);
@@ -866,9 +778,9 @@ export const commands: Command[] = [
     },
   },
   {
-    name: 'message',
+    name: 'msg get',
     description: 'Get a single message by ID',
-    usage: 'tg message <chat> <message_id>',
+    usage: 'tg msg get <chat> <message_id>',
     flags: {},
     minArgs: 2,
     run: async (client, args, _flags) => {
@@ -889,10 +801,10 @@ export const commands: Command[] = [
 
   // --- Send ---
   {
-    name: 'send',
+    name: 'action send',
     description: 'Send a message to a chat',
     usage:
-      'tg send <chat> "<text>" [--reply-to N] [--md] [--html] [--silent] [--no-preview] [--stdin] [--file path]',
+      'tg action send <chat> "<text>" [--reply-to N] [--md] [--html] [--silent] [--no-preview] [--stdin] [--file path]',
     flags: {
       '--reply-to': 'Reply to a specific message ID',
       '--md': 'Parse Telegram MarkdownV2: *bold* _italic_ `code` ~strike~ ||spoiler||',
@@ -1021,17 +933,17 @@ export const commands: Command[] = [
 
   // --- Search ---
   {
-    name: 'search',
-    description: 'Search messages globally or in a specific chat',
+    name: 'msg search',
+    description: 'Search messages across your chats or in a specific chat',
     usage:
-      'tg search "<query>" [--chat <id>] [--limit N] [--from <user>] [--since N] [--until N] [--type private|group|channel] [--filter photo|video|document|url|voice|gif|music|media|videonote|mention|pinned] [--context N] [--offset "cursor"] [--full] [--archived]',
+      'tg msg search "<query>" [--chat <id>] [--limit N] [--from <user>] [--since N] [--until N] [--type private|group|channel] [--filter photo|video|document|url|voice|gif|music|media|videonote|mention|pinned] [--context N] [--offset "cursor"] [--full] [--archived]',
     flags: {
-      '--chat': 'Search in a specific chat (default: global)',
+      '--chat': 'Search in a specific chat (default: across all your chats)',
       '--limit': 'Max results (default: 20)',
       '--from': 'Filter by sender (requires --chat)',
       '--since': 'Only messages after this unix timestamp',
-      '--until': 'Only messages before this unix timestamp (global only)',
-      '--type': 'Filter by chat type: private, group, or channel (global only)',
+      '--until': 'Only messages before this unix timestamp (cross-chat only)',
+      '--type': 'Filter by chat type: private, group, or channel (cross-chat only)',
       '--filter':
         'Filter by content: photo, video, document, url, voice, gif, music, media, videonote, mention, pinned',
       '--context': 'Include N messages before and after each hit',
@@ -1072,8 +984,8 @@ export const commands: Command[] = [
       if (flags['--chat']) {
         // Per-chat search
         if (flags['--type'])
-          fail('--type is for global search only (filters by chat type)', 'INVALID_ARGS');
-        if (flags['--until']) fail('--until is for global search only', 'INVALID_ARGS');
+          fail('--type is for cross-chat search only (filters by chat type)', 'INVALID_ARGS');
+        if (flags['--until']) fail('--until is for cross-chat search only', 'INVALID_ARGS');
 
         const chatId = await resolveChatId(client, flags['--chat']);
 
@@ -1147,10 +1059,10 @@ export const commands: Command[] = [
             : {}),
         });
       } else {
-        // Global search — message search only
+        // Cross-chat search — searches across all your chats via searchMessages
         if (flags['--from']) {
           fail(
-            '--from requires --chat for per-chat search. Global search does not support sender filtering.',
+            '--from requires --chat. Cross-chat search does not support sender filtering.',
             'INVALID_ARGS',
           );
         }
@@ -1161,7 +1073,7 @@ export const commands: Command[] = [
             'INVALID_ARGS',
           );
         }
-        if (filterValue && GLOBAL_UNSUPPORTED_FILTERS.has(filterValue)) {
+        if (filterValue && CROSS_CHAT_UNSUPPORTED_FILTERS.has(filterValue)) {
           fail(`--filter ${filterValue} requires --chat`, 'INVALID_ARGS');
         }
 
@@ -1228,7 +1140,7 @@ export const commands: Command[] = [
         let formatted = await Promise.all(formattedPromises);
 
         if (contextN > 0) {
-          // For global search, enrich each result with context from its chat
+          // For cross-chat search, enrich each result with context from its chat
           const MAX_CONTEXT = 5;
           const enriched: Record<string, unknown>[] = [];
           for (let i = 0; i < formatted.length; i++) {
@@ -1269,28 +1181,6 @@ export const commands: Command[] = [
     },
   },
 
-  // --- Chat info ---
-  {
-    name: 'chat',
-    description: 'Get detailed info about a chat or user',
-    usage: 'tg chat <id|username>',
-    minArgs: 1,
-    run: async (client, args) => {
-      if (!args[0]) fail('Missing required argument: <id|username>', 'INVALID_ARGS');
-      const chatId = await resolveChatId(client, args[0]);
-      const chat = await client.invoke({ _: 'getChat', chat_id: chatId });
-      if (chat.type._ === 'chatTypePrivate') {
-        const user = await client.invoke({
-          _: 'getUser',
-          user_id: chat.type.user_id,
-        });
-        success(strip({ chat: slimChat(chat), user: slimUser(user) }));
-      } else {
-        success(strip({ chat: slimChat(chat) }));
-      }
-    },
-  },
-
   // --- Resolve ---
   {
     name: 'resolve',
@@ -1315,18 +1205,23 @@ export const commands: Command[] = [
 
   // --- Find ---
   {
-    name: 'find',
-    description: 'Find bots, channels, groups, users, or contacts by name',
-    usage: 'tg find "<query>" [--type bot|channel|group|user|contact] [--limit N] [--archived]',
+    name: 'chats search',
+    description: 'Search chats, bots, groups, or channels by name',
+    usage:
+      'tg chats search "<query>" [--type chat|bot|group|channel] [--limit N] [--archived] [--global]',
     flags: {
-      '--type': 'Filter: bot, channel, group, user, or contact',
+      '--type': 'Filter: chat, bot, group, or channel',
       '--limit': 'Max results (default: 50)',
       '--archived': 'Show only archived chats (default: excludes archived)',
+      '--global': 'Include public Telegram search (network call)',
     },
     run: async (client, args, flags) => {
       const query = args[0];
       if (!query)
-        fail('Missing required argument: <query>. Usage: tg find "<query>"', 'INVALID_ARGS');
+        fail(
+          'Missing required argument: <query>. Usage: tg chats search "<query>"',
+          'INVALID_ARGS',
+        );
 
       const limit = parseLimit(flags, 50);
       const typeFilter = flags['--type'];
@@ -1335,88 +1230,114 @@ export const commands: Command[] = [
           `Invalid --type: ${typeFilter}. Valid: ${[...VALID_FIND_TYPES].join(', ')}`,
           'INVALID_ARGS',
         );
+      const isGlobal = '--global' in flags;
 
       // Fire TDLib calls in parallel
-      const [publicRes, localRes, contactRes] = await Promise.all([
+      const searches: Promise<{ chat_ids: number[] }>[] = [
         client
-          .invoke({ _: 'searchPublicChats', query })
+          .invoke({ _: 'searchChats', query, limit: 50 })
           .catch(() => ({ chat_ids: [] as number[] })),
         client
-          .invoke({ _: 'searchChats', query, limit: 20 })
+          .invoke({ _: 'searchChatsOnServer', query, limit: 50 })
           .catch(() => ({ chat_ids: [] as number[] })),
-        !typeFilter || typeFilter === 'contact' || typeFilter === 'user'
-          ? client
-              .invoke({ _: 'searchContacts', query, limit: 50 })
-              .catch(() => ({ user_ids: [] as number[] }))
-          : Promise.resolve({ user_ids: [] as number[] }),
-      ]);
+      ];
+      if (isGlobal) {
+        searches.push(
+          client
+            .invoke({ _: 'searchPublicChats', query })
+            .catch(() => ({ chat_ids: [] as number[] })),
+        );
+      }
+      const searchResults = await Promise.all(searches);
 
       // Merge + deduplicate chat IDs
-      const uniqueChatIds = new Map<number, true>();
-      for (const id of publicRes.chat_ids) uniqueChatIds.set(id, true);
-      for (const id of localRes.chat_ids) uniqueChatIds.set(id, true);
+      const uniqueChatIds = new Set<number>();
+      for (const res of searchResults) {
+        for (const id of res.chat_ids) uniqueChatIds.add(id);
+      }
 
-      const contactUserIds = new Set(contactRes.user_ids);
+      // Resolve chat info + full info in parallel
+      type FindResult = {
+        chat: Td.chat;
+        user?: Td.user;
+        description?: string;
+        bio?: string;
+        personalChannel?: { id: number; title: string; username: string | null };
+      };
 
-      // Resolve chat info
-      const chatPromises = [...uniqueChatIds.keys()].map(async (chatId) => {
+      const resolvePromises = [...uniqueChatIds].map(async (chatId): Promise<FindResult | null> => {
         try {
           const chat = await client.invoke({ _: 'getChat', chat_id: chatId });
-          let user: Td.user | undefined;
+          const result: FindResult = { chat };
+
           if (chat.type._ === 'chatTypePrivate') {
+            const userId = chat.type.user_id;
+            const [user, fullInfo] = await Promise.all([
+              client.invoke({ _: 'getUser', user_id: userId }).catch(() => undefined),
+              client.invoke({ _: 'getUserFullInfo', user_id: userId }).catch(() => undefined),
+            ]);
+            result.user = user;
+            if (fullInfo) {
+              if (user?.type._ === 'userTypeBot') {
+                result.bio = fullInfo.bot_info?.short_description || undefined;
+              } else {
+                result.bio = fullInfo.bio?.text || undefined;
+              }
+              if (fullInfo.personal_chat_id) {
+                try {
+                  const pc = await client.invoke({
+                    _: 'getChat',
+                    chat_id: fullInfo.personal_chat_id,
+                  });
+                  const pcUsername =
+                    pc.type._ === 'chatTypeSupergroup'
+                      ? ((
+                          (await client
+                            .invoke({ _: 'getSupergroup', supergroup_id: pc.type.supergroup_id })
+                            .catch(() => undefined)) as Td.supergroup | undefined
+                        )?.usernames?.active_usernames?.[0] ?? null)
+                      : null;
+                  result.personalChannel = { id: pc.id, title: pc.title, username: pcUsername };
+                } catch {
+                  // personal channel not accessible
+                }
+              }
+            }
+          } else if (chat.type._ === 'chatTypeSupergroup') {
             try {
-              user = await client.invoke({
-                _: 'getUser',
-                user_id: chat.type.user_id,
+              const sgFull = await client.invoke({
+                _: 'getSupergroupFullInfo',
+                supergroup_id: chat.type.supergroup_id,
               });
+              result.description = sgFull.description || undefined;
             } catch {
-              // skip user info
+              // skip
+            }
+          } else if (chat.type._ === 'chatTypeBasicGroup') {
+            try {
+              const bgFull = await client.invoke({
+                _: 'getBasicGroupFullInfo',
+                basic_group_id: chat.type.basic_group_id,
+              });
+              result.description = bgFull.description || undefined;
+            } catch {
+              // skip
             }
           }
-          return { chat, user };
+
+          return result;
         } catch {
           return null;
         }
       });
 
-      // Resolve contact user IDs not already in chat set
-      const contactPromises = [...contactUserIds]
-        .filter((uid) => !uniqueChatIds.has(uid))
-        .map(async (userId) => {
-          try {
-            const chat = await client.invoke({
-              _: 'createPrivateChat',
-              user_id: userId,
-              force: false,
-            });
-            let user: Td.user | undefined;
-            try {
-              user = await client.invoke({ _: 'getUser', user_id: userId });
-            } catch {
-              // skip user info
-            }
-            return { chat, user };
-          } catch {
-            return null;
-          }
-        });
-
-      const allResults = (await Promise.all([...chatPromises, ...contactPromises])).filter(
-        (r): r is { chat: Td.chat; user: Td.user | undefined } => r !== null,
+      const allResults = (await Promise.all(resolvePromises)).filter(
+        (r): r is FindResult => r !== null,
       );
-
-      // Deduplicate by chat ID
-      const seen = new Set<number>();
-      const dedupedEntities = allResults.filter(({ chat }) => {
-        const id = chat.id;
-        if (seen.has(id)) return false;
-        seen.add(id);
-        return true;
-      });
 
       // Filter by archive status
       const showArchived = flags['--archived'] !== undefined;
-      const archiveFiltered = dedupedEntities.filter(({ chat }) => {
+      const archiveFiltered = allResults.filter(({ chat }) => {
         const isArchived = chat.positions?.some((p) => p.list._ === 'chatListArchive') ?? false;
         return showArchived ? isArchived : !isArchived;
       });
@@ -1439,34 +1360,31 @@ export const commands: Command[] = [
                   (chatType === 'chatTypeSupergroup' &&
                     !(chat.type as Td.chatTypeSupergroup).is_channel)
                 );
-              case 'user':
-                return chatType === 'chatTypePrivate' && user?.type._ !== 'userTypeBot';
-              case 'contact':
-                return chatType === 'chatTypePrivate' && user?.is_contact === true;
+              case 'chat':
+                return chatType === 'chatTypePrivate';
               default:
                 return true;
             }
           })
         : archiveFiltered;
 
-      // Sort bots by popularity (active_user_count descending)
-      if (typeFilter === 'bot') {
-        filtered.sort((a, b) => {
-          const aCount =
-            a.user?.type._ === 'userTypeBot' ? (a.user.type.active_user_count ?? 0) : 0;
-          const bCount =
-            b.user?.type._ === 'userTypeBot' ? (b.user.type.active_user_count ?? 0) : 0;
-          return bCount - aCount;
-        });
-      }
-
-      // Slim, strip, limit
-      const sliced = filtered.slice(0, limit);
-      const results = sliced.map(({ chat, user }) => {
-        const slim = strip(slimChat(chat)) as Record<string, unknown>;
-        if (user) slim.user = strip(slimUser(user));
-        return slim;
+      // Sort by last message date (most recent first)
+      filtered.sort((a, b) => {
+        const aDate = a.chat.last_message?.date ?? 0;
+        const bDate = b.chat.last_message?.date ?? 0;
+        return bDate - aDate;
       });
+
+      // Flatten + limit
+      const sliced = filtered.slice(0, limit);
+      const results = sliced.map(({ chat, user, description, bio, personalChannel }) =>
+        flattenFindResult(chat, {
+          isBot: user?.type._ === 'userTypeBot',
+          description,
+          bio,
+          personalChannel,
+        }),
+      );
 
       success(results, {
         hasMore: filtered.length > limit ? true : undefined,
@@ -1474,35 +1392,11 @@ export const commands: Command[] = [
     },
   },
 
-  // --- Read ---
-  {
-    name: 'read',
-    description: 'Mark messages as read in a chat',
-    usage: 'tg read <chat>',
-    minArgs: 1,
-    run: async (client, args) => {
-      if (!args[0]) fail('Missing required argument: <chat>', 'INVALID_ARGS');
-      const chatId = await resolveChatId(client, args[0]);
-      // Get latest message to mark as read
-      const chat = await client.invoke({ _: 'getChat', chat_id: chatId });
-      if (chat.last_message) {
-        await client.invoke({
-          _: 'viewMessages',
-          chat_id: chatId,
-          message_ids: [chat.last_message.id],
-          source: { _: 'messageSourceChatHistory' },
-          force_read: true,
-        });
-      }
-      success({ chat: args[0], marked: true });
-    },
-  },
-
   // --- Edit ---
   {
-    name: 'edit',
+    name: 'action edit',
     description: 'Edit a sent message',
-    usage: 'tg edit <chat> <msgId> "<new text>" [--md] [--html] [--stdin] [--file path]',
+    usage: 'tg action edit <chat> <msgId> "<new text>" [--md] [--html] [--stdin] [--file path]',
     flags: {
       '--md': 'Parse Telegram MarkdownV2: *bold* _italic_ `code` ~strike~ ||spoiler||',
       '--html': 'Parse HTML: <b>bold</b> <i>italic</i> <code>code</code>',
@@ -1553,9 +1447,9 @@ export const commands: Command[] = [
 
   // --- Delete ---
   {
-    name: 'delete',
+    name: 'action delete',
     description: 'Delete messages from a chat',
-    usage: 'tg delete <chat> <msgId> [msgId...] [--revoke]',
+    usage: 'tg action delete <chat> <msgId> [msgId...] [--revoke]',
     flags: {
       '--revoke': 'Delete for everyone (default: delete only for yourself)',
     },
@@ -1578,9 +1472,9 @@ export const commands: Command[] = [
 
   // --- Forward ---
   {
-    name: 'forward',
+    name: 'action forward',
     description: 'Forward messages from one chat to another',
-    usage: 'tg forward <from-chat> <to-chat> <msgId> [msgId...] [--silent]',
+    usage: 'tg action forward <from-chat> <to-chat> <msgId> [msgId...] [--silent]',
     flags: {
       '--silent': 'Forward without notification',
     },
@@ -1705,9 +1599,9 @@ export const commands: Command[] = [
 
   // --- Download ---
   {
-    name: 'download',
+    name: 'media download',
     description: 'Download media from a message or by file ID',
-    usage: 'tg download <chat> <msgId> [--output path] | tg download --file-id <id>',
+    usage: 'tg media download <chat> <msgId> [--output path] | tg media download --file-id <id>',
     flags: {
       '--output': 'Output file path (default: auto-named in cwd)',
       '--file-id': 'Download directly by TDLib file ID',
@@ -1764,9 +1658,9 @@ export const commands: Command[] = [
 
   // --- Transcribe ---
   {
-    name: 'transcribe',
+    name: 'media transcribe',
     description: 'Transcribe a voice or video note to text (Telegram Premium)',
-    usage: 'tg transcribe <chat> <msgId>',
+    usage: 'tg media transcribe <chat> <msgId>',
     minArgs: 2,
     run: async (client, args) => {
       if (!args[0]) fail('Missing required argument: <chat>', 'INVALID_ARGS');
@@ -1821,13 +1715,13 @@ export const commands: Command[] = [
 
   // --- Members ---
   {
-    name: 'members',
+    name: 'chats members',
     description: 'List members of a group or channel',
     usage:
-      'tg members <chat> [--limit N] [--search text] [--offset N] [--type bot|admin|recent] [--filter bot|admin|recent]',
+      'tg chats members <chat> [--limit N] [--query text] [--offset N] [--type bot|admin|recent] [--filter bot|admin|recent]',
     flags: {
       '--limit': 'Max members (default: 100)',
-      '--search': 'Search members by name',
+      '--query': 'Search members by name',
       '--offset': 'Offset for pagination',
       '--type': 'Filter by type: bot, admin, recent (default: recent)',
       '--filter': 'Alias for --type',
@@ -1838,7 +1732,7 @@ export const commands: Command[] = [
       const chatId = await resolveChatId(client, args[0]);
       const chat = await client.invoke({ _: 'getChat', chat_id: chatId });
       const limit = parseLimit(flags, 100);
-      const search = flags['--search'] || '';
+      const search = flags['--query'] || '';
       const offset = flags['--offset'] ? Number(flags['--offset']) : 0;
 
       const typeFlag = flags['--type'] ?? flags['--filter'];
@@ -1938,9 +1832,9 @@ export const commands: Command[] = [
 
   // --- Pin ---
   {
-    name: 'pin',
+    name: 'action pin',
     description: 'Pin a message in a chat',
-    usage: 'tg pin <chat> <msgId> [--silent]',
+    usage: 'tg action pin <chat> <msgId> [--silent]',
     flags: {
       '--silent': 'Pin without notification',
     },
@@ -1963,9 +1857,9 @@ export const commands: Command[] = [
 
   // --- Unpin ---
   {
-    name: 'unpin',
+    name: 'action unpin',
     description: 'Unpin a message or all messages in a chat',
-    usage: 'tg unpin <chat> [msgId] [--all]',
+    usage: 'tg action unpin <chat> [msgId] [--all]',
     flags: {
       '--all': 'Unpin all messages',
     },
@@ -1993,9 +1887,9 @@ export const commands: Command[] = [
 
   // --- React ---
   {
-    name: 'react',
+    name: 'action react',
     description: 'Add or remove a reaction on a message',
-    usage: 'tg react <chat> <msgId> <emoji> [--remove]',
+    usage: 'tg action react <chat> <msgId> <emoji> [--remove]',
     flags: {
       '--remove': 'Remove the reaction instead of adding',
       '--big': 'Send big animation',
@@ -2050,9 +1944,9 @@ export const commands: Command[] = [
 
   // --- Click inline keyboard button ---
   {
-    name: 'click',
+    name: 'action click',
     description: 'Click an inline keyboard button',
-    usage: 'tg click <chat> <messageId> <button>',
+    usage: 'tg action click <chat> <messageId> <button>',
     flags: {},
     minArgs: 3,
     run: async (client, args) => {
@@ -2198,7 +2092,7 @@ export const commands: Command[] = [
     name: 'listen',
     description: 'Stream real-time events (NDJSON). Requires --chat or --type.',
     usage:
-      'tg listen --type user|bot|group|channel [--chat <ids>] [--exclude-chat <ids>] [--exclude-type <type>] [--event <types>] [--incoming] [--download-media]',
+      'tg listen --type user|bot|group|channel [--chat <ids>] [--exclude-chat <ids>] [--exclude-type <type>] [--event <types>] [--incoming] [--auto-download]',
     flags: {
       '--chat': 'Comma-separated chat IDs to include',
       '--type': 'Include entire category: user, group, or channel',
@@ -2207,7 +2101,7 @@ export const commands: Command[] = [
       '--event':
         'Comma-separated event types (default: new_message,edit_message,delete_messages,message_reactions). Also: read_outbox, user_typing, user_status, message_send_succeeded',
       '--incoming': 'Only include incoming messages (filter out outgoing)',
-      '--download-media': 'Auto-download photos, stickers, voice messages',
+      '--auto-download': 'Auto-download photos, stickers, voice messages',
     },
     streaming: true,
     run: async (client, _args, flags) => {
@@ -2253,7 +2147,7 @@ export const commands: Command[] = [
         const resolved = await resolveChatId(client, raw);
         excludeChatIds.add(String(resolved));
       }
-      const downloadMedia = '--download-media' in flags;
+      const downloadMedia = '--auto-download' in flags;
       const incomingOnly = '--incoming' in flags;
 
       if (!chatIds.size && !typeFilter) {

@@ -74,7 +74,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   for (const id of cleanupIds) {
-    await tg('delete', 'me', String(id));
+    await tg('action', 'delete', 'me', String(id));
   }
 }, TIMEOUT);
 
@@ -94,13 +94,13 @@ describe('me', () => {
   );
 });
 
-// ─── Dialogs ───
+// ─── Chats List ───
 
-describe('dialogs', () => {
+describe('chats list', () => {
   it(
     'returns a list of chats',
     async () => {
-      const r = await tg('dialogs', '--limit', '5');
+      const r = await tg('chats', 'list', '--limit', '5');
       expect(r.ok).toBe(true);
       expect(r.data.length).toBeGreaterThan(0);
       expect(r.data.length).toBeLessThanOrEqual(5);
@@ -114,7 +114,7 @@ describe('dialogs', () => {
   it(
     '--type user filters to DMs only',
     async () => {
-      const r = await tg('dialogs', '--type', 'user', '--limit', '10');
+      const r = await tg('chats', 'list', '--type', 'user', '--limit', '10');
       expect(r.ok).toBe(true);
       for (const d of r.data) {
         expect(d.type).toBe('user');
@@ -126,7 +126,7 @@ describe('dialogs', () => {
   it(
     '--type group filters to groups only',
     async () => {
-      const r = await tg('dialogs', '--type', 'group', '--limit', '5');
+      const r = await tg('chats', 'list', '--type', 'group', '--limit', '5');
       expect(r.ok).toBe(true);
       for (const d of r.data) {
         expect(d.type).toBe('group');
@@ -138,7 +138,7 @@ describe('dialogs', () => {
   it(
     '--type channel filters to channels only',
     async () => {
-      const r = await tg('dialogs', '--type', 'channel', '--limit', '5');
+      const r = await tg('chats', 'list', '--type', 'channel', '--limit', '5');
       expect(r.ok).toBe(true);
       for (const d of r.data) {
         expect(d.type).toBe('channel');
@@ -148,9 +148,9 @@ describe('dialogs', () => {
   );
 
   it(
-    '--search filters by title',
+    'chats search filters by title (replaces dialogs --search)',
     async () => {
-      const r = await tg('dialogs', '--search', 'Saved', '--limit', '10');
+      const r = await tg('chats', 'search', 'Saved', '--limit', '10');
       expect(r.ok).toBe(true);
       for (const d of r.data) {
         expect(d.title.toLowerCase()).toContain('saved');
@@ -162,7 +162,7 @@ describe('dialogs', () => {
   it(
     'type field present for user dialogs',
     async () => {
-      const r = await tg('dialogs', '--type', 'user', '--limit', '10');
+      const r = await tg('chats', 'list', '--type', 'user', '--limit', '10');
       expect(r.ok).toBe(true);
       for (const d of r.data) {
         expect(d.type).toBe('user');
@@ -174,7 +174,7 @@ describe('dialogs', () => {
   it(
     'includes last_message with date',
     async () => {
-      const r = await tg('dialogs', '--limit', '3');
+      const r = await tg('chats', 'list', '--limit', '3');
       expect(r.ok).toBe(true);
       for (const d of r.data) {
         if (d.last_message) {
@@ -189,11 +189,11 @@ describe('dialogs', () => {
   it(
     'pagination with --offset-date',
     async () => {
-      const r1 = await tg('dialogs', '--limit', '3');
+      const r1 = await tg('chats', 'list', '--limit', '3');
       expect(r1.ok).toBe(true);
       expect(r1.hasMore).toBe(true);
       expect(r1.nextOffset).toBeNumber();
-      const r2 = await tg('dialogs', '--limit', '3', '--offset-date', String(r1.nextOffset));
+      const r2 = await tg('chats', 'list', '--limit', '3', '--offset-date', String(r1.nextOffset));
       expect(r2.ok).toBe(true);
       expect(r2.data.length).toBeGreaterThan(0);
       // Second page should have different chats
@@ -208,8 +208,8 @@ describe('dialogs', () => {
   it(
     '--archived includes both main and archived chats',
     async () => {
-      const main = await tg('dialogs', '--limit', '5');
-      const withArchived = await tg('dialogs', '--limit', '40', '--archived');
+      const main = await tg('chats', 'list', '--limit', '5');
+      const withArchived = await tg('chats', 'list', '--limit', '40', '--archived');
       expect(main.ok).toBe(true);
       expect(withArchived.ok).toBe(true);
       // Archived should return at least as many chats as main-only
@@ -226,7 +226,7 @@ describe('dialogs', () => {
   it(
     '--archived with --type still filters correctly',
     async () => {
-      const r = await tg('dialogs', '--archived', '--type', 'user', '--limit', '10');
+      const r = await tg('chats', 'list', '--archived', '--type', 'user', '--limit', '10');
       expect(r.ok).toBe(true);
       for (const d of r.data) {
         expect(d.type).toBe('user');
@@ -238,7 +238,7 @@ describe('dialogs', () => {
   it(
     'invalid --type returns INVALID_ARGS',
     async () => {
-      const r = await tg('dialogs', '--type', 'dm');
+      const r = await tg('chats', 'list', '--type', 'dm');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('INVALID_ARGS');
     },
@@ -246,13 +246,13 @@ describe('dialogs', () => {
   );
 });
 
-// ─── Unread ───
+// ─── Chats List --unread ───
 
-describe('unread', () => {
+describe('chats list --unread', () => {
   it(
     'returns unread chats with counts',
     async () => {
-      const r = await tg('unread');
+      const r = await tg('chats', 'list', '--unread');
       expect(r.ok).toBe(true);
       expect(Array.isArray(r.data)).toBe(true);
       for (const d of r.data) {
@@ -265,9 +265,9 @@ describe('unread', () => {
   );
 
   it(
-    '--all includes archived chats',
+    '--archived includes archived chats',
     async () => {
-      const r = await tg('unread', '--all');
+      const r = await tg('chats', 'list', '--unread', '--archived');
       expect(r.ok).toBe(true);
       // May or may not have archived — just verify it doesn't error
       expect(Array.isArray(r.data)).toBe(true);
@@ -278,7 +278,7 @@ describe('unread', () => {
   it(
     '--type user filters to DMs',
     async () => {
-      const r = await tg('unread', '--type', 'user');
+      const r = await tg('chats', 'list', '--unread', '--type', 'user');
       expect(r.ok).toBe(true);
       for (const d of r.data) {
         expect(d.type).toBe('user');
@@ -290,7 +290,7 @@ describe('unread', () => {
   it(
     'includes last_read_inbox_message_id for fetching unread messages',
     async () => {
-      const r = await tg('unread', '--limit', '3');
+      const r = await tg('chats', 'list', '--unread', '--limit', '3');
       expect(r.ok).toBe(true);
       for (const d of r.data) {
         if (d.last_read_inbox_message_id) {
@@ -304,11 +304,11 @@ describe('unread', () => {
 
 // ─── Messages ───
 
-describe('messages', () => {
+describe('msg list', () => {
   it(
     'returns messages from Saved Messages',
     async () => {
-      const r = await tg('messages', 'me', '--limit', '5');
+      const r = await tg('msg', 'list', 'me', '--limit', '5');
       expect(r.ok).toBe(true);
       expect(r.data.length).toBeLessThanOrEqual(5);
       for (const m of r.data) {
@@ -324,7 +324,7 @@ describe('messages', () => {
   it(
     '--limit respects the count',
     async () => {
-      const r = await tg('messages', 'me', '--limit', '3');
+      const r = await tg('msg', 'list', 'me', '--limit', '3');
       expect(r.ok).toBe(true);
       expect(r.data.length).toBeLessThanOrEqual(3);
     },
@@ -334,11 +334,19 @@ describe('messages', () => {
   it(
     '--offset-id paginates correctly',
     async () => {
-      const r1 = await tg('messages', 'me', '--limit', '3');
+      const r1 = await tg('msg', 'list', 'me', '--limit', '3');
       expect(r1.ok).toBe(true);
       expect(r1.data.length).toBeGreaterThan(0);
       if (r1.hasMore) {
-        const r2 = await tg('messages', 'me', '--limit', '3', '--offset-id', String(r1.nextOffset));
+        const r2 = await tg(
+          'msg',
+          'list',
+          'me',
+          '--limit',
+          '3',
+          '--offset-id',
+          String(r1.nextOffset),
+        );
         expect(r2.ok).toBe(true);
         // Messages should be older (lower IDs)
         const id2 = r2.data[0].id ?? r2.data[0].ids?.[0];
@@ -352,7 +360,7 @@ describe('messages', () => {
   it(
     '--filter photo returns only photos',
     async () => {
-      const r = await tg('messages', 'me', '--filter', 'photo', '--limit', '5');
+      const r = await tg('msg', 'list', 'me', '--filter', 'photo', '--limit', '5');
       expect(r.ok).toBe(true);
       for (const m of r.data) {
         expect(m.photo ?? m.photos).toBeTruthy();
@@ -364,7 +372,7 @@ describe('messages', () => {
   it(
     '--filter document returns documents with metadata',
     async () => {
-      const r = await tg('messages', 'me', '--filter', 'document', '--limit', '5');
+      const r = await tg('msg', 'list', 'me', '--filter', 'document', '--limit', '5');
       expect(r.ok).toBe(true);
       for (const m of r.data) {
         // Single docs have `doc` field, all have `content === 'doc'`
@@ -377,7 +385,7 @@ describe('messages', () => {
   it(
     '--filter url returns messages with links',
     async () => {
-      const r = await tg('messages', 'me', '--filter', 'url', '--limit', '5');
+      const r = await tg('msg', 'list', 'me', '--filter', 'url', '--limit', '5');
       expect(r.ok).toBe(true);
       for (const m of r.data) {
         // URL messages contain links in text or have web page preview
@@ -390,7 +398,7 @@ describe('messages', () => {
   it(
     '--reverse returns oldest first',
     async () => {
-      const r = await tg('messages', 'me', '--limit', '5', '--reverse');
+      const r = await tg('msg', 'list', 'me', '--limit', '5', '--reverse');
       expect(r.ok).toBe(true);
       if (r.data.length >= 2) {
         // Date is now "HH:MM" string — verify order by ID (monotonic)
@@ -406,11 +414,11 @@ describe('messages', () => {
     '--min-id filters to newer messages',
     async () => {
       // Get some messages to find a reference ID
-      const r1 = await tg('messages', 'me', '--limit', '5');
+      const r1 = await tg('msg', 'list', 'me', '--limit', '5');
       expect(r1.ok).toBe(true);
       if (r1.data.length >= 3) {
         const midId = r1.data[2].id;
-        const r2 = await tg('messages', 'me', '--min-id', String(midId), '--limit', '10');
+        const r2 = await tg('msg', 'list', 'me', '--min-id', String(midId), '--limit', '10');
         expect(r2.ok).toBe(true);
         for (const m of r2.data) {
           expect(m.id).toBeGreaterThan(midId);
@@ -425,7 +433,7 @@ describe('messages', () => {
     async () => {
       // Use a recent timestamp to get recent messages only
       const oneWeekAgo = Math.floor(Date.now() / 1000) - 7 * 86400;
-      const r = await tg('messages', 'me', '--since', String(oneWeekAgo), '--limit', '10');
+      const r = await tg('msg', 'list', 'me', '--since', String(oneWeekAgo), '--limit', '10');
       expect(r.ok).toBe(true);
       // Date is now "HH:MM" string — can't compare numerically; just verify data returned
       expect(r.data.length).toBeGreaterThan(0);
@@ -437,11 +445,11 @@ describe('messages', () => {
     'negative group ID works',
     async () => {
       // Find a group to test
-      const groups = await tg('dialogs', '--type', 'group', '--limit', '1');
+      const groups = await tg('chats', 'list', '--type', 'group', '--limit', '1');
       if (groups.ok && groups.data.length > 0) {
         const groupId = groups.data[0].id;
         expect(groupId).toBeLessThan(0); // Should be negative
-        const r = await tg('messages', String(groupId), '--limit', '2');
+        const r = await tg('msg', 'list', String(groupId), '--limit', '2');
         expect(r.ok).toBe(true);
         expect(r.data.length).toBeGreaterThan(0);
       }
@@ -452,7 +460,7 @@ describe('messages', () => {
   it(
     'invalid --filter returns INVALID_ARGS',
     async () => {
-      const r = await tg('messages', 'me', '--filter', 'invalid');
+      const r = await tg('msg', 'list', 'me', '--filter', 'invalid');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('INVALID_ARGS');
     },
@@ -462,7 +470,7 @@ describe('messages', () => {
   it(
     'missing chat arg returns INVALID_ARGS',
     async () => {
-      const r = await tg('messages');
+      const r = await tg('msg', 'list');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('INVALID_ARGS');
     },
@@ -472,11 +480,11 @@ describe('messages', () => {
 
 // ─── Search ───
 
-describe('search', () => {
+describe('msg search', () => {
   it(
-    'global search returns results with chat_id and chat_title',
+    'cross-chat search returns results with chat_id and chat_title',
     async () => {
-      const r = await tg('search', 'test', '--limit', '5');
+      const r = await tg('msg', 'search', 'test', '--limit', '5');
       expect(r.ok).toBe(true);
       for (const m of r.data) {
         expect(m.chat_id).toBeNumber();
@@ -489,7 +497,7 @@ describe('search', () => {
   it(
     'chat_id normalized: channels have -100 prefix',
     async () => {
-      const r = await tg('search', 'test', '--limit', '20');
+      const r = await tg('msg', 'search', 'test', '--limit', '20');
       expect(r.ok).toBe(true);
       for (const m of r.data) {
         const chatId = m.chat_id;
@@ -506,7 +514,7 @@ describe('search', () => {
   it(
     '--chat scopes to specific chat',
     async () => {
-      const r = await tg('search', 'a', '--chat', 'me', '--limit', '3');
+      const r = await tg('msg', 'search', 'a', '--chat', 'me', '--limit', '3');
       expect(r.ok).toBe(true);
       expect(Array.isArray(r.data)).toBe(true);
     },
@@ -514,10 +522,10 @@ describe('search', () => {
   );
 
   it(
-    '--since filters by date on global search',
+    '--since filters by date on cross-chat search',
     async () => {
       const oneMonthAgo = Math.floor(Date.now() / 1000) - 30 * 86400;
-      const r = await tg('search', 'test', '--since', String(oneMonthAgo), '--limit', '10');
+      const r = await tg('msg', 'search', 'test', '--since', String(oneMonthAgo), '--limit', '10');
       expect(r.ok).toBe(true);
       // Date is now "HH:MM" string — can't compare numerically; just verify data returned
       expect(r.data.length).toBeGreaterThan(0);
@@ -528,7 +536,7 @@ describe('search', () => {
   it(
     '--type private filters to DM results',
     async () => {
-      const r = await tg('search', 'привет', '--type', 'private', '--limit', '10');
+      const r = await tg('msg', 'search', 'привет', '--type', 'private', '--limit', '10');
       expect(r.ok).toBe(true);
       for (const m of r.data) {
         // User chat_ids are positive
@@ -541,7 +549,7 @@ describe('search', () => {
   it(
     '--type group filters to group results',
     async () => {
-      const r = await tg('search', 'test', '--type', 'group', '--limit', '10');
+      const r = await tg('msg', 'search', 'test', '--type', 'group', '--limit', '10');
       expect(r.ok).toBe(true);
       for (const m of r.data) {
         expect(m.chat_id).toBeLessThan(0);
@@ -553,7 +561,17 @@ describe('search', () => {
   it(
     '--context returns surrounding messages',
     async () => {
-      const r = await tg('search', 'привет', '--chat', 'me', '--context', '2', '--limit', '1');
+      const r = await tg(
+        'msg',
+        'search',
+        'привет',
+        '--chat',
+        'me',
+        '--context',
+        '2',
+        '--limit',
+        '1',
+      );
       expect(r.ok).toBe(true);
       if (r.data.length > 0) {
         const hit = r.data[0];
@@ -568,7 +586,7 @@ describe('search', () => {
   it(
     '--from requires --chat',
     async () => {
-      const r = await tg('search', 'test', '--from', 'me');
+      const r = await tg('msg', 'search', 'test', '--from', 'me');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('INVALID_ARGS');
     },
@@ -578,7 +596,7 @@ describe('search', () => {
   it(
     'senderName populated in search results',
     async () => {
-      const r = await tg('search', 'test', '--limit', '10');
+      const r = await tg('msg', 'search', 'test', '--limit', '10');
       expect(r.ok).toBe(true);
       // At least some results should have sender_name
       const _withName = r.data.filter((m: Record<string, unknown>) => m.sender_name);
@@ -589,14 +607,14 @@ describe('search', () => {
   );
 
   it(
-    'search chat_id works with messages command',
+    'search chat_id works with msg list command',
     async () => {
-      const r = await tg('search', 'test', '--type', 'group', '--limit', '1');
+      const r = await tg('msg', 'search', 'test', '--type', 'group', '--limit', '1');
       expect(r.ok).toBe(true);
       if (r.data.length > 0) {
         const chatId = r.data[0].chat_id;
-        // The chat_id from search should work directly with messages
-        const msgs = await tg('messages', String(chatId), '--limit', '2');
+        // The chat_id from search should work directly with msg list
+        const msgs = await tg('msg', 'list', String(chatId), '--limit', '2');
         expect(msgs.ok).toBe(true);
         expect(msgs.data.length).toBeGreaterThan(0);
       }
@@ -607,10 +625,18 @@ describe('search', () => {
   it(
     'pagination with --offset',
     async () => {
-      const r1 = await tg('search', 'test', '--limit', '5');
+      const r1 = await tg('msg', 'search', 'test', '--limit', '5');
       expect(r1.ok).toBe(true);
       if (r1.hasMore && r1.nextOffset) {
-        const r2 = await tg('search', 'test', '--limit', '5', '--offset', String(r1.nextOffset));
+        const r2 = await tg(
+          'msg',
+          'search',
+          'test',
+          '--limit',
+          '5',
+          '--offset',
+          String(r1.nextOffset),
+        );
         expect(r2.ok).toBe(true);
         expect(r2.data.length).toBeGreaterThan(0);
       }
@@ -621,11 +647,11 @@ describe('search', () => {
 
 // ─── Send & Edit ───
 
-describe('send', () => {
+describe('action send', () => {
   it(
     'sends plain text to Saved Messages',
     async () => {
-      const r = await tg('send', 'me', 'e2e test message — will be deleted');
+      const r = await tg('action', 'send', 'me', 'e2e test message — will be deleted');
       expect(r.ok).toBe(true);
       track(r.data.id);
       expect(r.data.id).toBeNumber();
@@ -637,7 +663,7 @@ describe('send', () => {
   it(
     'sends with --html formatting',
     async () => {
-      const r = await tg('send', 'me', '<b>bold</b> <i>italic</i>', '--html');
+      const r = await tg('action', 'send', 'me', '<b>bold</b> <i>italic</i>', '--html');
       expect(r.ok).toBe(true);
       track(r.data.id);
       expect(r.data.text).toBe('**bold** __italic__');
@@ -648,7 +674,7 @@ describe('send', () => {
   it(
     'sends with --md formatting',
     async () => {
-      const r = await tg('send', 'me', '*bold* `code`', '--md');
+      const r = await tg('action', 'send', 'me', '*bold* `code`', '--md');
       expect(r.ok).toBe(true);
       track(r.data.id);
     },
@@ -659,7 +685,7 @@ describe('send', () => {
     '--stdin reads from pipe',
     async () => {
       const proc = Bun.spawn(
-        ['bash', '-c', `echo "stdin test msg" | bun run ${CLI_ENTRY} send me --stdin`],
+        ['bash', '-c', `echo "stdin test msg" | bun run ${CLI_ENTRY} action send me --stdin`],
         {
           stdout: 'pipe',
           stderr: 'pipe',
@@ -682,7 +708,7 @@ describe('send', () => {
       const tmpFile = path.join(tmpdir(), 'tg_test_msg.txt');
       const Bun2 = globalThis.Bun;
       Bun2.write(tmpFile, 'file test msg');
-      const r = await tg('send', 'me', '--file', tmpFile);
+      const r = await tg('action', 'send', 'me', '--file', tmpFile);
       expect(r.ok).toBe(true);
       track(r.data.id);
       expect(r.data.text).toBe('file test msg');
@@ -694,7 +720,7 @@ describe('send', () => {
   it(
     'missing text returns INVALID_ARGS',
     async () => {
-      const r = await tg('send', 'me');
+      const r = await tg('action', 'send', 'me');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('INVALID_ARGS');
     },
@@ -702,17 +728,17 @@ describe('send', () => {
   );
 });
 
-describe('edit', () => {
+describe('action edit', () => {
   it(
     'edits a message',
     async () => {
       // Send a message first
-      const s = await tg('send', 'me', 'original text');
+      const s = await tg('action', 'send', 'me', 'original text');
       expect(s.ok).toBe(true);
       track(s.data.id);
       const msgId = s.data.id;
 
-      const r = await tg('edit', 'me', String(msgId), 'edited text');
+      const r = await tg('action', 'edit', 'me', String(msgId), 'edited text');
       expect(r.ok).toBe(true);
       expect(r.data.text).toBe('edited text');
       expect(r.data.edited).toBe(true);
@@ -721,30 +747,16 @@ describe('edit', () => {
   );
 });
 
-// ─── Read ───
-
-describe('read', () => {
-  it(
-    'marks chat as read',
-    async () => {
-      const r = await tg('read', 'me');
-      expect(r.ok).toBe(true);
-      expect(r.data.marked).toBe(true);
-    },
-    TIMEOUT,
-  );
-});
-
 // ─── Delete ───
 
-describe('delete', () => {
+describe('action delete', () => {
   it(
     'deletes a message',
     async () => {
-      const s = await tg('send', 'me', 'to be deleted');
+      const s = await tg('action', 'send', 'me', 'to be deleted');
       expect(s.ok).toBe(true);
       track(s.data.id);
-      const r = await tg('delete', 'me', String(s.data.id));
+      const r = await tg('action', 'delete', 'me', String(s.data.id));
       expect(r.ok).toBe(true);
       expect(r.data.deleted).toContain(s.data.id);
     },
@@ -754,15 +766,15 @@ describe('delete', () => {
 
 // ─── Forward ───
 
-describe('forward', () => {
+describe('action forward', () => {
   it(
     'forwards a message to Saved Messages',
     async () => {
       // Send then forward to self
-      const s = await tg('send', 'me', 'forward test');
+      const s = await tg('action', 'send', 'me', 'forward test');
       expect(s.ok).toBe(true);
       track(s.data.id);
-      const r = await tg('forward', 'me', 'me', String(s.data.id));
+      const r = await tg('action', 'forward', 'me', 'me', String(s.data.id));
       expect(r.ok).toBe(true);
       if (r.data[0]?.id) track(r.data[0].id);
       expect(r.data.length).toBeGreaterThan(0);
@@ -771,13 +783,13 @@ describe('forward', () => {
   );
 });
 
-// ─── Chat ───
+// ─── Resolve (chat info) ───
 
-describe('chat', () => {
+describe('resolve (chat info)', () => {
   it(
     'returns info for a user',
     async () => {
-      const r = await tg('chat', myUsername);
+      const r = await tg('resolve', myUsername);
       expect(r.ok).toBe(true);
       expect(r.data.chat.id).toBe(myId);
       expect(r.data.chat.type).toBe('user');
@@ -789,7 +801,7 @@ describe('chat', () => {
   it(
     'returns info for Saved Messages',
     async () => {
-      const r = await tg('chat', 'me');
+      const r = await tg('resolve', 'me');
       expect(r.ok).toBe(true);
       expect(r.data.chat.id).toBe(myId);
     },
@@ -824,11 +836,11 @@ describe('resolve', () => {
 
 // ─── Members ───
 
-describe('members', () => {
+describe('chats members', () => {
   let groupId: number;
 
   beforeAll(async () => {
-    const r = await tg('dialogs', '--type', 'group', '--limit', '1');
+    const r = await tg('chats', 'list', '--type', 'group', '--limit', '1');
     if (r.ok && r.data.length > 0) {
       groupId = r.data[0].id;
     }
@@ -838,7 +850,7 @@ describe('members', () => {
     'returns member list with user_id and status',
     async () => {
       if (!groupId) return;
-      const r = await tg('members', String(groupId), '--limit', '10');
+      const r = await tg('chats', 'members', String(groupId), '--limit', '10');
       expect(r.ok).toBe(true);
       for (const m of r.data) {
         expect(m.user_id).toBeNumber();
@@ -852,7 +864,7 @@ describe('members', () => {
     '--type bot filters to bots only',
     async () => {
       if (!groupId) return;
-      const r = await tg('members', String(groupId), '--type', 'bot');
+      const r = await tg('chats', 'members', String(groupId), '--type', 'bot');
       expect(r.ok).toBe(true);
       // Results are filtered by the TDLib supergroupMembersFilterBots filter
       expect(Array.isArray(r.data)).toBe(true);
@@ -861,10 +873,10 @@ describe('members', () => {
   );
 
   it(
-    '--search filters by name',
+    '--query filters by name',
     async () => {
       if (!groupId) return;
-      const r = await tg('members', String(groupId), '--search', 'a');
+      const r = await tg('chats', 'members', String(groupId), '--query', 'a');
       expect(r.ok).toBe(true);
       expect(Array.isArray(r.data)).toBe(true);
     },
@@ -875,7 +887,7 @@ describe('members', () => {
     'invalid --type falls back to recent (no validation)',
     async () => {
       if (!groupId) return;
-      const r = await tg('members', String(groupId), '--type', 'invalid');
+      const r = await tg('chats', 'members', String(groupId), '--type', 'invalid');
       // members command does not validate --type; unknown values fall through to 'recent'
       expect(r.ok).toBe(true);
       expect(Array.isArray(r.data)).toBe(true);
@@ -886,16 +898,16 @@ describe('members', () => {
 
 // ─── Download ───
 
-describe('download', () => {
+describe('media download', () => {
   it(
     'downloads media from a message with photo',
     async () => {
       // Find a photo in Saved Messages
-      const photos = await tg('messages', 'me', '--filter', 'photo', '--limit', '1');
+      const photos = await tg('msg', 'list', 'me', '--filter', 'photo', '--limit', '1');
       if (photos.ok && photos.data.length > 0) {
         const outputPath = path.join(tmpdir(), `tg_test_dl_${Date.now()}.jpg`);
         const msgId = photos.data[0].id ?? photos.data[0].ids?.[0];
-        const r = await tg('download', 'me', String(msgId), '--output', outputPath);
+        const r = await tg('media', 'download', 'me', String(msgId), '--output', outputPath);
         expect(r.ok).toBe(true);
         expect(r.data.file).toBeString();
         expect(r.data.size).toBeGreaterThan(0);
@@ -910,10 +922,10 @@ describe('download', () => {
     'no media returns NOT_FOUND',
     async () => {
       // Send a text-only message, try to download
-      const s = await tg('send', 'me', 'no media here');
+      const s = await tg('action', 'send', 'me', 'no media here');
       expect(s.ok).toBe(true);
       track(s.data.id);
-      const r = await tg('download', 'me', String(s.data.id));
+      const r = await tg('media', 'download', 'me', String(s.data.id));
       expect(r.ok).toBe(false);
       expect(r.code).toBe('NOT_FOUND');
     },
@@ -923,16 +935,16 @@ describe('download', () => {
 
 // ─── Pin / Unpin ───
 
-describe('pin/unpin', () => {
+describe('action pin/unpin', () => {
   it(
     'pins and unpins a message',
     async () => {
-      const s = await tg('send', 'me', 'pin test');
+      const s = await tg('action', 'send', 'me', 'pin test');
       expect(s.ok).toBe(true);
       track(s.data.id);
-      const pin = await tg('pin', 'me', String(s.data.id), '--silent');
+      const pin = await tg('action', 'pin', 'me', String(s.data.id), '--silent');
       expect(pin.ok).toBe(true);
-      const unpin = await tg('unpin', 'me', String(s.data.id));
+      const unpin = await tg('action', 'unpin', 'me', String(s.data.id));
       expect(unpin.ok).toBe(true);
     },
     TIMEOUT,
@@ -984,7 +996,7 @@ describe('error handling', () => {
   it(
     'invalid entity returns NOT_FOUND',
     async () => {
-      const r = await tg('chat', 'xyznonexistent12345');
+      const r = await tg('resolve', 'xyznonexistent12345');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('NOT_FOUND');
     },
@@ -994,7 +1006,7 @@ describe('error handling', () => {
   it(
     '--limit 0 returns INVALID_ARGS',
     async () => {
-      const r = await tg('messages', 'me', '--limit', '0');
+      const r = await tg('msg', 'list', 'me', '--limit', '0');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('INVALID_ARGS');
     },
@@ -1004,7 +1016,7 @@ describe('error handling', () => {
   it(
     '--limit negative returns INVALID_ARGS',
     async () => {
-      const r = await tg('messages', 'me', '--limit', '-1');
+      const r = await tg('msg', 'list', 'me', '--limit', '-1');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('INVALID_ARGS');
     },
@@ -1014,7 +1026,7 @@ describe('error handling', () => {
   it(
     '--limit non-numeric returns INVALID_ARGS',
     async () => {
-      const r = await tg('messages', 'me', '--limit', 'abc');
+      const r = await tg('msg', 'list', 'me', '--limit', 'abc');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('INVALID_ARGS');
     },
@@ -1028,13 +1040,14 @@ describe('interoperability', () => {
   it(
     'unread → messages: last_read_inbox_message_id as --min-id',
     async () => {
-      const unreads = await tg('unread', '--limit', '1');
+      const unreads = await tg('chats', 'list', '--unread', '--limit', '1');
       expect(unreads.ok).toBe(true);
       if (unreads.data.length > 0 && unreads.data[0].last_read_inbox_message_id) {
         const chatId = unreads.data[0].id;
         const minId = unreads.data[0].last_read_inbox_message_id;
         const msgs = await tg(
-          'messages',
+          'msg',
+          'list',
           String(chatId),
           '--min-id',
           String(minId),
@@ -1051,13 +1064,13 @@ describe('interoperability', () => {
   );
 
   it(
-    'dialogs → messages: dialog ID works with messages',
+    'chats list → msg list: dialog ID works with messages',
     async () => {
-      const dialogs = await tg('dialogs', '--limit', '3');
+      const dialogs = await tg('chats', 'list', '--limit', '3');
       expect(dialogs.ok).toBe(true);
       if (dialogs.data.length > 0) {
         const chatId = dialogs.data[0].id;
-        const msgs = await tg('messages', String(chatId), '--limit', '2');
+        const msgs = await tg('msg', 'list', String(chatId), '--limit', '2');
         expect(msgs.ok).toBe(true);
       }
     },
@@ -1065,13 +1078,13 @@ describe('interoperability', () => {
   );
 
   it(
-    'search → messages: search chat_id works with messages (groups)',
+    'msg search → msg list: search chat_id works with messages (groups)',
     async () => {
-      const search = await tg('search', 'test', '--type', 'group', '--limit', '3');
+      const search = await tg('msg', 'search', 'test', '--type', 'group', '--limit', '3');
       expect(search.ok).toBe(true);
       if (search.data.length > 0) {
         const chatId = search.data[0].chat_id;
-        const msgs = await tg('messages', String(chatId), '--limit', '2');
+        const msgs = await tg('msg', 'list', String(chatId), '--limit', '2');
         expect(msgs.ok).toBe(true);
         expect(msgs.data.length).toBeGreaterThan(0);
       }
@@ -1083,10 +1096,10 @@ describe('interoperability', () => {
     'end-of-flags -- separator',
     async () => {
       // Use -- to prevent negative ID from being parsed as flag
-      const groups = await tg('dialogs', '--type', 'group', '--limit', '1');
+      const groups = await tg('chats', 'list', '--type', 'group', '--limit', '1');
       if (groups.ok && groups.data.length > 0) {
         const groupId = groups.data[0].id;
-        const r = await tg('messages', '--limit', '2', '--', String(groupId));
+        const r = await tg('msg', 'list', '--limit', '2', '--', String(groupId));
         // This should work since -- stops flag parsing and groupId becomes positional
         // Note: with current parsing, positional args after -- work
         expect(r.ok).toBe(true);
@@ -1098,7 +1111,7 @@ describe('interoperability', () => {
   it(
     'messages media_album_id identifies albums',
     async () => {
-      const r = await tg('messages', 'me', '--filter', 'photo', '--limit', '50');
+      const r = await tg('msg', 'list', 'me', '--filter', 'photo', '--limit', '50');
       expect(r.ok).toBe(true);
       const withGroupId = r.data.filter((m: Record<string, unknown>) => m.media_album_id);
       // Group messages by media_album_id
@@ -1117,7 +1130,7 @@ describe('interoperability', () => {
   it(
     'texturl entities rendered as markdown links in content.text',
     async () => {
-      const r = await tg('messages', 'me', '--filter', 'url', '--limit', '20');
+      const r = await tg('msg', 'list', 'me', '--filter', 'url', '--limit', '20');
       expect(r.ok).toBe(true);
       // Entities are now rendered inline as markdown by unparse()
       // TextUrl entities appear as [text](url) in the content text
@@ -1142,7 +1155,7 @@ describe('input validation', () => {
   it(
     'accepts equals-sign syntax for flag values',
     async () => {
-      const r = await tg('dialogs', '--type=user', '--limit=3');
+      const r = await tg('chats', 'list', '--type=user', '--limit=3');
       expect(r.ok).toBe(true);
       for (const d of r.data) {
         expect(d.type).toBe('user');
@@ -1154,7 +1167,7 @@ describe('input validation', () => {
   it(
     'rejects unrecognized flags instead of silently ignoring them',
     async () => {
-      const r = await tg('dialogs', '--bogus');
+      const r = await tg('chats', 'list', '--bogus');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('INVALID_ARGS');
       expect(r.error).toContain('--bogus');
@@ -1165,7 +1178,7 @@ describe('input validation', () => {
   it(
     'error messages are concise and actionable',
     async () => {
-      const r = await tg('messages');
+      const r = await tg('msg', 'list');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('INVALID_ARGS');
       // Should be concise, not contain the full usage line
@@ -1182,7 +1195,7 @@ describe('unread filtering', () => {
   it(
     'dialogs can be filtered to only unread chats',
     async () => {
-      const r = await tg('dialogs', '--unread', '--limit', '10');
+      const r = await tg('chats', 'list', '--unread', '--limit', '10');
       expect(r.ok).toBe(true);
       for (const d of r.data) {
         expect(d.unread).toBeGreaterThan(0);
@@ -1194,7 +1207,7 @@ describe('unread filtering', () => {
   it(
     'unread filter composes with chat type filter',
     async () => {
-      const r = await tg('dialogs', '--unread', '--type', 'channel', '--limit', '5');
+      const r = await tg('chats', 'list', '--unread', '--type', 'channel', '--limit', '5');
       expect(r.ok).toBe(true);
       for (const d of r.data) {
         expect(d.type).toBe('channel');
@@ -1208,19 +1221,19 @@ describe('unread filtering', () => {
 // ─── Filter + Limit ───
 
 describe('filter + limit', () => {
-  // --- dialogs: --type + --limit ---
+  // --- chats list: --type + --limit ---
 
   for (const type of ['user', 'bot', 'group', 'channel'] as const) {
     it(
-      `dialogs --type ${type} --limit 5 returns exactly 5 when enough exist`,
+      `chats list --type ${type} --limit 5 returns exactly 5 when enough exist`,
       async () => {
-        const all = await tg('dialogs', '--type', type, '--limit', '50');
+        const all = await tg('chats', 'list', '--type', type, '--limit', '50');
         expect(all.ok).toBe(true);
         for (const d of all.data) {
           expect(d.type).toBe(type);
         }
         if (all.data.length >= 5) {
-          const r = await tg('dialogs', '--type', type, '--limit', '5');
+          const r = await tg('chats', 'list', '--type', type, '--limit', '5');
           expect(r.ok).toBe(true);
           expect(r.data.length).toBe(5);
           for (const d of r.data) {
@@ -1232,59 +1245,38 @@ describe('filter + limit', () => {
     );
   }
 
-  // --- dialogs: --type bot + --search + --limit ---
+  // --- chats search: --type bot + --query + --limit ---
 
   it(
-    'dialogs --type bot --search <term> --limit 5 filters both type and title',
+    'chats search --type bot --limit 5 returns only bots',
     async () => {
-      const all = await tg('dialogs', '--type', 'bot', '--limit', '10');
-      expect(all.ok).toBe(true);
-      if (all.data.length > 0) {
-        const term = all.data[0].title.split(/\s+/)[0];
-        const r = await tg('dialogs', '--type', 'bot', '--search', term, '--limit', '5');
-        expect(r.ok).toBe(true);
-        expect(r.data.length).toBeLessThanOrEqual(5);
-        for (const d of r.data) {
-          expect(d.type).toBe('bot');
-          expect(d.title.toLowerCase()).toContain(term.toLowerCase());
-        }
-      }
-    },
-    TIMEOUT,
-  );
-
-  // --- find: --type + --limit ---
-
-  it(
-    'find --type bot --limit 5 returns only bots',
-    async () => {
-      const r = await tg('find', 'bot', '--type', 'bot', '--limit', '5');
+      const r = await tg('chats', 'search', 'bot', '--type', 'bot', '--limit', '5');
       expect(r.ok).toBe(true);
       expect(r.data.length).toBeLessThanOrEqual(5);
       for (const d of r.data) {
-        expect(d.user?.type).toBe('bot');
+        expect(d.type).toBe('bot');
       }
     },
     TIMEOUT,
   );
 
   it(
-    'find --type user --limit 5 returns only regular users',
+    'chats search --type chat --limit 5 returns only direct chats',
     async () => {
-      const r = await tg('find', 'a', '--type', 'user', '--limit', '5');
+      const r = await tg('chats', 'search', 'a', '--type', 'chat', '--limit', '5');
       expect(r.ok).toBe(true);
       expect(r.data.length).toBeLessThanOrEqual(5);
       for (const d of r.data) {
-        expect(d.user?.type).toBe('regular');
+        expect(d.type).toBe('user');
       }
     },
     TIMEOUT,
   );
 
   it(
-    'find --type channel --limit 5 returns only channels',
+    'chats search --type channel --limit 5 returns only channels',
     async () => {
-      const r = await tg('find', 'news', '--type', 'channel', '--limit', '5');
+      const r = await tg('chats', 'search', 'news', '--type', 'channel', '--limit', '5');
       expect(r.ok).toBe(true);
       expect(r.data.length).toBeLessThanOrEqual(5);
       for (const d of r.data) {
@@ -1294,19 +1286,19 @@ describe('filter + limit', () => {
     TIMEOUT,
   );
 
-  // --- messages: --filter + --limit ---
+  // --- msg list: --filter + --limit ---
 
   it(
-    'messages --filter photo --limit 5 returns exactly 5 when enough exist',
+    'msg list --filter photo --limit 5 returns exactly 5 when enough exist',
     async () => {
-      const all = await tg('messages', 'me', '--filter', 'photo', '--limit', '20');
+      const all = await tg('msg', 'list', 'me', '--filter', 'photo', '--limit', '20');
       expect(all.ok).toBe(true);
       for (const m of all.data) {
         // Single photo or album (photos plural)
         expect(m.photo ?? m.photos).toBeTruthy();
       }
       if (all.data.length >= 5) {
-        const r = await tg('messages', 'me', '--filter', 'photo', '--limit', '5');
+        const r = await tg('msg', 'list', 'me', '--filter', 'photo', '--limit', '5');
         expect(r.ok).toBe(true);
         expect(r.data.length).toBe(5);
         for (const m of r.data) {
@@ -1318,9 +1310,9 @@ describe('filter + limit', () => {
   );
 
   it(
-    'messages --filter voice --limit 5 returns only voice notes',
+    'msg list --filter voice --limit 5 returns only voice notes',
     async () => {
-      const r = await tg('messages', 'me', '--filter', 'voice', '--limit', '5');
+      const r = await tg('msg', 'list', 'me', '--filter', 'voice', '--limit', '5');
       expect(r.ok).toBe(true);
       expect(r.data.length).toBeLessThanOrEqual(5);
       for (const m of r.data) {
@@ -1330,12 +1322,12 @@ describe('filter + limit', () => {
     TIMEOUT,
   );
 
-  // --- search: --type + --limit ---
+  // --- msg search: --type + --limit ---
 
   it(
-    'search --type channel --limit 5 returns only channel messages',
+    'msg search --type channel --limit 5 returns only channel messages',
     async () => {
-      const r = await tg('search', 'a', '--type', 'channel', '--limit', '5');
+      const r = await tg('msg', 'search', 'a', '--type', 'channel', '--limit', '5');
       expect(r.ok).toBe(true);
       expect(r.data.length).toBeLessThanOrEqual(5);
       for (const m of r.data) {
@@ -1346,9 +1338,9 @@ describe('filter + limit', () => {
   );
 
   it(
-    'search --filter photo --limit 5 returns only photos',
+    'msg search --filter photo --limit 5 returns only photos',
     async () => {
-      const r = await tg('search', 'a', '--filter', 'photo', '--limit', '5');
+      const r = await tg('msg', 'search', 'a', '--filter', 'photo', '--limit', '5');
       expect(r.ok).toBe(true);
       expect(r.data.length).toBeLessThanOrEqual(5);
       for (const m of r.data) {
@@ -1358,14 +1350,22 @@ describe('filter + limit', () => {
     TIMEOUT,
   );
 
-  // --- members: --type bot + --limit ---
+  // --- chats members: --type bot + --limit ---
 
   it(
-    'members --type bot --limit 5 returns only bots',
+    'chats members --type bot --limit 5 returns only bots',
     async () => {
-      const group = await tg('dialogs', '--type', 'group', '--limit', '1');
+      const group = await tg('chats', 'list', '--type', 'group', '--limit', '1');
       if (!group.ok || group.data.length === 0) return;
-      const r = await tg('members', String(group.data[0].id), '--type', 'bot', '--limit', '5');
+      const r = await tg(
+        'chats',
+        'members',
+        String(group.data[0].id),
+        '--type',
+        'bot',
+        '--limit',
+        '5',
+      );
       expect(r.ok).toBe(true);
       expect(r.data.length).toBeLessThanOrEqual(5);
     },
@@ -1397,6 +1397,17 @@ describe('state-mutating commands are removed', () => {
     },
     TIMEOUT,
   );
+
+  it(
+    'read is rejected',
+    async () => {
+      const r = await tg('read', 'me');
+      expect(r.ok).toBe(false);
+      expect(r.code).toBe('INVALID_ARGS');
+      expect(r.error).toContain('Unknown command');
+    },
+    TIMEOUT,
+  );
 });
 
 // ─── Media-only search ───
@@ -1405,7 +1416,7 @@ describe('media search without text query', () => {
   it(
     'search by media type does not require a text query',
     async () => {
-      const r = await tg('search', '--chat', 'me', '--filter', 'photo', '--limit', '3');
+      const r = await tg('msg', 'search', '--chat', 'me', '--filter', 'photo', '--limit', '3');
       expect(r.ok).toBe(true);
       expect(Array.isArray(r.data)).toBe(true);
     },
@@ -1415,7 +1426,7 @@ describe('media search without text query', () => {
   it(
     'search requires either a text query or a media filter',
     async () => {
-      const r = await tg('search');
+      const r = await tg('msg', 'search');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('INVALID_ARGS');
       expect(r.error).toContain('--filter');
@@ -1430,7 +1441,7 @@ describe('sender identity in messages', () => {
   it(
     'every message includes the sender display name',
     async () => {
-      const r = await tg('messages', 'me', '--limit', '3');
+      const r = await tg('msg', 'list', 'me', '--limit', '3');
       expect(r.ok).toBe(true);
       for (const m of r.data) {
         expect(m.name).toBeString();
@@ -1443,9 +1454,9 @@ describe('sender identity in messages', () => {
   it(
     'group messages resolve sender names for each participant',
     async () => {
-      const groups = await tg('dialogs', '--type', 'group', '--limit', '1');
+      const groups = await tg('chats', 'list', '--type', 'group', '--limit', '1');
       if (groups.ok && groups.data.length > 0) {
-        const r = await tg('messages', String(groups.data[0].id), '--limit', '5');
+        const r = await tg('msg', 'list', String(groups.data[0].id), '--limit', '5');
         expect(r.ok).toBe(true);
         for (const m of r.data) {
           expect(m.name).toBeString();
@@ -1462,7 +1473,7 @@ describe('limit is respected even with client-side filtering', () => {
   it(
     'sender filter still returns the requested number of messages',
     async () => {
-      const r = await tg('messages', 'me', '--limit', '5', '--from', String(myId));
+      const r = await tg('msg', 'list', 'me', '--limit', '5', '--from', String(myId));
       expect(r.ok).toBe(true);
       expect(r.data.length).toBe(5);
       for (const m of r.data) {
@@ -1475,7 +1486,7 @@ describe('limit is respected even with client-side filtering', () => {
   it(
     'media filter still returns the requested number of messages',
     async () => {
-      const r = await tg('messages', 'me', '--filter', 'photo', '--limit', '5');
+      const r = await tg('msg', 'list', 'me', '--filter', 'photo', '--limit', '5');
       expect(r.ok).toBe(true);
       if (r.hasMore) {
         expect(r.data.length).toBe(5);
@@ -1490,18 +1501,18 @@ describe('limit is respected even with client-side filtering', () => {
 
 // ─── Direct file download ───
 
-describe('download by file ID', () => {
+describe('media download by file ID', () => {
   // Note: 'files can be downloaded using just their TDLib file ID' test removed —
   // flat format doesn't expose TDLib file IDs, so we can't extract one from message output.
 
   it(
     'download by chat + message ID still works',
     async () => {
-      const r = await tg('messages', 'me', '--filter', 'photo', '--limit', '1');
+      const r = await tg('msg', 'list', 'me', '--filter', 'photo', '--limit', '1');
       expect(r.ok).toBe(true);
       if (r.data.length > 0) {
         const msgId = r.data[0].id ?? r.data[0].ids?.[0];
-        const dl = await tg('download', 'me', String(msgId));
+        const dl = await tg('media', 'download', 'me', String(msgId));
         expect(dl.ok).toBe(true);
         expect(dl.data.file).toBeString();
       }
@@ -1516,7 +1527,7 @@ describe('speech recognition', () => {
   it(
     'transcribe rejects non-audio messages',
     async () => {
-      const r = await tg('messages', 'me', '--limit', '1');
+      const r = await tg('msg', 'list', 'me', '--limit', '1');
       expect(r.ok).toBe(true);
       if (
         r.data.length > 0 &&
@@ -1525,7 +1536,7 @@ describe('speech recognition', () => {
         !r.data[0].voice &&
         !r.data[0].video
       ) {
-        const t = await tg('transcribe', 'me', String(r.data[0].id));
+        const t = await tg('media', 'transcribe', 'me', String(r.data[0].id));
         expect(t.ok).toBe(false);
         expect(t.code).toBe('INVALID_ARGS');
       }
@@ -1541,7 +1552,7 @@ describe('voice note transcript in output', () => {
     'voice notes include transcript text when already recognized',
     async () => {
       // Find voice notes via search — transcript may or may not be present
-      const r = await tg('search', '--chat', 'me', '--filter', 'voice', '--limit', '5');
+      const r = await tg('msg', 'search', '--chat', 'me', '--filter', 'voice', '--limit', '5');
       if (!r.ok || r.data.length === 0) return;
       for (const m of r.data) {
         expect(m.voice).toBeTruthy();
@@ -1563,10 +1574,10 @@ describe('smart date formatting', () => {
     'today messages show absolute format with time',
     async () => {
       // Send a message so we guarantee a "today" date
-      const s = await tg('send', 'me', `date-test-${Date.now()}`);
+      const s = await tg('action', 'send', 'me', `date-test-${Date.now()}`);
       expect(s.ok).toBe(true);
       track(s.data.id);
-      const r = await tg('messages', 'me', '--limit', '1');
+      const r = await tg('msg', 'list', 'me', '--limit', '1');
       expect(r.ok).toBe(true);
       // Format: "Mar 4, 14:30" (this year) or "Mar 4, 2025, 14:30" (other year)
       expect(r.data[0].date).toMatch(/^[A-Z][a-z]{2} \d{1,2}, (\d{4}, )?\d{2}:\d{2}$/);
@@ -1577,7 +1588,7 @@ describe('smart date formatting', () => {
   it(
     'dates use absolute format (MMM D, HH:MM)',
     async () => {
-      const r = await tg('messages', 'me', '--limit', '50');
+      const r = await tg('msg', 'list', 'me', '--limit', '50');
       expect(r.ok).toBe(true);
       // Format: "Mar 4, 14:30" (this year) or "Mar 4, 2025, 14:30" (other year)
       const validFormat = /^[A-Z][a-z]{2} \d{1,2}, (\d{4}, )?\d{2}:\d{2}$/;
@@ -1591,7 +1602,7 @@ describe('smart date formatting', () => {
   it(
     'dialog last_date uses absolute format',
     async () => {
-      const r = await tg('dialogs', '--limit', '5');
+      const r = await tg('chats', 'list', '--limit', '5');
       expect(r.ok).toBe(true);
       const validFormat = /^[A-Z][a-z]{2} \d{1,2}, (\d{4}, )?\d{2}:\d{2}$/;
       for (const d of r.data) {
@@ -1610,7 +1621,7 @@ describe('media paths in message output', () => {
   it(
     'photos have path or true indicator',
     async () => {
-      const r = await tg('messages', 'me', '--filter', 'photo', '--limit', '3');
+      const r = await tg('msg', 'list', 'me', '--filter', 'photo', '--limit', '3');
       expect(r.ok).toBe(true);
       for (const m of r.data) {
         const photoVal = m.photo ?? m.photos;
@@ -1626,14 +1637,23 @@ describe('media paths in message output', () => {
   );
 
   it(
-    '--download-media adds paths to photos',
+    '--auto-download adds paths to photos',
     async () => {
-      const r = await tg('messages', 'me', '--filter', 'photo', '--limit', '2', '--download-media');
+      const r = await tg(
+        'msg',
+        'list',
+        'me',
+        '--filter',
+        'photo',
+        '--limit',
+        '2',
+        '--auto-download',
+      );
       expect(r.ok).toBe(true);
       for (const m of r.data) {
         const values = m.photos ?? [m.photo];
         for (const v of values) {
-          // With --download-media, photos should have string paths (starting with ~ or /)
+          // With --auto-download, photos should have string paths (starting with ~ or /)
           expect(v).toBeString();
           expect(v.startsWith('~') || v.startsWith('/')).toBe(true);
         }
@@ -1645,7 +1665,7 @@ describe('media paths in message output', () => {
   it(
     'document albums show docs array with filenames',
     async () => {
-      const r = await tg('messages', 'me', '--filter', 'document', '--limit', '5');
+      const r = await tg('msg', 'list', 'me', '--filter', 'document', '--limit', '5');
       expect(r.ok).toBe(true);
       for (const m of r.data) {
         if (m.ids) {
@@ -1668,16 +1688,17 @@ describe('media paths in message output', () => {
   );
 
   it(
-    '--download-media downloads documents and shows paths',
+    '--auto-download downloads documents and shows paths',
     async () => {
       const r = await tg(
-        'messages',
+        'msg',
+        'list',
         'me',
         '--filter',
         'document',
         '--limit',
         '1',
-        '--download-media',
+        '--auto-download',
       );
       expect(r.ok).toBe(true);
       if (r.data.length > 0) {
