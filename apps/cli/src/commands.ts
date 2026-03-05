@@ -17,7 +17,15 @@ import {
   flattenMessage,
   flattenMessages,
 } from './flatten';
-import { enrichMessage, enrichMessages, enrichOpts, getFileId } from './helpers';
+import {
+  enrichMembers,
+  enrichMessage,
+  enrichMessages,
+  enrichOpts,
+  enrichUserProfile,
+  getFileId,
+  type UserProfile,
+} from './helpers';
 import { fail, strip, success, warn } from './output';
 import { resolveChatId, resolveEntity } from './resolve';
 import { slimAuthState, slimMembers, slimMessage, slimMessages, slimUser } from './slim';
@@ -1058,8 +1066,9 @@ export const commands: Command[] = [
       const chatId = await resolveChatId(client, args[0]);
       const chat = await client.invoke({ _: 'getChat', chat_id: chatId });
       let user: Td.user | undefined;
-      let bio: string | undefined;
       let description: string | undefined;
+      let link_preview: string | undefined;
+      let personalChannel: UserProfile['personal_channel'];
       let memberCount: number | undefined;
       let username: string | undefined;
       let groups: CommonGroupInfo[] | undefined;
@@ -1085,12 +1094,13 @@ export const commands: Command[] = [
       } else if (chat.type._ === 'chatTypePrivate') {
         const userId = chat.type.user_id;
         user = await client.invoke({ _: 'getUser', user_id: userId });
-        const fullInfo = await client.invoke({ _: 'getUserFullInfo', user_id: userId });
-        bio = fullInfo.bio?.text || undefined;
-        if (fullInfo.bot_info) {
-          description =
-            fullInfo.bot_info.short_description || fullInfo.bot_info.description || undefined;
+        const profile = await enrichUserProfile(client, userId);
+        if (profile) {
+          description = profile.description;
+          link_preview = profile.link_preview;
+          personalChannel = profile.personal_channel;
         }
+        const fullInfo = await client.invoke({ _: 'getUserFullInfo', user_id: userId });
         if (fullInfo.group_in_common_count > 0) {
           const common = await client.invoke({
             _: 'getGroupsInCommon',
@@ -1148,8 +1158,9 @@ export const commands: Command[] = [
       success(
         flattenInfo(chat, {
           user,
-          bio,
           description,
+          link_preview,
+          personal_channel: personalChannel,
           member_count: memberCount,
           username,
           groups_in_common: groups,
@@ -1216,8 +1227,8 @@ export const commands: Command[] = [
         chat: Td.chat;
         user?: Td.user;
         description?: string;
-        bio?: string;
-        personalChannel?: { id: number; title: string; username: string | null };
+        link_preview?: string;
+        personalChannel?: UserProfile['personal_channel'];
       };
 
       const resolvePromises = [...uniqueChatIds].map(async (chatId): Promise<FindResult | null> => {
@@ -1227,36 +1238,15 @@ export const commands: Command[] = [
 
           if (chat.type._ === 'chatTypePrivate') {
             const userId = chat.type.user_id;
-            const [user, fullInfo] = await Promise.all([
-              client.invoke({ _: 'getUser', user_id: userId }).catch(() => undefined),
-              client.invoke({ _: 'getUserFullInfo', user_id: userId }).catch(() => undefined),
-            ]);
+            const user = await client
+              .invoke({ _: 'getUser', user_id: userId })
+              .catch(() => undefined);
             result.user = user;
-            if (fullInfo) {
-              if (user?.type._ === 'userTypeBot') {
-                result.bio = fullInfo.bot_info?.short_description || undefined;
-              } else {
-                result.bio = fullInfo.bio?.text || undefined;
-              }
-              if (fullInfo.personal_chat_id) {
-                try {
-                  const pc = await client.invoke({
-                    _: 'getChat',
-                    chat_id: fullInfo.personal_chat_id,
-                  });
-                  const pcUsername =
-                    pc.type._ === 'chatTypeSupergroup'
-                      ? ((
-                          (await client
-                            .invoke({ _: 'getSupergroup', supergroup_id: pc.type.supergroup_id })
-                            .catch(() => undefined)) as Td.supergroup | undefined
-                        )?.usernames?.active_usernames?.[0] ?? null)
-                      : null;
-                  result.personalChannel = { id: pc.id, title: pc.title, username: pcUsername };
-                } catch {
-                  // personal channel not accessible
-                }
-              }
+            const profile = await enrichUserProfile(client, userId);
+            if (profile) {
+              result.description = profile.description;
+              result.link_preview = profile.link_preview;
+              result.personalChannel = profile.personal_channel;
             }
           } else if (chat.type._ === 'chatTypeSupergroup') {
             try {
@@ -1332,11 +1322,11 @@ export const commands: Command[] = [
 
       // Flatten + limit
       const sliced = filtered.slice(0, limit);
-      const results = sliced.map(({ chat, user, description, bio, personalChannel }) =>
+      const results = sliced.map(({ chat, user, description, link_preview, personalChannel }) =>
         flattenFindResult(chat, {
           isBot: user?.type._ === 'userTypeBot',
           description,
-          bio,
+          link_preview,
           personalChannel,
         }),
       );
@@ -1713,7 +1703,8 @@ export const commands: Command[] = [
         });
 
         const hasMore = result.members.length >= limit;
-        success(strip(slimMembers(result.members)), {
+        const flat = await enrichMembers(client, slimMembers(result.members));
+        success(strip(flat), {
           hasMore,
           nextOffset: hasMore ? offset + limit : undefined,
         });
@@ -1774,8 +1765,8 @@ export const commands: Command[] = [
 
         const sliced = members.slice(offset, offset + limit);
         const hasMore = members.length > offset + limit;
-
-        success(strip(slimMembers(sliced)), {
+        const flat = await enrichMembers(client, slimMembers(sliced));
+        success(strip(flat), {
           hasMore,
           nextOffset: hasMore ? offset + limit : undefined,
         });

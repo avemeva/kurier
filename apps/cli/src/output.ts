@@ -128,7 +128,12 @@ export function mapErrorCode(message: string): ErrorCode {
     return 'INVALID_ARGS';
   if (/AUTH_KEY_UNREGISTERED|SESSION_REVOKED|Session expired/i.test(message))
     return 'SESSION_EXPIRED';
-  if (/FORBIDDEN|ADMIN_REQUIRED|WRITE_FORBIDDEN|USER_BANNED/i.test(message)) return 'UNAUTHORIZED';
+  if (
+    /FORBIDDEN|ADMIN_REQUIRED|WRITE_FORBIDDEN|USER_BANNED|Member list is inaccessible/i.test(
+      message,
+    )
+  )
+    return 'UNAUTHORIZED';
   if (/FLOOD_WAIT|FLOOD_PREMIUM_WAIT|Too Many Requests/i.test(message)) return 'FLOOD_WAIT';
   if (/timed out|TIMEOUT/i.test(message)) return 'TIMEOUT';
   if (/Expected: wait_/i.test(message)) return 'INVALID_ARGS';

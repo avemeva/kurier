@@ -246,6 +246,104 @@ describe('chats list', () => {
   );
 });
 
+// ─── Chats List: filtered scan completeness (MAX_SCAN bug) ───
+//
+// The filtered path (--type, --unread) scans chats through loadChats in batches,
+// but a hard MAX_SCAN=500 cap stops scanning early. If you have >500 chats,
+// groups/channels/bots beyond position 500 are silently dropped.
+//
+// Strategy: the unfiltered path loads `limit` chats directly via loadChats(limit).
+// With --limit 2000 it loads far more than the filtered path's 500-cap, exposing
+// groups the filtered scan misses.
+
+describe('chats list: filtered scan returns all matches', () => {
+  // Load a large unfiltered snapshot once, then compare each --type filter against it
+  let allChats: Array<{ id: number; type: string; unread: number }>;
+
+  beforeAll(async () => {
+    const r = await tg('chats', 'list', '--limit', '2000');
+    expect(r.ok).toBe(true);
+    allChats = r.data;
+  }, 60_000);
+
+  it('--type group returns all groups even when total chats exceed 500', async () => {
+    const expected = new Set(allChats.filter((d) => d.type === 'group').map((d) => d.id));
+    // Skip if there aren't enough chats to trigger the bug
+    if (expected.size <= 30) return;
+
+    const filtered = await tg(
+      'chats',
+      'list',
+      '--type',
+      'group',
+      '--limit',
+      String(expected.size + 50),
+    );
+    expect(filtered.ok).toBe(true);
+    const filteredIds = new Set(filtered.data.map((d: Record<string, unknown>) => d.id));
+
+    const missing = [...expected].filter((id) => !filteredIds.has(id));
+    expect(missing).toEqual([]);
+  }, 60_000);
+
+  it('--type channel returns all channels even when total chats exceed 500', async () => {
+    const expected = new Set(allChats.filter((d) => d.type === 'channel').map((d) => d.id));
+    if (expected.size <= 30) return;
+
+    const filtered = await tg(
+      'chats',
+      'list',
+      '--type',
+      'channel',
+      '--limit',
+      String(expected.size + 50),
+    );
+    expect(filtered.ok).toBe(true);
+    const filteredIds = new Set(filtered.data.map((d: Record<string, unknown>) => d.id));
+
+    const missing = [...expected].filter((id) => !filteredIds.has(id));
+    expect(missing).toEqual([]);
+  }, 60_000);
+
+  it('--type bot returns all bots even when total chats exceed 500', async () => {
+    const expected = new Set(allChats.filter((d) => d.type === 'bot').map((d) => d.id));
+    if (expected.size <= 30) return;
+
+    const filtered = await tg(
+      'chats',
+      'list',
+      '--type',
+      'bot',
+      '--limit',
+      String(expected.size + 50),
+    );
+    expect(filtered.ok).toBe(true);
+    const filteredIds = new Set(filtered.data.map((d: Record<string, unknown>) => d.id));
+
+    const missing = [...expected].filter((id) => !filteredIds.has(id));
+    expect(missing).toEqual([]);
+  }, 60_000);
+
+  it('--type user returns all users even when total chats exceed 500', async () => {
+    const expected = new Set(allChats.filter((d) => d.type === 'user').map((d) => d.id));
+    if (expected.size <= 30) return;
+
+    const filtered = await tg(
+      'chats',
+      'list',
+      '--type',
+      'user',
+      '--limit',
+      String(expected.size + 50),
+    );
+    expect(filtered.ok).toBe(true);
+    const filteredIds = new Set(filtered.data.map((d: Record<string, unknown>) => d.id));
+
+    const missing = [...expected].filter((id) => !filteredIds.has(id));
+    expect(missing).toEqual([]);
+  }, 60_000);
+});
+
 // ─── Chats List --unread ───
 
 describe('chats list --unread', () => {

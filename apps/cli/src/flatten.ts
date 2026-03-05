@@ -70,8 +70,14 @@ export type FlatFindResult = {
   type: 'user' | 'bot' | 'group' | 'channel';
   last_date?: string;
   description?: string;
-  bio?: string;
-  personal_channel?: { id: number; title: string; username: string | null };
+  link_preview?: string;
+  personal_channel?: {
+    id: number;
+    title: string;
+    username: string | null;
+    description?: string;
+    link_preview?: string;
+  };
 };
 
 export type FlatCommonGroup = {
@@ -89,7 +95,15 @@ type FlatInfoUser = {
   type: 'user';
   username?: string;
   phone?: string;
-  bio?: string;
+  description?: string;
+  link_preview?: string;
+  personal_channel?: {
+    id: number;
+    title: string;
+    username: string | null;
+    description?: string;
+    link_preview?: string;
+  };
   is_contact?: boolean;
   is_premium?: boolean;
 };
@@ -100,6 +114,7 @@ type FlatInfoBot = {
   type: 'bot';
   username?: string;
   description?: string;
+  link_preview?: string;
 };
 
 type FlatInfoGroup = {
@@ -472,6 +487,25 @@ export function flattenChats(chats: Td.chat[], botChatIds?: Set<number>): FlatCh
   return chats.map((c) => flattenChat(c, botChatIds));
 }
 
+// --- Member flattening ---
+
+export type FlatMember = {
+  user_id: number;
+  name?: string;
+  username?: string;
+  status: 'creator' | 'admin' | 'member' | 'restricted' | 'banned' | 'left';
+  custom_title?: string;
+  description?: string;
+  link_preview?: string;
+  personal_channel?: {
+    id: number;
+    title: string;
+    username: string | null;
+    description?: string;
+    link_preview?: string;
+  };
+};
+
 // --- Find result flattening ---
 
 export function flattenFindResult(
@@ -479,8 +513,14 @@ export function flattenFindResult(
   extra: {
     isBot?: boolean;
     description?: string;
-    bio?: string;
-    personalChannel?: { id: number; title: string; username: string | null };
+    link_preview?: string;
+    personalChannel?: {
+      id: number;
+      title: string;
+      username: string | null;
+      description?: string;
+      link_preview?: string;
+    };
   },
 ): FlatFindResult {
   const m = chat.last_message;
@@ -490,7 +530,7 @@ export function flattenFindResult(
     type: flattenChatType(chat.type, extra.isBot),
     last_date: m ? formatTime(m.date) : undefined,
     description: extra.description || undefined,
-    bio: extra.bio || undefined,
+    link_preview: extra.link_preview || undefined,
     personal_channel: extra.personalChannel || undefined,
   }) as FlatFindResult;
 }
@@ -508,8 +548,15 @@ export function flattenInfo(
   chat: Td.chat,
   extra: {
     user?: Td.user;
-    bio?: string;
     description?: string;
+    link_preview?: string;
+    personal_channel?: {
+      id: number;
+      title: string;
+      username: string | null;
+      description?: string;
+      link_preview?: string;
+    };
     member_count?: number;
     username?: string;
     groups_in_common?: CommonGroupInfo[];
@@ -545,7 +592,9 @@ export function flattenInfo(
         type,
         username: u?.usernames?.active_usernames?.[0] ?? undefined,
         phone: u?.phone_number || undefined,
-        bio: extra.bio || undefined,
+        description: extra.description || undefined,
+        link_preview: extra.link_preview || undefined,
+        personal_channel: extra.personal_channel || undefined,
         is_contact: u?.is_contact || undefined,
         is_premium: u?.is_premium || undefined,
       }) as FlatInfoUser;
@@ -556,7 +605,8 @@ export function flattenInfo(
         title: chat.title,
         type,
         username: u?.usernames?.active_usernames?.[0] ?? undefined,
-        description: extra.description || extra.bio || undefined,
+        description: extra.description || undefined,
+        link_preview: extra.link_preview || undefined,
       }) as FlatInfoBot;
       break;
     case 'group':

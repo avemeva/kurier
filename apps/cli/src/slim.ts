@@ -264,7 +264,7 @@ type SlimContent =
     }
   | { type: string; [key: string]: unknown };
 
-type SlimChatMember = {
+export type SlimChatMember = {
   user_id: number;
   sender_type: 'user' | 'chat';
   joined_date?: number;
