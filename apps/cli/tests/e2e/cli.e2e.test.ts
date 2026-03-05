@@ -929,9 +929,120 @@ describe('info', () => {
   );
 
   it(
+    'resolves by numeric ID',
+    async () => {
+      const r = await tg('info', String(myId));
+      expect(r.ok).toBe(true);
+      expect(r.data.entity.id).toBe(myId);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'resolves by t.me link',
+    async () => {
+      const r = await tg('info', `t.me/${myUsername}`);
+      expect(r.ok).toBe(true);
+      expect(r.data.entity.id).toBe(myId);
+      expect(r.data.entity.username).toBe(myUsername);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'resolves negative group ID with -- separator',
+    async () => {
+      const groups = await tg('chats', 'list', '--type', 'group', '--limit', '1');
+      expect(groups.ok).toBe(true);
+      if (!groups.data.length) return;
+      const groupId = groups.data[0].id;
+      const r = await tg('info', '--', String(groupId));
+      expect(r.ok).toBe(true);
+      expect(r.data.entity.id).toBe(groupId);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'chat section has id, unread, and date fields',
+    async () => {
+      const r = await tg('info', myUsername);
+      expect(r.ok).toBe(true);
+      expect(typeof r.data.chat.id).toBe('number');
+      expect(typeof r.data.chat.unread).toBe('number');
+      // last and last_date present when chat has messages
+      if (r.data.chat.last) {
+        expect(typeof r.data.chat.last).toBe('string');
+        expect(typeof r.data.chat.last_date).toBe('string');
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'channel has description when set',
+    async () => {
+      const r = await tg('info', '@telegram');
+      expect(r.ok).toBe(true);
+      expect(typeof r.data.entity.description).toBe('string');
+      expect(r.data.entity.description.length).toBeGreaterThan(0);
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'shared groups are sorted by last_active (most recent first)',
+    async () => {
+      const contacts = await tg('chats', 'list', '--type', 'user', '--limit', '10');
+      expect(contacts.ok).toBe(true);
+      const contactId = contacts.data.find((c: { id: number }) => c.id !== myId)?.id;
+      if (!contactId) return;
+      const r = await tg('info', String(contactId));
+      expect(r.ok).toBe(true);
+      if (r.data.groups && r.data.groups.length >= 2) {
+        // last_active dates should be in descending order
+        for (let i = 1; i < r.data.groups.length; i++) {
+          const prev = new Date(r.data.groups[i - 1].last_active);
+          const curr = new Date(r.data.groups[i].last_active);
+          expect(prev.getTime()).toBeGreaterThanOrEqual(curr.getTime());
+        }
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'shared groups have last_date for group overall activity',
+    async () => {
+      const contacts = await tg('chats', 'list', '--type', 'user', '--limit', '10');
+      expect(contacts.ok).toBe(true);
+      const contactId = contacts.data.find((c: { id: number }) => c.id !== myId)?.id;
+      if (!contactId) return;
+      const r = await tg('info', String(contactId));
+      expect(r.ok).toBe(true);
+      if (r.data.groups) {
+        for (const g of r.data.groups) {
+          expect(typeof g.last_date).toBe('string');
+        }
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
     'missing arg returns INVALID_ARGS',
     async () => {
       const r = await tg('info');
+      expect(r.ok).toBe(false);
+      expect(r.code).toBe('INVALID_ARGS');
+    },
+    TIMEOUT,
+  );
+
+  it(
+    'old resolve command is rejected',
+    async () => {
+      const r = await tg('resolve', myUsername);
       expect(r.ok).toBe(false);
       expect(r.code).toBe('INVALID_ARGS');
     },
@@ -1101,7 +1212,7 @@ describe('error handling', () => {
   it(
     'invalid entity returns NOT_FOUND',
     async () => {
-      const r = await tg('resolve', 'xyznonexistent12345');
+      const r = await tg('info', 'xyznonexistent12345');
       expect(r.ok).toBe(false);
       expect(r.code).toBe('NOT_FOUND');
     },
