@@ -318,12 +318,12 @@ async function enrichWithContext(
         _: 'getChatHistory',
         chat_id: chatId,
         from_message_id: msgId,
-        offset: -contextN,
+        offset: -(contextN + 1),
         limit: contextN * 2 + 1,
         only_local: false,
       });
       const context = flattenMessages(
-        slimMessages(ctx.messages.filter((m): m is Td.message => m != null && m.id !== msgId)),
+        slimMessages(ctx.messages.filter((m): m is Td.message => m != null)),
       );
       enriched.push({ ...hit, context });
     } catch {
@@ -535,17 +535,15 @@ export const commands: Command[] = [
     name: 'msg list',
     description: 'Get message history from a chat',
     usage:
-      'tg msg list <chat> [--limit N] [--offset-id N] [--from <user>] [--query text] [--filter photo|video|document|url|voice|gif] [--since N] [--reverse]',
+      'tg msg list <chat> [--limit N] [--offset-id N] [--from <user>] [--query text] [--filter photo|video|document|url|voice|gif] [--since N]',
     flags: {
       '--limit': 'Max messages (default: 20)',
-      '--offset-id': 'Start from this message ID',
+      '--offset-id': 'Start from this message ID (pagination cursor)',
       '--from': 'Filter by sender (username or ID)',
       '--query': 'Search text within this chat',
       '--filter': 'Filter by media type: photo, video, document, url, voice, gif, music',
-      '--min-id': 'Minimum message ID (exclusive)',
-      '--max-id': 'Maximum message ID (exclusive)',
+      '--min-id': 'Only messages newer than this ID (exclusive floor)',
       '--since': 'Only messages after this unix timestamp (server-side filter)',
-      '--reverse': 'Oldest messages first',
       '--auto-download': 'Auto-download photos, stickers, voice messages; adds localPath to media',
       '--auto-transcribe': 'Auto-transcribe voice/video notes (Telegram Premium)',
     },
@@ -652,13 +650,11 @@ export const commands: Command[] = [
 
       // Build client-side filter predicate
       const minId = flags['--min-id'] ? Number(flags['--min-id']) : undefined;
-      const maxId = flags['--max-id'] ? Number(flags['--max-id']) : undefined;
       const fromEntity = flags['--from'] ? await resolveEntity(client, flags['--from']) : undefined;
-      const hasClientFilter = !!(minId || maxId || fromEntity);
+      const hasClientFilter = !!(minId || fromEntity);
 
       const clientFilter = (m: Td.message): boolean => {
         if (minId && m.id <= minId) return false;
-        if (maxId && m.id >= maxId) return false;
         if (fromEntity) {
           const senderId =
             m.sender_id._ === 'messageSenderUser'
@@ -785,19 +781,13 @@ export const commands: Command[] = [
         }
       }
 
-      const isReverse = '--reverse' in flags;
-      if (isReverse) matched.reverse();
-
       await autoDownloadSmall(client, matched);
       if ('--auto-download' in flags) await autoDownloadMessages(client, matched);
       if ('--auto-transcribe' in flags) await transcribeMessages(client, matched);
       const flatHistory = await enrichMessages(client, matched);
       const output = flatHistory.slice(0, limit);
       const more = flatHistory.length > limit || (!exhaustedHistory && scannedHistory < MAX_SCAN);
-      // When reversed, messages are [oldest...newest]. The next page needs messages
-      // older than the oldest in this batch, so nextOffset = messages[0].id (the oldest).
-      // When not reversed, messages are [newest...oldest], so nextOffset = last element.
-      const nextOffsetMsg = isReverse ? matched[0] : matched[matched.length - 1];
+      const nextOffsetMsg = matched[matched.length - 1];
 
       success(output, {
         hasMore: more,
@@ -974,7 +964,7 @@ export const commands: Command[] = [
       '--type': 'Filter by chat type: private, group, or channel (cross-chat only)',
       '--filter':
         'Filter by content: photo, video, document, url, voice, gif, music, media, videonote, mention, pinned',
-      '--context': 'Include N messages before and after each hit',
+      '--context': 'Include N before + hit + N after in context array',
       '--offset': 'Pagination cursor from previous nextOffset',
       '--full': 'Return full message text (default: truncated to 500 chars)',
       '--archived': 'Search in archived chats only (default: main chat list)',
@@ -1185,14 +1175,12 @@ export const commands: Command[] = [
                 _: 'getChatHistory',
                 chat_id: msgChatId,
                 from_message_id: msgId,
-                offset: -contextN,
+                offset: -(contextN + 1),
                 limit: contextN * 2 + 1,
                 only_local: false,
               });
               const context = flattenMessages(
-                slimMessages(
-                  ctx.messages.filter((cm): cm is Td.message => cm != null && cm.id !== msgId),
-                ),
+                slimMessages(ctx.messages.filter((cm): cm is Td.message => cm != null)),
               );
               enriched.push({ ...formatted[i], context });
             } catch {

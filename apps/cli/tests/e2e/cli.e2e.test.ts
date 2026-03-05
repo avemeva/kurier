@@ -396,21 +396,6 @@ describe('msg list', () => {
   );
 
   it(
-    '--reverse returns oldest first',
-    async () => {
-      const r = await tg('msg', 'list', 'me', '--limit', '5', '--reverse');
-      expect(r.ok).toBe(true);
-      if (r.data.length >= 2) {
-        // Date is now "HH:MM" string — verify order by ID (monotonic)
-        const id0 = r.data[0].id ?? r.data[0].ids?.[0];
-        const id1 = r.data[1].id ?? r.data[1].ids?.[0];
-        expect(id0).toBeLessThanOrEqual(id1);
-      }
-    },
-    TIMEOUT,
-  );
-
-  it(
     '--min-id filters to newer messages',
     async () => {
       // Get some messages to find a reference ID
@@ -452,6 +437,53 @@ describe('msg list', () => {
         const r = await tg('msg', 'list', String(groupId), '--limit', '2');
         expect(r.ok).toBe(true);
         expect(r.data.length).toBeGreaterThan(0);
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    '--offset-id returns messages near the offset, not latest',
+    async () => {
+      // Get the latest 5 messages
+      const r1 = await tg('msg', 'list', 'me', '--limit', '5');
+      expect(r1.ok).toBe(true);
+      expect(r1.data.length).toBeGreaterThanOrEqual(3);
+      // Pick a message in the middle as offset
+      const midMsg = r1.data[2];
+      const midId = midMsg.id ?? midMsg.ids?.[0];
+      // Fetch with offset-id = midId → should return messages OLDER than midId
+      const r2 = await tg('msg', 'list', 'me', '--limit', '3', '--offset-id', String(midId));
+      expect(r2.ok).toBe(true);
+      expect(r2.data.length).toBeGreaterThan(0);
+      // All returned message IDs must be < midId (older)
+      for (const m of r2.data) {
+        const id = m.id ?? m.ids?.[0];
+        expect(id).toBeLessThan(midId);
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    '--offset-id works on supergroups',
+    async () => {
+      // Find a supergroup with messages
+      const groups = await tg('chats', 'list', '--type', 'supergroup', '--limit', '3');
+      if (!groups.ok || groups.data.length === 0) return; // skip if no supergroups
+      const groupId = String(groups.data[0].id);
+      // Get latest messages
+      const r1 = await tg('msg', 'list', groupId, '--limit', '5');
+      expect(r1.ok).toBe(true);
+      if (r1.data.length < 3) return; // skip if not enough history
+      const midId = r1.data[2].id ?? r1.data[2].ids?.[0];
+      // Fetch with offset-id
+      const r2 = await tg('msg', 'list', groupId, '--limit', '3', '--offset-id', String(midId));
+      expect(r2.ok).toBe(true);
+      expect(r2.data.length).toBeGreaterThan(0);
+      for (const m of r2.data) {
+        const id = m.id ?? m.ids?.[0];
+        expect(id).toBeLessThan(midId);
       }
     },
     TIMEOUT,
@@ -1931,6 +1963,138 @@ describe('media paths in message output', () => {
           }
         }
       }
+    },
+    TIMEOUT,
+  );
+});
+
+// ─── Offset & Context (known messages) ───
+
+describe('offset and context with known messages', () => {
+  const nonce = `e2e-${Date.now()}`;
+  const msgIds: number[] = [];
+
+  beforeAll(async () => {
+    // Send 7 numbered messages to Saved Messages
+    for (let i = 1; i <= 7; i++) {
+      const r = await tg('action', 'send', 'me', `${nonce}-${i}`);
+      expect(r.ok).toBe(true);
+      msgIds.push(r.data.id);
+      track(r.data.id);
+    }
+  }, 60_000);
+
+  it(
+    '--offset-id returns messages older than the offset',
+    async () => {
+      // offset-id = msg 5 → should return msg 4, 3, 2, 1
+      const r = await tg('msg', 'list', 'me', '--limit', '4', '--offset-id', String(msgIds[4]));
+      expect(r.ok).toBe(true);
+      const ids = r.data.map((m: { id: number }) => m.id);
+      expect(ids).toContain(msgIds[3]); // msg 4
+      expect(ids).toContain(msgIds[2]); // msg 3
+      // All must be older than offset
+      for (const id of ids) {
+        expect(id).toBeLessThan(msgIds[4]);
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    '--offset-id paginates through all known messages',
+    async () => {
+      // Page 1: latest 3
+      const p1 = await tg('msg', 'list', 'me', '--limit', '3');
+      expect(p1.ok).toBe(true);
+      expect(p1.data.length).toBeGreaterThanOrEqual(3);
+      // Page 2: next 3 using nextOffset
+      const p2 = await tg(
+        'msg',
+        'list',
+        'me',
+        '--limit',
+        '3',
+        '--offset-id',
+        String(p1.nextOffset),
+      );
+      expect(p2.ok).toBe(true);
+      expect(p2.data.length).toBeGreaterThanOrEqual(3);
+      // No overlap between pages
+      const p1Ids = new Set(p1.data.map((m: { id: number }) => m.id));
+      for (const m of p2.data) {
+        expect(p1Ids.has(m.id)).toBe(false);
+      }
+      // Page 2 messages are all older than page 1 messages
+      const p1Min = Math.min(...p1.data.map((m: { id: number }) => m.id));
+      for (const m of p2.data) {
+        expect(m.id).toBeLessThan(p1Min);
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    '--context returns symmetric surrounding messages including the hit',
+    async () => {
+      // Search for msg 4 (index 3) with context 2
+      const r = await tg(
+        'msg',
+        'search',
+        `${nonce}-4`,
+        '--chat',
+        'me',
+        '--context',
+        '2',
+        '--limit',
+        '1',
+      );
+      expect(r.ok).toBe(true);
+      expect(r.data.length).toBe(1);
+      const hit = r.data[0];
+      expect(hit.id).toBe(msgIds[3]);
+      expect(Array.isArray(hit.context)).toBe(true);
+      // Context should have 5 messages: 2 after + hit + 2 before
+      expect(hit.context.length).toBe(5);
+      const ctxIds = hit.context.map((m: { id: number }) => m.id);
+      // Should include the hit itself
+      expect(ctxIds).toContain(msgIds[3]); // msg 4 (hit)
+      // Should include 2 newer
+      expect(ctxIds).toContain(msgIds[4]); // msg 5
+      expect(ctxIds).toContain(msgIds[5]); // msg 6
+      // Should include 2 older
+      expect(ctxIds).toContain(msgIds[2]); // msg 3
+      expect(ctxIds).toContain(msgIds[1]); // msg 2
+    },
+    TIMEOUT,
+  );
+
+  it(
+    '--context at edge of history returns available messages',
+    async () => {
+      // Search for msg 1 (oldest) with context 2 — only newer context available
+      const r = await tg(
+        'msg',
+        'search',
+        `${nonce}-1`,
+        '--chat',
+        'me',
+        '--context',
+        '2',
+        '--limit',
+        '1',
+      );
+      expect(r.ok).toBe(true);
+      expect(r.data.length).toBe(1);
+      const hit = r.data[0];
+      expect(hit.id).toBe(msgIds[0]);
+      expect(Array.isArray(hit.context)).toBe(true);
+      // At least the hit + 2 newer messages
+      expect(hit.context.length).toBeGreaterThanOrEqual(3);
+      const ctxIds = hit.context.map((m: { id: number }) => m.id);
+      expect(ctxIds).toContain(msgIds[0]); // msg 1 (hit)
+      expect(ctxIds).toContain(msgIds[1]); // msg 2
+      expect(ctxIds).toContain(msgIds[2]); // msg 3
     },
     TIMEOUT,
   );

@@ -79,14 +79,12 @@ tg chats members <chat> --filter bot|admin|recent                 # Alias for --
 
 # Messages
 tg msg list <chat> [--limit N]               # Message history (paginated)
-tg msg list <chat> --offset-id N             # Continue from message ID
-tg msg list <chat> --min-id N                # Only messages after this ID (exclusive)
-tg msg list <chat> --max-id N                # Only messages before this ID (exclusive)
+tg msg list <chat> --offset-id N             # Continue from message ID (pagination cursor)
+tg msg list <chat> --min-id N                # Only messages newer than this ID (exclusive floor)
 tg msg list <chat> --since N                 # Only messages after unix timestamp
 tg msg list <chat> --query "keyword"         # Search in chat
 tg msg list <chat> --from <user>             # Filter by sender
 tg msg list <chat> --filter photo            # Filter: photo|video|document|url|voice|gif|music
-tg msg list <chat> --reverse                 # Oldest first
 tg msg list <chat> --auto-download           # Auto-download photos/stickers/voice
 tg msg list <chat> --auto-transcribe         # Auto-transcribe voice/video notes (Premium)
 tg msg get <chat> <msgId>                    # Single message by ID
@@ -101,7 +99,7 @@ tg msg search "query" --since N                  # Messages after unix timestamp
 tg msg search "query" --until N                  # Messages before unix timestamp
 tg msg search "query" --chat <id>                # Search within a specific chat
 tg msg search "query" --chat <id> --from <user>  # Filter by sender (per-chat only)
-tg msg search "query" --context N                # Include N messages before/after each hit
+tg msg search "query" --context N                # Include N before + hit + N after in context array
 tg msg search "query" --full                     # Disable 500-char text truncation
 tg msg search "query" --archived                 # Search archived chats only (default: main list)
 

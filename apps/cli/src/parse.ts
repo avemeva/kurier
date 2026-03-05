@@ -9,7 +9,6 @@ export const BOOLEAN_FLAGS = new Set([
   '--silent',
   '--no-preview',
   '--revoke',
-  '--reverse',
   '--all',
   '--md',
   '--html',
