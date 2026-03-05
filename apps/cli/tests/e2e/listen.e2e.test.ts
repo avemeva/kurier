@@ -73,10 +73,30 @@ function listenBg(...args: string[]) {
     } catch {}
   })();
 
+  // Wait for the "Listening for events" stderr message — signals handler is registered
+  const ready = (async () => {
+    const stderrReader = (proc.stderr as ReadableStream<Uint8Array>).getReader();
+    const start = Date.now();
+    let buf = '';
+    while (Date.now() - start < 10_000) {
+      const { done, value } = await stderrReader.read();
+      if (done) break;
+      buf += Buffer.from(value).toString();
+      if (buf.includes('Listening')) {
+        stderrReader.releaseLock();
+        return;
+      }
+    }
+    stderrReader.releaseLock();
+  })();
+
   return {
     getLines(): string[] {
       const text = Buffer.concat(chunks).toString();
       return text.split('\n').filter((l) => l.trim());
+    },
+    async waitForReady(): Promise<void> {
+      await ready;
     },
     async waitForLines(count: number, timeoutMs = 10_000): Promise<string[]> {
       const start = Date.now();
@@ -253,6 +273,7 @@ describe('listen streaming', () => {
     '--chat resolves usernames and "me"',
     async () => {
       const handle = listenBg('--chat', 'me');
+      await handle.waitForReady();
 
       try {
         const nonce = `listen-resolve-${Date.now()}`;

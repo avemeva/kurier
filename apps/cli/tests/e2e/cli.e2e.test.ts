@@ -268,8 +268,7 @@ describe('chats list: filtered scan returns all matches', () => {
 
   it('--type group returns all groups even when total chats exceed 500', async () => {
     const expected = new Set(allChats.filter((d) => d.type === 'group').map((d) => d.id));
-    // Skip if there aren't enough chats to trigger the bug
-    if (expected.size <= 30) return;
+    expect(expected.size).toBeGreaterThan(0);
 
     const filtered = await tg(
       'chats',
@@ -288,7 +287,7 @@ describe('chats list: filtered scan returns all matches', () => {
 
   it('--type channel returns all channels even when total chats exceed 500', async () => {
     const expected = new Set(allChats.filter((d) => d.type === 'channel').map((d) => d.id));
-    if (expected.size <= 30) return;
+    expect(expected.size).toBeGreaterThan(0);
 
     const filtered = await tg(
       'chats',
@@ -307,7 +306,7 @@ describe('chats list: filtered scan returns all matches', () => {
 
   it('--type bot returns all bots even when total chats exceed 500', async () => {
     const expected = new Set(allChats.filter((d) => d.type === 'bot').map((d) => d.id));
-    if (expected.size <= 30) return;
+    expect(expected.size).toBeGreaterThan(0);
 
     const filtered = await tg(
       'chats',
@@ -326,7 +325,7 @@ describe('chats list: filtered scan returns all matches', () => {
 
   it('--type user returns all users even when total chats exceed 500', async () => {
     const expected = new Set(allChats.filter((d) => d.type === 'user').map((d) => d.id));
-    if (expected.size <= 30) return;
+    expect(expected.size).toBeGreaterThan(0);
 
     const filtered = await tg(
       'chats',
@@ -706,8 +705,8 @@ describe('msg search', () => {
       if (r.data.length > 0) {
         const hit = r.data[0];
         expect(Array.isArray(hit.context)).toBe(true);
-        // Context should have up to 4 messages (2 before + 2 after)
-        expect(hit.context.length).toBeLessThanOrEqual(4);
+        // Context should have up to 5 messages (2 before + hit + 2 after)
+        expect(hit.context.length).toBeLessThanOrEqual(5);
       }
     },
     TIMEOUT,
@@ -2069,13 +2068,14 @@ describe('media paths in message output', () => {
 // ─── Offset & Context (known messages) ───
 
 describe('offset and context with known messages', () => {
-  const nonce = `e2e-${Date.now()}`;
+  const nonce = `e2e${Date.now()}`;
+  const words = ['one', 'two', 'three', 'four', 'five', 'six', 'seven'];
   const msgIds: number[] = [];
 
   beforeAll(async () => {
     // Send 7 numbered messages to Saved Messages
-    for (let i = 1; i <= 7; i++) {
-      const r = await tg('action', 'send', 'me', `${nonce}-${i}`);
+    for (let i = 0; i < 7; i++) {
+      const r = await tg('action', 'send', 'me', `${nonce}${words[i]}`);
       expect(r.ok).toBe(true);
       msgIds.push(r.data.id);
       track(r.data.id);
@@ -2139,7 +2139,7 @@ describe('offset and context with known messages', () => {
       const r = await tg(
         'msg',
         'search',
-        `${nonce}-4`,
+        `${nonce}four`,
         '--chat',
         'me',
         '--context',
@@ -2174,7 +2174,7 @@ describe('offset and context with known messages', () => {
       const r = await tg(
         'msg',
         'search',
-        `${nonce}-1`,
+        `${nonce}one`,
         '--chat',
         'me',
         '--context',
