@@ -10,6 +10,7 @@ import { register as registerMe } from './commands/me';
 import { register as registerMedia } from './commands/media';
 import { register as registerMsg } from './commands/msg';
 import { ensureDaemon, runDaemonMode } from './daemon';
+import { formatHelp } from './help';
 import { CliError, fail, mapErrorCode, warn } from './output';
 import { pending } from './pending';
 
@@ -28,6 +29,7 @@ const program = new Command()
   .option('--timeout <seconds>', 'Timeout in seconds')
   .helpOption('--help', 'Show help')
   .exitOverride()
+  .configureHelp({ formatHelp })
   .configureOutput({
     writeOut: (str) => process.stdout.write(str),
     writeErr: (str) => process.stderr.write(str),
