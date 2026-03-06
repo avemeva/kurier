@@ -13,7 +13,7 @@
 
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { $ } from 'bun';
 
@@ -204,6 +204,9 @@ ${osSections.join('\n\n')}
 end
 `;
 
+// Write formula to file for the workflow to pick up
+const formulaPath = 'dist/agent-telegram.rb';
+await writeFile(formulaPath, formula);
+console.log(`Formula written to ${formulaPath}`);
 console.log(formula);
-console.log('--- End Formula ---');
-console.log('\nDone.');
+console.log('Done.');
