@@ -318,6 +318,12 @@ if [ -d "$tmp_dir/lib" ]; then
     echo -e "${MUTED}Installed tdjson to ${NC}${LIB_DIR}"
 fi
 
+# Install tdl.node prebuilds if bundled (next to binary for node-gyp-build)
+if [ -d "$tmp_dir/bin/prebuilds" ]; then
+    cp -r "$tmp_dir/bin/prebuilds" "$INSTALL_DIR/prebuilds"
+    echo -e "${MUTED}Installed tdl.node prebuilds to ${NC}${INSTALL_DIR}/prebuilds"
+fi
+
 rm -rf "$tmp_dir"
 
 # --- Update PATH ---

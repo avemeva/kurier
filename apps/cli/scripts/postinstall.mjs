@@ -65,6 +65,18 @@ try {
 
   console.log(`tg: binary linked for ${platform}-${arch}`);
 
+  // Copy tdl.node prebuilds next to the hardlinked binary so node-gyp-build finds them
+  const prebuildsSrc = path.join(path.dirname(binaryPath), 'prebuilds');
+  if (fs.existsSync(prebuildsSrc)) {
+    const prebuildsTarget = path.join(binDir, 'prebuilds');
+    try {
+      fs.cpSync(prebuildsSrc, prebuildsTarget, { recursive: true });
+      console.log(`tg: tdl.node prebuilds installed`);
+    } catch (e) {
+      console.log(`tg: could not copy prebuilds (${e.message})`);
+    }
+  }
+
   // Copy libtdjson to ~/.local/lib/agent-telegram/ so the daemon can find it
   const libSrcDir = path.join(path.dirname(binaryPath), '..', 'lib');
   const tdjsonNames = { darwin: 'libtdjson.dylib', linux: 'libtdjson.so', win32: 'tdjson.dll' };

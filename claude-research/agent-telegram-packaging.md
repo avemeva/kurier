@@ -196,13 +196,17 @@ Full clean-slate verification on the developer's machine:
 | 6.5.7 | `agent-telegram --daemon` starts + health check | `curl http://localhost:7312/health` returns `{"ok":true}` | TODO |
 | 6.5.8 | `agent-telegram me` returns live data | Returns user JSON | TODO |
 
-**This requires a new release (v0.1.6) first**, since the current v0.1.5 brew formula doesn't include `tdl.node`.
+**This requires a release with the prebuilds fix for all install channels.**
 
 ### Step 7: Fix daemon crash in distributed binary (BLOCKING) — DONE
 
-**Root cause:** `tdl.node` native addon was not shipped. `node-gyp-build` couldn't find it outside the monorepo.
+**Root cause:** `tdl.node` native addon was not shipped, and even after shipping in the archive, the curl install script and npm postinstall didn't copy the `prebuilds/` directory to where `node-gyp-build` searches.
 
-**Fix:** `build.ts` now copies `node_modules/tdl/prebuilds/<platform>-<arch>/tdl.node` into `dist/<name>/bin/prebuilds/<platform>-<arch>/tdl.node`. `node-gyp-build` searches `path.dirname(process.execPath)` as a fallback, which finds it there.
+**Fix (multi-step):**
+1. `build.ts` copies `node_modules/tdl/prebuilds/<platform>-<arch>/tdl.node` into `dist/<name>/bin/prebuilds/`
+2. Homebrew formula installs `bin/prebuilds/` (done in v0.1.8)
+3. `install` script (curl channel) copies `bin/prebuilds/` to `~/.local/bin/prebuilds/`
+4. `postinstall.mjs` (npm channel) copies prebuilds from platform package to wrapper's `bin/`
 
 | # | What | How to verify | Status |
 |---|------|-------------|--------|
