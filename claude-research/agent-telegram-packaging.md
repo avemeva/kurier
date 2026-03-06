@@ -191,6 +191,16 @@ Run `22771383437`. All builds compiled, all smoke tests crashed:
 
 **Root cause:** `--external onnxruntime-node` in `build.ts` tells Bun "don't bundle this, require() it at runtime." The binary crashes on startup trying to find it. Locally it worked because the binary ran next to `node_modules/`.
 
+### First real release attempts (v0.1.2, v0.1.3, 2026-03-06)
+
+v0.1.2 and v0.1.3 both failed at the publish step with `EOTP` — npm required OTP for publishing.
+
+**Root cause:** The npm granular access token `ci-publish` was created **without** "Bypass two-factor authentication (2FA)" checked. This setting cannot be toggled after creation — you must delete the token and create a new one.
+
+**Fix:** Deleted old token, created new `ci-publish` token with "Bypass 2FA" checked during creation. Updated `NPM_TOKEN` secret in GitHub. Re-ran v0.1.3 — all 9 jobs passed (3 builds + publish + 5 verify).
+
+**Lesson:** npm granular tokens' 2FA bypass setting is immutable after creation. Always check it during token creation if the token will be used in CI.
+
 ---
 
 ## Verification table — what needs to be done
@@ -209,23 +219,23 @@ Each row has a specific proof. "PASSED" means verified with real output. Steps a
 | **Step 3: Create secrets** | | | | |
 | 3.1 | `TG_API_ID` | `gh secret list` | Present | DONE |
 | 3.2 | `TG_API_HASH` | `gh secret list` | Present | DONE |
-| 3.3 | `NPM_TOKEN` | npmjs.com → Granular Access Token → `ci-publish` | Token created (expires Jun 4 2026) | DONE — needs `gh secret set` |
+| 3.3 | `NPM_TOKEN` | npmjs.com → Granular Access Token → `ci-publish` | Token created with Bypass 2FA (expires Jun 4 2026), set in GH secrets | DONE |
 | 3.4 | `HOMEBREW_TAP_TOKEN` | GitHub → Fine-grained PAT → `avemeva/homebrew-tap` → Contents: R/W | Set via `gh secret set HOMEBREW_TAP_TOKEN` | DONE |
 | **Step 4: First real release** | | | | |
-| 4.1 | Set NPM_TOKEN secret | `gh secret set NPM_TOKEN` | — | TODO |
-| 4.2 | Release script works | `cd apps/cli && bun run release patch` | Tag pushed, CI triggers | TODO |
-| 4.3 | All CI builds green | `gh run view <id>` | All build matrix jobs green | TODO |
-| 4.4 | npm packages published | `npm view @avemeva/agent-telegram` | Shows version | TODO |
-| 4.5 | GitHub release created | `gh release view v<version>` | Has archive assets (zip + tar.gz) | TODO |
-| 4.6 | Homebrew tap updated | Check `avemeva/homebrew-tap` repo | Formula has correct version and SHAs | TODO |
-| 4.7 | CI verify: curl on macOS | Verify job in CI | `agent-telegram doctor` passes | TODO |
-| 4.8 | CI verify: curl on Linux | Verify job in CI | `agent-telegram doctor` passes | TODO |
-| 4.9 | CI verify: npm on all platforms | Verify job in CI | `agent-telegram doctor` passes | TODO |
+| 4.1 | Set NPM_TOKEN secret | `gh secret set NPM_TOKEN` | Updated 2026-03-06T18:39:01Z | DONE |
+| 4.2 | Release script works | `cd apps/cli && bun run release patch` | v0.1.2 and v0.1.3 tags pushed, CI triggered | DONE |
+| 4.3 | All CI builds green | `gh run view 22774389355` | All 3 build jobs green (darwin-arm64, linux-x64, win32-x64) | DONE |
+| 4.4 | npm packages published | `npm view @avemeva/agent-telegram` | `@avemeva/agent-telegram@0.1.3` on registry | DONE |
+| 4.5 | GitHub release created | `gh release view v0.1.3` | 3 archives: darwin-arm64.zip, linux-x64.tar.gz, win32-x64.tar.gz | DONE |
+| 4.6 | Homebrew tap updated | Check `avemeva/homebrew-tap` repo | Formula v0.1.3, SHAs correct. Fixed: removed empty-sha256 platforms, added `bottle :unneeded`, fixed `def install` placement | DONE (fix in publish.ts pending next release) |
+| 4.7 | CI verify: curl on macOS | Verify job in CI | Run 22774389355: Verify (curl on macos-14) ✓ | DONE |
+| 4.8 | CI verify: curl on Linux | Verify job in CI | Run 22774389355: Verify (curl on ubuntu-latest) ✓ | DONE |
+| 4.9 | CI verify: npm on all platforms | Verify job in CI | Run 22774389355: npm on macos-14 ✓, ubuntu-latest ✓, windows-latest ✓ | DONE |
 | **Step 5: Local install verification** | | | | |
-| 5.1 | curl install from scratch | Remove binary+lib, run install script, `agent-telegram doctor` | Binary + tdjson installed, doctor passes | TODO |
-| 5.2 | npm/bun install from scratch | `npm i -g @avemeva/agent-telegram` or `bun i -g @avemeva/agent-telegram` | Binary installed, `agent-telegram --version` works | TODO |
-| 5.3 | brew install | `brew install avemeva/tap/agent-telegram`, `agent-telegram doctor` | Installed, doctor passes | TODO |
-| **COMPLETE** | All channels verified | curl + npm/bun + brew all install and run | — | TODO |
+| 5.1 | curl install from scratch | Remove binary+lib, run install script, `agent-telegram doctor` | v0.1.3, tdjson 29M at ~/.local/lib/agent-telegram/, doctor all green | DONE |
+| 5.2 | npm install from scratch | `npm i -g @avemeva/agent-telegram` then `agent-telegram doctor` | v0.1.3, postinstall copies tdjson to ~/.local/lib/agent-telegram/, doctor all green | DONE |
+| 5.3 | brew install | `brew install avemeva/tap/agent-telegram`, `agent-telegram doctor` | Fails: Xcode version check. Root cause: formula missing `bottle :unneeded`. Fix in publish.ts, needs next release to verify | TODO (fix committed, needs release) |
+| **COMPLETE** | All channels verified | curl ✓, npm ✓, brew needs next release to verify fix | — | TODO (brew pending) |
 
 ---
 
@@ -273,5 +283,5 @@ Each row has a specific proof. "PASSED" means verified with real output. Steps a
 |--------|--------|----------------|
 | `TG_API_ID` | SET | — |
 | `TG_API_HASH` | SET | — |
-| `NPM_TOKEN` | CREATED (not yet in GH secrets) | npm granular token `ci-publish`, expires Jun 4 2026 |
+| `NPM_TOKEN` | SET | npm granular token `ci-publish` with Bypass 2FA, expires Jun 4 2026 |
 | `HOMEBREW_TAP_TOKEN` | SET | GitHub fine-grained PAT `homebrew-tap-ci`, expires Apr 5 2026 |

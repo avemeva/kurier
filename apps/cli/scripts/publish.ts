@@ -146,6 +146,46 @@ for (const [key, filePath] of Object.entries(archiveFiles)) {
 
 const ghBase = `https://github.com/avemeva/kurier/releases/download/v${version}`;
 
+// Build platform blocks only for platforms that have actual archives (non-empty sha256)
+const macosBlocks: string[] = [];
+const linuxBlocks: string[] = [];
+
+if (shas['darwin-x64']) {
+  macosBlocks.push(`    if Hardware::CPU.intel?
+      url "${ghBase}/agent-telegram-darwin-x64.zip"
+      sha256 "${shas['darwin-x64']}"
+    end`);
+}
+
+if (shas['darwin-arm64']) {
+  macosBlocks.push(`    if Hardware::CPU.arm?
+      url "${ghBase}/agent-telegram-darwin-arm64.zip"
+      sha256 "${shas['darwin-arm64']}"
+    end`);
+}
+
+if (shas['linux-x64']) {
+  linuxBlocks.push(`    if Hardware::CPU.intel? and Hardware::CPU.is_64_bit?
+      url "${ghBase}/agent-telegram-linux-x64.tar.gz"
+      sha256 "${shas['linux-x64']}"
+    end`);
+}
+
+if (shas['linux-arm64']) {
+  linuxBlocks.push(`    if Hardware::CPU.arm? and Hardware::CPU.is_64_bit?
+      url "${ghBase}/agent-telegram-linux-arm64.tar.gz"
+      sha256 "${shas['linux-arm64']}"
+    end`);
+}
+
+const osSections: string[] = [];
+if (macosBlocks.length > 0) {
+  osSections.push(`  on_macos do\n${macosBlocks.join('\n')}\n  end`);
+}
+if (linuxBlocks.length > 0) {
+  osSections.push(`  on_linux do\n${linuxBlocks.join('\n')}\n  end`);
+}
+
 const formula = `# typed: false
 # frozen_string_literal: true
 
@@ -153,43 +193,13 @@ class AgentTelegram < Formula
   desc "AI-powered Telegram CLI"
   homepage "https://github.com/avemeva/kurier"
   version "${version}"
+  bottle :unneeded
 
-  on_macos do
-    if Hardware::CPU.intel?
-      url "${ghBase}/agent-telegram-darwin-x64.zip"
-      sha256 "${shas['darwin-x64'] ?? 'MISSING'}"
+${osSections.join('\n\n')}
 
-      def install
-        bin.install "agent-telegram"
-      end
-    end
-    if Hardware::CPU.arm?
-      url "${ghBase}/agent-telegram-darwin-arm64.zip"
-      sha256 "${shas['darwin-arm64'] ?? 'MISSING'}"
-
-      def install
-        bin.install "agent-telegram"
-      end
-    end
-  end
-
-  on_linux do
-    if Hardware::CPU.intel? and Hardware::CPU.is_64_bit?
-      url "${ghBase}/agent-telegram-linux-x64.tar.gz"
-      sha256 "${shas['linux-x64'] ?? 'MISSING'}"
-
-      def install
-        bin.install "agent-telegram"
-      end
-    end
-    if Hardware::CPU.arm? and Hardware::CPU.is_64_bit?
-      url "${ghBase}/agent-telegram-linux-arm64.tar.gz"
-      sha256 "${shas['linux-arm64'] ?? 'MISSING'}"
-
-      def install
-        bin.install "agent-telegram"
-      end
-    end
+  def install
+    bin.install "bin/agent-telegram"
+    (lib/"agent-telegram").install Dir["lib/*"] if (buildpath/"lib").exist?
   end
 end
 `;
