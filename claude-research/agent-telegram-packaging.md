@@ -1,8 +1,8 @@
 # agent-telegram CLI Packaging
 
-## Goal
+## What are we doing
 
-A person runs one command and gets a working Telegram CLI. No build tools, no dependencies, no second step. The binary has everything it needs: the compiled app, the TDLib native library, and baked-in API credentials.
+A person runs one command and gets a working Telegram CLI. No build tools, no dependencies, no second step.
 
 Three install channels:
 ```
@@ -21,12 +21,12 @@ agent-telegram me             # live Telegram data returns
 
 If any step fails, the distribution is broken.
 
-## What "working" actually means
+### What "working" actually means
 
-A compiled Bun binary is a self-contained executable — but it has two runtime dependencies that must ship alongside it:
+A compiled Bun binary is self-contained — but it has two runtime dependencies:
 
-1. **libtdjson** (30MB native lib) — the TDLib C++ library. Without it, the daemon can't start. It must be at `~/.local/lib/agent-telegram/libtdjson.{dylib,so,dll}`.
-2. **No `onnxruntime-node`** — the caption feature uses `@huggingface/transformers` which optionally imports `onnxruntime-node` (a native Node addon). If this import runs at startup, the binary crashes outside the monorepo. The caption code path must be fully lazy.
+1. **libtdjson** (30MB native lib) — TDLib C++ library. Without it, the daemon can't start. Must be at `~/.local/lib/agent-telegram/libtdjson.{dylib,so,dll}`.
+2. **No `onnxruntime-node` at startup** — caption feature uses `@huggingface/transformers` which optionally imports `onnxruntime-node`. If this import runs at startup, the binary crashes outside the monorepo.
 
 The proof chain:
 ```
@@ -38,50 +38,27 @@ User gets live data                →  full stack works end-to-end
 
 The local test that catches most problems:
 ```bash
-cp dist/agent-telegram-darwin-arm64/bin/agent-telegram /tmp/agent-telegram-test
-/tmp/agent-telegram-test --version    # crashes? onnxruntime problem
-/tmp/agent-telegram-test doctor       # tdjson missing? bundling problem
+cp dist/agent-telegram-darwin-arm64/bin/agent-telegram /tmp/
+/tmp/agent-telegram --version    # crashes? → onnxruntime problem
+/tmp/agent-telegram doctor       # tdjson missing? → bundling problem
 ```
 
-If it works from `/tmp/`, it'll work from a fresh install. If it only works from inside the monorepo, it's broken.
+If it works from `/tmp/`, it'll work from a fresh install.
 
-## Reference implementations
+---
 
-These projects solve the same distribution problem. Key patterns we adapted:
+## How it works
 
-### opencode (`/Users/andrey/Projects/opencode/`)
-
-| File | What we learned |
-|------|----------------|
-| `packages/opencode/script/build.ts` | Bun.build() with compile target for 11 platform variants. Uses `--single` flag for local dev. Generates platform package.json with os/cpu fields. **Key: no native deps in the bundle** — opencode has no equivalent of tdjson/onnxruntime. |
-| `packages/opencode/bin/opencode` | Node.js npm wrapper (~180 lines). Platform detection, binary resolution from node_modules, caching via hardlink. AVX2/baseline fallback (we skipped this). |
-| `packages/opencode/script/postinstall.mjs` | Hardlinks binary from platform package to `bin/.opencode`, patches npm shims. We followed this pattern exactly. |
-| `packages/opencode/script/publish.ts` | Full pipeline: platform packages → wrapper → Docker → AUR → Homebrew formula. We took npm + Homebrew, skipped Docker/AUR. |
-| `install` (461 lines bash) | Platform/arch detection (Rosetta, AVX2, musl), GitHub releases download, progress bar, PATH modification for zsh/bash/fish/ash. We simplified (no AVX2, no musl, no Docker detection). |
-| `.github/workflows/publish.yml` | 3-job pipeline: version → build → publish. **Key difference: opencode cross-compiles from one runner** because it has no native deps. We can't — tdjson is platform-specific. |
-
-### agent-browser (`/Users/andrey/Projects/agent-browser/`)
-
-| File | What we learned |
-|------|----------------|
-| `bin/agent-browser.js` | Simpler wrapper (~55 lines). Platform detection + spawn binary. We based our wrapper on this. |
-| `scripts/postinstall.js` | Downloads binary from GitHub releases (not from npm optionalDeps). Alternative approach we considered but didn't use. |
-| `.github/workflows/release.yml` | Builds 5 platform binaries, publishes to npm + GitHub release. Simpler than opencode. |
-
-### Key difference from references
-
-**Neither opencode nor agent-browser ships a native library alongside the binary.** They're pure compiled JS — the binary is the entire distribution. We have tdjson (30MB C++ lib) that must be co-installed. This is the unique challenge and the source of most complexity.
-
-## Architecture
+### Architecture
 
 ```
 agent-telegram binary (compiled Bun)
 ├── agent-telegram --daemon           → TDLib HTTP proxy (port 7312, needs libtdjson)
-├── agent-telegram --caption-daemon   → Caption HTTP server (port 7313, needs WASM/WebGPU)
+├── agent-telegram --caption-daemon   → Caption HTTP server (port 7313, WASM/WebGPU)
 ├── agent-telegram doctor             → Installation health check
 └── agent-telegram <command>          → HTTP client to daemon
 
-Archive contents:
+Archive contents (what gets distributed):
 ├── bin/agent-telegram                → 60MB compiled binary
 └── lib/libtdjson.{dylib,so,dll}     → 30MB TDLib native library
 
@@ -90,21 +67,40 @@ Install locations:
 └── ~/.local/lib/agent-telegram/      → libtdjson
 ```
 
-## How it works
+### Distribution channels
 
-Two modes: **develop** and **release**.
+```
+npm i -g @avemeva/agent-telegram
+  → installs wrapper package (@avemeva/agent-telegram)
+  → pulls platform optionalDep (@avemeva/agent-telegram-darwin-arm64)
+  → postinstall hardlinks binary from platform pkg to bin/
+  → user runs: agent-telegram
 
-### Develop (daily)
+brew install avemeva/tap/agent-telegram
+  → downloads archive from GitHub release
+  → extracts binary to Homebrew prefix
+  → user runs: agent-telegram
 
-```bash
-git add . && git commit -m "whatever" && git push    # nothing triggers
+curl -fsSL .../install | bash
+  → detects platform/arch (darwin/linux, arm64/x64, Rosetta check)
+  → downloads archive from GitHub release
+  → extracts binary to ~/.local/bin/
+  → extracts libtdjson to ~/.local/lib/agent-telegram/
+  → modifies PATH in shell config
+  → user runs: agent-telegram
 ```
 
-### Release
+### Develop vs Release
 
 ```bash
-cd apps/cli && bun run release patch                  # one command, CI does the rest
+# Day-to-day: push code freely, nothing triggers
+git add . && git commit -m "whatever" && git push
+
+# Release: one command, CI does everything else
+cd apps/cli && bun run release patch
 ```
+
+### Release flow diagram
 
 ```
 release.ts                          GitHub Actions
@@ -126,152 +122,43 @@ git push && git push --tags ──────→ tag v0.1.1 arrives
                                     │          │ ubuntu      → linux-x64
                                     │          │ windows     → win32-x64
                                     └────┬────┘
+                                         │ smoke test: agent-telegram --version
                                     ┌────┴────┐
-                                    │ publish  │ npm publish (platform pkgs + wrapper)
-                                    │          │ gh release create (archives)
-                                    │          │ update homebrew tap formula
+                                    │ publish  │ ~2 min
+                                    │          │ npm publish (platform pkgs + wrapper)
+                                    │          │ gh release create (archives with bin + lib)
+                                    │          │ push updated formula to homebrew tap
                                     └────┬────┘
                                     ┌────┴────┐
-                                    │ verify   │ curl install on macOS + Linux
+                                    │ verify   │ ~2 min
+                                    │          │ curl install on macOS + Linux
                                     │          │ npm i -g on macOS + Linux + Windows
                                     │          │ agent-telegram doctor on each
                                     └─────────┘
+
+After ~10 min, all three install channels work:
+
+  curl -fsSL https://raw.githubusercontent.com/avemeva/kurier/main/install | bash
+  npm i -g @avemeva/agent-telegram
+  brew install avemeva/tap/agent-telegram
 ```
 
 Can also trigger manually: Actions → "Publish agent-telegram" → Run workflow (with dry_run option).
 
-## Current state
-
-### What's built
-- Build script (`build.ts`) — compiles for current platform, bundles tdjson, creates archive
-- Publish script (`publish.ts`) — publishes to npm with dynamic platform discovery
-- Install script (`install`) — curl installer, extracts binary + tdjson
-- npm wrapper (`bin/agent-telegram.js`) + postinstall hardlink
-- CI workflow (`publish.yml`) — matrix build, publish, verify jobs
-- Release script (`release.ts`) — bump, tag, push
-- Doctor command — checks binary, tdjson, config, daemon
-- Homebrew tap at `avemeva/homebrew-tap`
-
-### What's broken (first CI run, 2026-03-06)
-
-Run `22771383437` — all builds compiled but all smoke tests crashed:
-
-```
-error: Cannot find package 'onnxruntime-node' from '/$bunfs/root/agent-telegram'
-```
-
-| Runner | Build | Smoke test | Issue |
-|--------|-------|-----------|-------|
-| macos-14 (ARM) | OK | CRASH | onnxruntime-node import at startup |
-| macos-13 (Intel) | — | — | Runner deprecated by GitHub |
-| ubuntu-latest | OK | CRASH | Same onnxruntime-node |
-| windows-latest | OK | CRASH | Same onnxruntime-node |
-
-**Why it worked locally:** The binary ran next to the monorepo's `node_modules/` which contains `onnxruntime-node`. In CI (and on user machines), there's no `node_modules/`, so it crashes.
-
-**Why we didn't catch it:** We always tested from within the project directory. The `/tmp/` isolation test was identified but not consistently applied.
-
-### What's not yet tested
-
-- No install channel has been tested end-to-end on a real release (curl, npm, brew)
-- No cross-platform binary has been verified to actually run
-- Windows binary name (.exe) not verified
-- Homebrew formula install not verified (local Xcode version blocks it)
+The release script guards against dirty working tree — commit or stash first.
 
 ---
 
-## Steps to working distribution (in order)
+## What's been done
 
-Each step gates the next. The proof for each step is specific and binary — it either works or it doesn't.
-
-### Step 1: Fix onnxruntime-node crash
-
-**Problem:** `--external onnxruntime-node` in `build.ts` makes the binary crash at startup.
-
-**Options:**
-- A) Remove `--external` — let Bun bundle/tree-shake it. `@huggingface/transformers` falls back to WASM/WebGPU when native onnxruntime isn't available.
-- B) Keep `--external` but ensure nothing in the startup path imports it. Caption code must be fully lazy (dynamic import only on `--caption-daemon`).
-
-**Proof:**
-```bash
-bun run scripts/build.ts --single
-cp dist/agent-telegram-darwin-arm64/bin/agent-telegram /tmp/
-/tmp/agent-telegram --version     # must print 0.1.0, not crash
-```
-
-### Step 2: Fix macos-13 runner
-
-**Problem:** `macos-13` deprecated. Need a runner for darwin-x64.
-
-**Options:** `macos-15` (runs x64 via Rosetta on ARM), or drop darwin-x64 for now.
-
-**Proof:** CI job starts and doesn't immediately fail with "configuration not supported."
-
-### Step 3: CI dry run — all smoke tests pass
-
-**Trigger:** `gh workflow run publish.yml --repo avemeva/kurier -f dry_run=true`
-
-**Proof:** Every build job green. `agent-telegram --version` succeeds on all runners. This proves the binary starts on macOS, Linux, and Windows — outside the monorepo, on a clean machine.
-
-### Step 4: Create missing secrets
-
-| Secret | Status | Where to create |
-|--------|--------|----------------|
-| `TG_API_ID` | SET | — |
-| `TG_API_HASH` | SET | — |
-| `NPM_TOKEN` | **MISSING** | npmjs.com → Settings → Access Tokens → Automation type |
-| `HOMEBREW_TAP_TOKEN` | **MISSING** | GitHub → Settings → Fine-grained PAT → `avemeva/homebrew-tap` → Contents: read/write |
-
-### Step 5: First real release
-
-**Trigger:** `cd apps/cli && bun run release patch`
-
-**Proof — check each independently:**
-
-| What | How to check | Pass criteria |
-|------|-------------|---------------|
-| CI all green | `gh run view <id>` | All 3 jobs (build, publish, verify) green |
-| npm packages exist | `npm view @avemeva/agent-telegram` | Shows version 0.1.1 |
-| GitHub release exists | `gh release view v0.1.1` | Has 3-4 archive assets |
-| Homebrew tap updated | Check `avemeva/homebrew-tap` Formula | Contains `version "0.1.1"` and correct SHAs |
-| Verify jobs pass | CI verify job logs | `agent-telegram doctor` passes on fresh macOS + Linux + Windows |
-
-### Step 6: Manual end-to-end
-
-After CI green, verify on your own machine. This is the final proof.
-
-```bash
-# Clean slate
-trash ~/.local/bin/agent-telegram ~/.local/lib/agent-telegram
-
-# curl install
-curl -fsSL https://raw.githubusercontent.com/avemeva/kurier/main/install | bash -s -- --no-modify-path
-
-# The four checks that prove everything works:
-agent-telegram --version          # binary starts (no onnxruntime crash)
-agent-telegram doctor             # tdjson found, config found
-agent-telegram --daemon &         # TDLib proxy starts (tdjson loads)
-agent-telegram me                 # live data (full stack works)
-
-# Repeat for npm
-trash ~/.local/bin/agent-telegram ~/.local/lib/agent-telegram
-npm i -g @avemeva/agent-telegram
-agent-telegram --version
-agent-telegram doctor
-```
-
----
-
-## Files
-
-### New files (this session)
+### Files created
 | File | Purpose |
 |------|---------|
 | `apps/cli/bin/agent-telegram.js` | npm wrapper (Node.js, replaces `bin/tg.js`) |
 | `apps/cli/scripts/release.ts` | One-command release: bump version, tag, push |
 | `apps/cli/src/commands/doctor.ts` | `agent-telegram doctor` — checks binary, tdjson, config, daemon |
 
-### Modified files
+### Files modified
 | File | What changed |
 |------|-------------|
 | `install` | Renamed tg → agent-telegram, extracts tdjson to `~/.local/lib/agent-telegram/` |
@@ -286,7 +173,105 @@ agent-telegram doctor
 | `packages/protocol/src/paths.ts` | `~/.local/lib/tg` → `~/.local/lib/agent-telegram` (all platform paths) |
 | `apps/cli/package.json` | Added `release` script |
 
-### Deleted files
+### Files deleted
 | File | Replaced by |
 |------|------------|
 | `apps/cli/bin/tg.js` | `apps/cli/bin/agent-telegram.js` |
+
+### First CI run (dry_run, 2026-03-06)
+
+Run `22771383437`. All builds compiled, all smoke tests crashed:
+
+| Runner | Build | Smoke test | Error |
+|--------|-------|-----------|-------|
+| macos-14 (ARM) | OK | CRASH | `Cannot find package 'onnxruntime-node' from '/$bunfs/root/agent-telegram'` |
+| macos-13 (Intel) | — | — | Runner `macos-13` no longer exists (deprecated by GitHub) |
+| ubuntu-latest | OK | CRASH | Same onnxruntime-node error |
+| windows-latest | OK | CRASH | Same onnxruntime-node error |
+
+**Root cause:** `--external onnxruntime-node` in `build.ts` tells Bun "don't bundle this, require() it at runtime." The binary crashes on startup trying to find it. Locally it worked because the binary ran next to `node_modules/`.
+
+---
+
+## Verification table — what needs to be done
+
+Each row has a specific proof. "PASSED" means verified with real output. Steps are in dependency order.
+
+| # | What | How to verify | Proof | Status |
+|---|------|-------------|-------|--------|
+| **Step 1: Fix binary crash** | | | | |
+| 1.1 | Remove `--external onnxruntime-node` or lazy-import it | Edit `build.ts`, rebuild | — | TODO |
+| 1.2 | Binary starts OUTSIDE monorepo | `cp dist/.../bin/agent-telegram /tmp/ && /tmp/agent-telegram --version` | Prints `0.1.0` (not `Cannot find package`) | TODO |
+| 1.3 | Doctor passes outside monorepo | `/tmp/agent-telegram doctor` | `TDLib ok`, `Config ok` | TODO |
+| **Step 2: Fix CI runners** | | | | |
+| 2.1 | Replace deprecated `macos-13` | Update `publish.yml` matrix | — | TODO |
+| 2.2 | CI dry run — all smoke tests pass | `gh workflow run publish.yml -f dry_run=true` then `gh run view <id>` | All build jobs green, `--version` passes on every runner | TODO |
+| **Step 3: Create secrets** | | | | |
+| 3.1 | `TG_API_ID` | `gh secret list` | Present | DONE |
+| 3.2 | `TG_API_HASH` | `gh secret list` | Present | DONE |
+| 3.3 | `NPM_TOKEN` | npmjs.com → Access Tokens → Automation, then `gh secret set` | Present in `gh secret list` | TODO |
+| 3.4 | `HOMEBREW_TAP_TOKEN` | GitHub → Fine-grained PAT → `avemeva/homebrew-tap`, then `gh secret set` | Present in `gh secret list` | TODO |
+| **Step 4: First real release** | | | | |
+| 4.1 | Release script works | `cd apps/cli && bun run release patch` | Tag pushed, CI triggers | TODO |
+| 4.2 | All CI builds green | `gh run view <id>` | All build matrix jobs green | TODO |
+| 4.3 | npm packages published | `npm view @avemeva/agent-telegram` | Shows version 0.1.1 | TODO |
+| 4.4 | GitHub release created | `gh release view v0.1.1` | Has 3-4 archive assets (zip + tar.gz) | TODO |
+| 4.5 | Homebrew tap updated | Check `avemeva/homebrew-tap` repo | Formula has `version "0.1.1"` and correct SHAs | TODO |
+| 4.6 | CI verify: curl on macOS | Verify job in CI | `agent-telegram doctor` passes | TODO |
+| 4.7 | CI verify: curl on Linux | Verify job in CI | `agent-telegram doctor` passes | TODO |
+| 4.8 | CI verify: npm on all platforms | Verify job in CI | `agent-telegram doctor` passes | TODO |
+| **Step 5: Manual end-to-end** | | | | |
+| 5.1 | curl install from scratch | Remove binary+lib, run install script, `agent-telegram doctor` | Binary + tdjson installed, doctor passes | TODO |
+| 5.2 | curl → live Telegram | `agent-telegram --daemon & && agent-telegram me` | Returns live JSON with user data | TODO |
+| 5.3 | npm install from scratch | `npm i -g @avemeva/agent-telegram`, `agent-telegram doctor` | Binary installed via postinstall hardlink, doctor passes | TODO |
+| 5.4 | npm → live Telegram | `agent-telegram --daemon & && agent-telegram me` | Returns live JSON | TODO |
+| 5.5 | brew install | `brew install avemeva/tap/agent-telegram`, `agent-telegram doctor` | Installed, doctor passes | BLOCKED (local Xcode) |
+
+---
+
+## Reference sources
+
+### Implementations we adapted from
+
+| Source | File | What we took |
+|--------|------|-------------|
+| opencode | `packages/opencode/script/build.ts` | Bun.build() compile pattern, `--single` flag for local dev, platform package.json generation with os/cpu fields |
+| opencode | `packages/opencode/bin/opencode` | Node.js npm wrapper (~180 lines): platform detection, binary resolution from node_modules, caching via hardlink. We simplified (no AVX2/baseline). |
+| opencode | `packages/opencode/script/postinstall.mjs` | Hardlinks binary from platform package to `bin/`, patches npm shims |
+| opencode | `packages/opencode/script/publish.ts` | Full publish pipeline: platform packages → wrapper → Homebrew formula. We took npm + brew, skipped Docker/AUR. |
+| opencode | `install` (461 lines bash) | Platform/arch detection (Rosetta, AVX2, musl), GitHub releases download with progress bar, PATH modification for zsh/bash/fish/ash. We simplified. |
+| opencode | `.github/workflows/publish.yml` | 3-job CI: version → build → publish. **Key difference: opencode cross-compiles from one runner** because it has no native deps. We can't — tdjson is platform-specific. |
+| agent-browser | `bin/agent-browser.js` | Simpler wrapper (~55 lines): platform detection + spawn binary. We based our wrapper on this. |
+| agent-browser | `scripts/postinstall.js` | Alternative: downloads binary from GitHub releases (not npm optionalDeps) |
+| agent-browser | `.github/workflows/release.yml` | Build 5 platform binaries → npm publish + GitHub release |
+
+### Key difference from references
+
+**Neither opencode nor agent-browser ships a native library alongside the binary.** They're pure compiled JS — the binary is the entire distribution. We have tdjson (30MB C++ lib) that must be co-installed. This is the unique challenge. `prebuilt-tdlib` provides per-platform tdjson via npm optionalDeps — each CI runner gets the correct one via `bun install`.
+
+### Files to read for full context
+
+| File | Why |
+|------|-----|
+| `apps/cli/scripts/build.ts` | Build mechanics, tdjson bundling, `--external onnxruntime-node` (the crash source) |
+| `apps/cli/scripts/publish.ts` | npm publish pipeline, dynamic platform discovery, Homebrew formula generation |
+| `apps/cli/scripts/release.ts` | Bump + tag + push automation |
+| `apps/cli/bin/agent-telegram.js` | npm wrapper: finds platform binary in node_modules |
+| `apps/cli/scripts/postinstall.mjs` | npm postinstall: hardlinks binary |
+| `apps/cli/src/commands/doctor.ts` | Installation health check |
+| `apps/cli/src/caption-daemon.ts` | Caption daemon (Florence-2, HTTP server) — imports @huggingface/transformers |
+| `apps/cli/src/caption.ts` | Caption client lifecycle |
+| `apps/cli/src/index.ts` | Entry point — `--daemon` and `--caption-daemon` pre-Commander checks |
+| `apps/cli/src/daemon.ts` | TDLib daemon — loads tdjson at runtime |
+| `packages/protocol/src/paths.ts` | All platform-specific paths (lib dir, app dir, config dir) |
+| `install` | Bash curl install script |
+| `.github/workflows/publish.yml` | CI/CD workflow |
+
+### Secrets status
+
+| Secret | Status | Where to create |
+|--------|--------|----------------|
+| `TG_API_ID` | SET | — |
+| `TG_API_HASH` | SET | — |
+| `NPM_TOKEN` | **MISSING** | npmjs.com → Settings → Access Tokens → Automation type |
+| `HOMEBREW_TAP_TOKEN` | **MISSING** | GitHub → Fine-grained PAT → `avemeva/homebrew-tap` → Contents: read/write |
