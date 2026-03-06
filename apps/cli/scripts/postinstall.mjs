@@ -64,6 +64,33 @@ try {
   }
 
   console.log(`tg: binary linked for ${platform}-${arch}`);
+
+  // Copy libtdjson to ~/.local/lib/agent-telegram/ so the daemon can find it
+  const libSrcDir = path.join(path.dirname(binaryPath), '..', 'lib');
+  const tdjsonNames = { darwin: 'libtdjson.dylib', linux: 'libtdjson.so', win32: 'tdjson.dll' };
+  const tdjsonName = tdjsonNames[platform];
+
+  if (tdjsonName) {
+    const tdjsonSrc = path.join(libSrcDir, tdjsonName);
+    if (fs.existsSync(tdjsonSrc)) {
+      const libDestDir =
+        platform === 'win32'
+          ? path.join(
+              process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'),
+              'agent-telegram',
+              'lib',
+            )
+          : path.join(os.homedir(), '.local', 'lib', 'agent-telegram');
+      fs.mkdirSync(libDestDir, { recursive: true });
+      const tdjsonDest = path.join(libDestDir, tdjsonName);
+      try {
+        fs.copyFileSync(tdjsonSrc, tdjsonDest);
+        console.log(`tg: tdjson installed to ${libDestDir}`);
+      } catch (e) {
+        console.log(`tg: could not copy tdjson (${e.message})`);
+      }
+    }
+  }
 } catch (error) {
   // Postinstall must never fail the install
   console.log(`tg: postinstall skipped (${error.message})`);

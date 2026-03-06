@@ -100,6 +100,8 @@ const result = Bun.spawnSync(
     `process.env.TG_BUILTIN_API_ID="${apiId}"`,
     '--define',
     `process.env.TG_BUILTIN_API_HASH="${apiHash}"`,
+    '--define',
+    `process.env.TG_VERSION="${pkg.version}"`,
   ],
   { stdio: ['inherit', 'inherit', 'inherit'] },
 );

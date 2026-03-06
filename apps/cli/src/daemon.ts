@@ -21,7 +21,7 @@ import path from 'node:path';
 import {
   APP_DIR,
   CREDENTIALS_FILE,
-  getInstalledTdjsonPath,
+  findTdjsonPath,
   LOG_FILE,
   PID_FILE,
   PORT_FILE,
@@ -269,9 +269,8 @@ export async function runDaemonMode(): Promise<void> {
   const { startProxy } = await import('@tg/protocol/proxy');
 
   // In compiled binary, getTdjson() won't find node_modules.
-  // Use installed library from the platform-specific path.
-  const tdjsonInstalled = getInstalledTdjsonPath();
-  const tdjson = existsSync(tdjsonInstalled) ? tdjsonInstalled : undefined;
+  // Search multiple locations: ~/.local/lib/, relative to binary, etc.
+  const tdjson = findTdjsonPath() ?? undefined;
 
   const proxy = await startProxy({
     apiId: credentials.apiId,

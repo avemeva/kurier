@@ -31,7 +31,7 @@ const MAX_FLOOD_WAIT_SEC = 30;
 const program = new Command()
   .name('agent-telegram')
   .description('Telegram CLI for AI agents')
-  .version('0.1.0', '--version')
+  .version(process.env.TG_VERSION ?? '0.0.0-dev', '--version')
   .option('--timeout <seconds>', 'Timeout in seconds')
   .helpOption('--help', 'Show help')
   .exitOverride()

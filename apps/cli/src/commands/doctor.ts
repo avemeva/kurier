@@ -3,6 +3,7 @@ import path from 'node:path';
 import {
   APP_DIR,
   CREDENTIALS_FILE,
+  findTdjsonPath,
   getInstalledTdjsonPath,
   PID_FILE,
   PORT_FILE,
@@ -45,11 +46,11 @@ function checkBinary(): Check {
 }
 
 function checkTdlib(): Check {
-  const tdjsonPath = getInstalledTdjsonPath();
-  if (existsSync(tdjsonPath)) {
-    return { name: 'TDLib', status: 'ok', detail: tdjsonPath };
+  const found = findTdjsonPath();
+  if (found) {
+    return { name: 'TDLib', status: 'ok', detail: found };
   }
-  return { name: 'TDLib', status: 'FAIL', detail: `${tdjsonPath} not found` };
+  return { name: 'TDLib', status: 'FAIL', detail: `${getInstalledTdjsonPath()} not found` };
 }
 
 function checkConfig(): Check {
@@ -92,7 +93,7 @@ export function register(parent: Command): void {
     .command('doctor')
     .description('Verify installation is complete')
     .action(() => {
-      const version = '0.1.0';
+      const version = process.env.TG_VERSION ?? '0.0.0-dev';
       const checks: Check[] = [checkBinary(), checkTdlib(), checkConfig(), checkDaemon()];
 
       console.log(`\nagent-telegram v${version}\n`);

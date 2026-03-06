@@ -200,32 +200,32 @@ Each row has a specific proof. "PASSED" means verified with real output. Steps a
 | # | What | How to verify | Proof | Status |
 |---|------|-------------|-------|--------|
 | **Step 1: Fix binary crash** | | | | |
-| 1.1 | Remove `--external onnxruntime-node` or lazy-import it | Edit `build.ts`, rebuild | — | TODO |
-| 1.2 | Binary starts OUTSIDE monorepo | `cp dist/.../bin/agent-telegram /tmp/ && /tmp/agent-telegram --version` | Prints `0.1.0` (not `Cannot find package`) | TODO |
-| 1.3 | Doctor passes outside monorepo | `/tmp/agent-telegram doctor` | `TDLib ok`, `Config ok` | TODO |
+| 1.1 | Remove `--external onnxruntime-node` or lazy-import it | Edit `build.ts`, rebuild | Changed to `--external @huggingface/transformers` | DONE |
+| 1.2 | Binary starts OUTSIDE monorepo | `cp dist/.../bin/agent-telegram /tmp/ && /tmp/agent-telegram --version` | Prints `0.1.0` | DONE |
+| 1.3 | Doctor passes outside monorepo | `/tmp/agent-telegram doctor` | `TDLib ok`, `Config ok`, `All checks passed` | DONE |
 | **Step 2: Fix CI runners** | | | | |
-| 2.1 | Replace deprecated `macos-13` | Update `publish.yml` matrix | — | TODO |
-| 2.2 | CI dry run — all smoke tests pass | `gh workflow run publish.yml -f dry_run=true` then `gh run view <id>` | All build jobs green, `--version` passes on every runner | TODO |
+| 2.1 | Replace deprecated `macos-13` | Update `publish.yml` matrix | Removed darwin-x64 row, fixed scoped npm name in verify | DONE |
+| 2.2 | CI dry run — all smoke tests pass | `gh workflow run publish.yml -f dry_run=true` then `gh run view <id>` | Run 22772090727: darwin-arm64 ✓, linux-x64 ✓, win32-x64 ✓ | DONE |
 | **Step 3: Create secrets** | | | | |
 | 3.1 | `TG_API_ID` | `gh secret list` | Present | DONE |
 | 3.2 | `TG_API_HASH` | `gh secret list` | Present | DONE |
-| 3.3 | `NPM_TOKEN` | npmjs.com → Access Tokens → Automation, then `gh secret set` | Present in `gh secret list` | TODO |
-| 3.4 | `HOMEBREW_TAP_TOKEN` | GitHub → Fine-grained PAT → `avemeva/homebrew-tap`, then `gh secret set` | Present in `gh secret list` | TODO |
+| 3.3 | `NPM_TOKEN` | npmjs.com → Granular Access Token → `ci-publish` | Token created (expires Jun 4 2026) | DONE — needs `gh secret set` |
+| 3.4 | `HOMEBREW_TAP_TOKEN` | GitHub → Fine-grained PAT → `avemeva/homebrew-tap` → Contents: R/W | Set via `gh secret set HOMEBREW_TAP_TOKEN` | DONE |
 | **Step 4: First real release** | | | | |
-| 4.1 | Release script works | `cd apps/cli && bun run release patch` | Tag pushed, CI triggers | TODO |
-| 4.2 | All CI builds green | `gh run view <id>` | All build matrix jobs green | TODO |
-| 4.3 | npm packages published | `npm view @avemeva/agent-telegram` | Shows version 0.1.1 | TODO |
-| 4.4 | GitHub release created | `gh release view v0.1.1` | Has 3-4 archive assets (zip + tar.gz) | TODO |
-| 4.5 | Homebrew tap updated | Check `avemeva/homebrew-tap` repo | Formula has `version "0.1.1"` and correct SHAs | TODO |
-| 4.6 | CI verify: curl on macOS | Verify job in CI | `agent-telegram doctor` passes | TODO |
-| 4.7 | CI verify: curl on Linux | Verify job in CI | `agent-telegram doctor` passes | TODO |
-| 4.8 | CI verify: npm on all platforms | Verify job in CI | `agent-telegram doctor` passes | TODO |
-| **Step 5: Manual end-to-end** | | | | |
+| 4.1 | Set NPM_TOKEN secret | `gh secret set NPM_TOKEN` | — | TODO |
+| 4.2 | Release script works | `cd apps/cli && bun run release patch` | Tag pushed, CI triggers | TODO |
+| 4.3 | All CI builds green | `gh run view <id>` | All build matrix jobs green | TODO |
+| 4.4 | npm packages published | `npm view @avemeva/agent-telegram` | Shows version | TODO |
+| 4.5 | GitHub release created | `gh release view v<version>` | Has archive assets (zip + tar.gz) | TODO |
+| 4.6 | Homebrew tap updated | Check `avemeva/homebrew-tap` repo | Formula has correct version and SHAs | TODO |
+| 4.7 | CI verify: curl on macOS | Verify job in CI | `agent-telegram doctor` passes | TODO |
+| 4.8 | CI verify: curl on Linux | Verify job in CI | `agent-telegram doctor` passes | TODO |
+| 4.9 | CI verify: npm on all platforms | Verify job in CI | `agent-telegram doctor` passes | TODO |
+| **Step 5: Local install verification** | | | | |
 | 5.1 | curl install from scratch | Remove binary+lib, run install script, `agent-telegram doctor` | Binary + tdjson installed, doctor passes | TODO |
-| 5.2 | curl → live Telegram | `agent-telegram --daemon & && agent-telegram me` | Returns live JSON with user data | TODO |
-| 5.3 | npm install from scratch | `npm i -g @avemeva/agent-telegram`, `agent-telegram doctor` | Binary installed via postinstall hardlink, doctor passes | TODO |
-| 5.4 | npm → live Telegram | `agent-telegram --daemon & && agent-telegram me` | Returns live JSON | TODO |
-| 5.5 | brew install | `brew install avemeva/tap/agent-telegram`, `agent-telegram doctor` | Installed, doctor passes | BLOCKED (local Xcode) |
+| 5.2 | npm/bun install from scratch | `npm i -g @avemeva/agent-telegram` or `bun i -g @avemeva/agent-telegram` | Binary installed, `agent-telegram --version` works | TODO |
+| 5.3 | brew install | `brew install avemeva/tap/agent-telegram`, `agent-telegram doctor` | Installed, doctor passes | TODO |
+| **COMPLETE** | All channels verified | curl + npm/bun + brew all install and run | — | TODO |
 
 ---
 
@@ -273,5 +273,5 @@ Each row has a specific proof. "PASSED" means verified with real output. Steps a
 |--------|--------|----------------|
 | `TG_API_ID` | SET | — |
 | `TG_API_HASH` | SET | — |
-| `NPM_TOKEN` | **MISSING** | npmjs.com → Settings → Access Tokens → Automation type |
-| `HOMEBREW_TAP_TOKEN` | **MISSING** | GitHub → Fine-grained PAT → `avemeva/homebrew-tap` → Contents: read/write |
+| `NPM_TOKEN` | CREATED (not yet in GH secrets) | npm granular token `ci-publish`, expires Jun 4 2026 |
+| `HOMEBREW_TAP_TOKEN` | SET | GitHub fine-grained PAT `homebrew-tap-ci`, expires Apr 5 2026 |

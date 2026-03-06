@@ -7,6 +7,7 @@
  *   Windows: %LOCALAPPDATA%/agent-telegram  (defaults to ~/AppData/Local/agent-telegram)
  */
 
+import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
@@ -85,6 +86,30 @@ export function getLibDir(): string {
 /** Full path to the installed TDLib native library. */
 export function getInstalledTdjsonPath(): string {
   return path.join(getLibDir(), getTdjsonFilename());
+}
+
+/**
+ * Search for tdjson in multiple locations.
+ *
+ * Search order:
+ *   1. Standard install path (~/.local/lib/agent-telegram/)
+ *   2. Relative to binary: ../lib/agent-telegram/ (Homebrew, curl install)
+ *   3. Relative to binary: ../lib/ (npm platform package)
+ */
+export function findTdjsonPath(): string | null {
+  const filename = getTdjsonFilename();
+
+  const installed = getInstalledTdjsonPath();
+  if (existsSync(installed)) return installed;
+
+  const binDir = path.dirname(process.execPath);
+  const brewPath = path.join(binDir, '..', 'lib', 'agent-telegram', filename);
+  if (existsSync(brewPath)) return brewPath;
+
+  const npmPath = path.join(binDir, '..', 'lib', filename);
+  if (existsSync(npmPath)) return npmPath;
+
+  return null;
 }
 
 // ---------------------------------------------------------------------------
