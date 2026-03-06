@@ -27,8 +27,12 @@ jobs:
         include:
           - target: darwin-arm64
             os: macos-14
+          - target: darwin-x64
+            os: macos-15-intel
           - target: linux-x64
             os: ubuntu-latest
+          - target: linux-arm64
+            os: ubuntu-24.04-arm
           - target: win32-x64
             os: windows-latest
     runs-on: ${{ matrix.os }}
@@ -171,11 +175,19 @@ jobs:
         include:
           - os: macos-14
             method: curl
+          - os: macos-15-intel
+            method: curl
           - os: ubuntu-latest
+            method: curl
+          - os: ubuntu-24.04-arm
             method: curl
           - os: macos-14
             method: npm
+          - os: macos-15-intel
+            method: npm
           - os: ubuntu-latest
+            method: npm
+          - os: ubuntu-24.04-arm
             method: npm
           - os: windows-latest
             method: npm

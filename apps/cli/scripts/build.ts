@@ -120,6 +120,10 @@ await Bun.file(`dist/${name}/package.json`).write(
       os: [os],
       cpu: [arch],
       files: ['bin', 'lib'],
+      repository: {
+        type: 'git',
+        url: 'https://github.com/avemeva/kurier',
+      },
     },
     null,
     2,
@@ -218,7 +222,7 @@ if (releaseFlag) {
   const dirs = ['bin'];
   if (existsSync(`dist/${name}/lib`)) dirs.push('lib');
 
-  if (os === 'linux' || os === 'win32') {
+  if (os === 'linux') {
     await $`tar -czf ../${name}.tar.gz ${dirs}`.cwd(distDir);
   } else {
     await $`zip -r ../${name}.zip ${dirs}`.cwd(distDir);
