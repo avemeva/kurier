@@ -3,8 +3,8 @@
  * Run after `bun build --compile` to ensure the compiled binary can find TDLib.
  *
  * Destination varies by platform:
- *   macOS/Linux: ~/.local/lib/tg/libtdjson.{dylib,so}
- *   Windows:     %LOCALAPPDATA%/tg/lib/tdjson.dll
+ *   macOS/Linux: ~/.local/lib/agent-telegram/libtdjson.{dylib,so}
+ *   Windows:     %LOCALAPPDATA%/agent-telegram/lib/tdjson.dll
  */
 
 import { copyFileSync, mkdirSync } from 'node:fs';

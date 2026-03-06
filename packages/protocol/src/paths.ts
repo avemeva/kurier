@@ -3,8 +3,8 @@
  *
  * Platform conventions:
  *   macOS:   ~/Library/Application Support/dev.telegramai.app
- *   Linux:   $XDG_DATA_HOME/tg  (defaults to ~/.local/share/tg)
- *   Windows: %LOCALAPPDATA%/tg  (defaults to ~/AppData/Local/tg)
+ *   Linux:   $XDG_DATA_HOME/agent-telegram  (defaults to ~/.local/share/agent-telegram)
+ *   Windows: %LOCALAPPDATA%/agent-telegram  (defaults to ~/AppData/Local/agent-telegram)
  */
 
 import { homedir } from 'node:os';
@@ -21,9 +21,15 @@ export function getAppDir(): string {
     case 'darwin':
       return path.join(homedir(), 'Library', 'Application Support', 'dev.telegramai.app');
     case 'win32':
-      return path.join(process.env.LOCALAPPDATA ?? path.join(homedir(), 'AppData', 'Local'), 'tg');
+      return path.join(
+        process.env.LOCALAPPDATA ?? path.join(homedir(), 'AppData', 'Local'),
+        'agent-telegram',
+      );
     default:
-      return path.join(process.env.XDG_DATA_HOME ?? path.join(homedir(), '.local', 'share'), 'tg');
+      return path.join(
+        process.env.XDG_DATA_HOME ?? path.join(homedir(), '.local', 'share'),
+        'agent-telegram',
+      );
   }
 }
 
@@ -34,9 +40,15 @@ export function getAppDir(): string {
 export function getConfigDir(): string {
   switch (platform) {
     case 'win32':
-      return path.join(process.env.APPDATA ?? path.join(homedir(), 'AppData', 'Roaming'), 'tg');
+      return path.join(
+        process.env.APPDATA ?? path.join(homedir(), 'AppData', 'Roaming'),
+        'agent-telegram',
+      );
     default:
-      return path.join(process.env.XDG_CONFIG_HOME ?? path.join(homedir(), '.config'), 'tg');
+      return path.join(
+        process.env.XDG_CONFIG_HOME ?? path.join(homedir(), '.config'),
+        'agent-telegram',
+      );
   }
 }
 
@@ -62,11 +74,11 @@ export function getLibDir(): string {
     case 'win32':
       return path.join(
         process.env.LOCALAPPDATA ?? path.join(homedir(), 'AppData', 'Local'),
-        'tg',
+        'agent-telegram',
         'lib',
       );
     default:
-      return path.join(homedir(), '.local', 'lib', 'tg');
+      return path.join(homedir(), '.local', 'lib', 'agent-telegram');
   }
 }
 

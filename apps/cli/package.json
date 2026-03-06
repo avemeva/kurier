@@ -9,7 +9,8 @@
     "test": "bun test tests/unit",
     "test:e2e": "bun test tests/e2e",
     "typecheck": "tsc --noEmit",
-    "build": "bun run scripts/build.ts && bun run scripts/install-tdjson.ts"
+    "build": "bun run scripts/build.ts && bun run scripts/install-tdjson.ts",
+    "release": "bun run scripts/release.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "next",

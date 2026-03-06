@@ -1,25 +1,18 @@
-name: Publish
+name: Publish agent-telegram
 
 on:
+  push:
+    tags: ['v*']
   workflow_dispatch:
     inputs:
-      bump:
-        description: 'Version bump type'
-        required: false
-        default: 'patch'
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
       dry_run:
-        description: 'Dry run (no actual publishing)'
+        description: 'Dry run (no publishing)'
         required: false
         default: false
         type: boolean
 
 concurrency:
-  group: publish
+  group: publish-agent-telegram
   cancel-in-progress: false
 
 permissions:
@@ -27,142 +20,216 @@ permissions:
 
 jobs:
   build:
-    name: Build all platforms
-    runs-on: ubuntu-latest
+    name: Build (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: darwin-arm64
+            os: macos-14
+          - target: darwin-x64
+            os: macos-13
+          - target: linux-x64
+            os: ubuntu-latest
+          - target: win32-x64
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build all platforms
+      - run: bun install --frozen-lockfile
+      - name: Build
         run: bun run apps/cli/scripts/build.ts --release
         env:
           TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
-
-      - name: Verify build artifacts
+      - name: Smoke test
+        if: matrix.target != 'win32-x64'
         run: |
-          EXPECTED=(
-            "tg-darwin-arm64"
-            "tg-darwin-x64"
-            "tg-linux-arm64"
-            "tg-linux-x64"
-            "tg-win32-x64"
-          )
-          ERRORS=0
-          for name in "${EXPECTED[@]}"; do
-            bin="apps/cli/dist/${name}/bin/tg"
-            pkg="apps/cli/dist/${name}/package.json"
-            if [ ! -f "$bin" ]; then
-              echo "ERROR: Missing $bin"
-              ERRORS=$((ERRORS + 1))
-            else
-              echo "OK: $bin ($(stat -c%s "$bin") bytes)"
-            fi
-            if [ ! -f "$pkg" ]; then
-              echo "ERROR: Missing $pkg"
-              ERRORS=$((ERRORS + 1))
-            fi
-          done
-          # Check archives
-          for name in "${EXPECTED[@]}"; do
-            if [[ "$name" == *linux* ]]; then
-              archive="apps/cli/dist/${name}.tar.gz"
-            else
-              archive="apps/cli/dist/${name}.zip"
-            fi
-            if [ ! -f "$archive" ]; then
-              echo "ERROR: Missing $archive"
-              ERRORS=$((ERRORS + 1))
-            else
-              echo "OK: $archive"
-            fi
-          done
-          if [ "$ERRORS" -gt 0 ]; then
-            echo "Error: $ERRORS issues found"
-            exit 1
-          fi
-          echo "All build artifacts verified"
-
-      - name: Upload build artifacts
+          chmod +x apps/cli/dist/agent-telegram-${{ matrix.target }}/bin/agent-telegram
+          apps/cli/dist/agent-telegram-${{ matrix.target }}/bin/agent-telegram --version
+      - name: Smoke test (Windows)
+        if: matrix.target == 'win32-x64'
+        shell: bash
+        run: |
+          apps/cli/dist/agent-telegram-${{ matrix.target }}/bin/agent-telegram --version
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dist
-          path: apps/cli/dist/
+          name: agent-telegram-${{ matrix.target }}
+          path: |
+            apps/cli/dist/agent-telegram-${{ matrix.target }}/
+            apps/cli/dist/agent-telegram-${{ matrix.target }}.*
           retention-days: 7
 
   publish:
-    name: Publish to npm + GitHub
+    name: Publish
     needs: build
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
+      - run: bun install --frozen-lockfile
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Download build artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: dist
           path: apps/cli/dist/
-
-      - name: Publish to npm
-        run: |
-          cd apps/cli
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
-            bun run scripts/publish.ts --dry-run
-          else
-            bun run scripts/publish.ts
-          fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          merge-multiple: true
 
       - name: Get version
         id: version
         run: |
-          VERSION=$(cd apps/cli && node -p "require('./package.json').version")
+          if [[ "$GITHUB_REF_NAME" == v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION=$(cd apps/cli && node -p "require('./package.json').version")
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publishing version: $VERSION"
+
+      - name: Publish to npm
+        if: ${{ !inputs.dry_run }}
+        run: |
+          cd apps/cli
+          bun run scripts/publish.ts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish to npm (dry run)
+        if: ${{ inputs.dry_run }}
+        run: |
+          cd apps/cli
+          bun run scripts/publish.ts --dry-run
 
       - name: Create GitHub Release
         if: ${{ !inputs.dry_run }}
         run: |
           TAG="v${{ steps.version.outputs.version }}"
-
-          # Collect archives
           ARCHIVES=()
           for f in apps/cli/dist/*.zip apps/cli/dist/*.tar.gz; do
             [ -f "$f" ] && ARCHIVES+=("$f")
           done
-
           if gh release view "$TAG" &>/dev/null; then
-            echo "Release $TAG exists, uploading archives..."
             gh release upload "$TAG" "${ARCHIVES[@]}" --clobber
           else
-            echo "Creating release $TAG..."
-            gh release create "$TAG" \
-              --title "$TAG" \
-              --generate-notes \
-              "${ARCHIVES[@]}"
+            gh release create "$TAG" --title "$TAG" --generate-notes "${ARCHIVES[@]}"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Homebrew tap
+        if: ${{ !inputs.dry_run }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          GHBASE="https://github.com/avemeva/kurier/releases/download/v${VERSION}"
+
+          # Compute SHA256 for each archive
+          sha_darwin_arm64=$(sha256sum apps/cli/dist/agent-telegram-darwin-arm64.zip 2>/dev/null | cut -d' ' -f1 || echo "MISSING")
+          sha_darwin_x64=$(sha256sum apps/cli/dist/agent-telegram-darwin-x64.zip 2>/dev/null | cut -d' ' -f1 || echo "MISSING")
+          sha_linux_x64=$(sha256sum apps/cli/dist/agent-telegram-linux-x64.tar.gz 2>/dev/null | cut -d' ' -f1 || echo "MISSING")
+          sha_linux_arm64=$(sha256sum apps/cli/dist/agent-telegram-linux-arm64.tar.gz 2>/dev/null | cut -d' ' -f1 || echo "MISSING")
+
+          # Clone tap, update formula, push
+          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/avemeva/homebrew-tap.git /tmp/homebrew-tap
+          cat > /tmp/homebrew-tap/Formula/agent-telegram.rb << FORMULA
+          # typed: false
+          # frozen_string_literal: true
+
+          class AgentTelegram < Formula
+            desc "AI-powered Telegram CLI"
+            homepage "https://github.com/avemeva/kurier"
+            version "${VERSION}"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "${GHBASE}/agent-telegram-darwin-arm64.zip"
+                sha256 "${sha_darwin_arm64}"
+
+                def install
+                  bin.install "agent-telegram"
+                end
+              end
+              if Hardware::CPU.intel?
+                url "${GHBASE}/agent-telegram-darwin-x64.zip"
+                sha256 "${sha_darwin_x64}"
+
+                def install
+                  bin.install "agent-telegram"
+                end
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.intel? and Hardware::CPU.is_64_bit?
+                url "${GHBASE}/agent-telegram-linux-x64.tar.gz"
+                sha256 "${sha_linux_x64}"
+
+                def install
+                  bin.install "agent-telegram"
+                end
+              end
+              if Hardware::CPU.arm? and Hardware::CPU.is_64_bit?
+                url "${GHBASE}/agent-telegram-linux-arm64.tar.gz"
+                sha256 "${sha_linux_arm64}"
+
+                def install
+                  bin.install "agent-telegram"
+                end
+              end
+            end
+          end
+          FORMULA
+
+          cd /tmp/homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/agent-telegram.rb
+          git commit -m "Update agent-telegram to v${VERSION}"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  verify:
+    name: Verify (${{ matrix.method }} on ${{ matrix.os }})
+    needs: publish
+    if: ${{ !inputs.dry_run }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            method: curl
+          - os: ubuntu-latest
+            method: curl
+          - os: macos-14
+            method: npm
+          - os: ubuntu-latest
+            method: npm
+          - os: windows-latest
+            method: npm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install via curl
+        if: matrix.method == 'curl'
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/avemeva/kurier/main/install | bash -s -- --no-modify-path
+
+      - name: Install via npm
+        if: matrix.method == 'npm'
+        run: npm i -g agent-telegram
+
+      - name: Verify
+        run: |
+          agent-telegram --version
+          agent-telegram doctor

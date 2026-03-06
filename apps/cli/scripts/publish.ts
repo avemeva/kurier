@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
 /**
- * Publishing pipeline for tg-cli.
+ * Publishing pipeline for agent-telegram.
  *
  * Publishes 5 platform packages + 1 wrapper package to npm,
  * then generates a Homebrew formula to stdout.
@@ -21,50 +21,50 @@ const cliDir = path.resolve(import.meta.dir, '..');
 process.chdir(cliDir);
 
 const dryRun = process.argv.includes('--dry-run');
-const dryRunFlag = dryRun ? '--dry-run' : '';
 
 const pkg = await Bun.file('package.json').json();
 const version = pkg.version;
 
-console.log(`Publishing tg-cli v${version}${dryRun ? ' (dry run)' : ''}`);
+console.log(`Publishing agent-telegram v${version}${dryRun ? ' (dry run)' : ''}`);
 
-// --- Verify build artifacts ---
+// --- Discover build artifacts ---
 
-const platforms = [
-  { os: 'darwin', arch: 'arm64' },
-  { os: 'darwin', arch: 'x64' },
-  { os: 'linux', arch: 'arm64' },
-  { os: 'linux', arch: 'x64' },
-  { os: 'win32', arch: 'x64' },
-];
+import { readdirSync } from 'node:fs';
 
-for (const { os, arch } of platforms) {
-  const name = `tg-${os}-${arch}`;
-  const distDir = `dist/${name}`;
-  if (!existsSync(distDir)) {
-    console.error(`Missing build artifact: ${distDir}`);
-    console.error('Run `bun run build` first.');
-    process.exit(1);
-  }
-  if (!existsSync(`${distDir}/package.json`)) {
-    console.error(`Missing package.json in ${distDir}`);
-    process.exit(1);
+const platformPattern = /^agent-telegram-(darwin|linux|win32)-(arm64|x64)$/;
+const platforms: { os: string; arch: string }[] = [];
+
+for (const entry of readdirSync('dist')) {
+  const m = entry.match(platformPattern);
+  if (m?.[1] && m[2] && existsSync(`dist/${entry}/package.json`)) {
+    platforms.push({ os: m[1], arch: m[2] });
   }
 }
+
+if (platforms.length === 0) {
+  console.error('No build artifacts found in dist/. Run builds first.');
+  process.exit(1);
+}
+
+console.log(
+  `Found ${platforms.length} platform(s): ${platforms.map((p) => `${p.os}-${p.arch}`).join(', ')}`,
+);
 
 // --- Publish platform packages ---
 
 console.log('\nPublishing platform packages...');
 
 const publishTasks = platforms.map(async ({ os, arch }) => {
-  const name = `tg-${os}-${arch}`;
-  const distDir = `dist/${name}`;
+  const name = `agent-telegram-${os}-${arch}`;
+  const distDir = path.resolve(`dist/${name}`);
 
   if (process.platform !== 'win32') {
     await $`chmod -R 755 ${distDir}`;
   }
 
-  await $`npm publish ${distDir} --access public ${dryRunFlag}`.nothrow();
+  const args = ['npm', 'publish', '--access', 'public'];
+  if (dryRun) args.push('--dry-run');
+  await $`${args}`.cwd(distDir).nothrow();
   console.log(`  Published ${name}@${version}`);
 });
 
@@ -74,27 +74,27 @@ await Promise.all(publishTasks);
 
 console.log('\nBuilding wrapper package...');
 
-const wrapperDir = 'dist/tg-cli';
+const wrapperDir = 'dist/agent-telegram';
 await $`mkdir -p ${wrapperDir}/bin`;
-await $`cp bin/tg.js ${wrapperDir}/bin/tg.js`;
+await $`cp bin/agent-telegram.js ${wrapperDir}/bin/agent-telegram.js`;
 await $`cp scripts/postinstall.mjs ${wrapperDir}/postinstall.mjs`;
 
 const optionalDependencies: Record<string, string> = {};
 for (const { os, arch } of platforms) {
-  optionalDependencies[`tg-${os}-${arch}`] = version;
+  optionalDependencies[`agent-telegram-${os}-${arch}`] = version;
 }
 
 const wrapperPkg = {
-  name: 'tg-cli',
+  name: 'agent-telegram',
   version,
   description: 'AI-powered Telegram CLI',
-  bin: { tg: './bin/tg.js' },
+  bin: { 'agent-telegram': './bin/agent-telegram.js' },
   scripts: { postinstall: 'node ./postinstall.mjs' },
   optionalDependencies,
   license: 'MIT',
   repository: {
     type: 'git',
-    url: 'https://github.com/nicedayzhu/telegram-ai',
+    url: 'https://github.com/avemeva/kurier',
   },
 };
 
@@ -107,8 +107,10 @@ if (existsSync(licenseFile)) {
 }
 
 console.log('Publishing wrapper package...');
-await $`npm publish ${wrapperDir} --access public ${dryRunFlag}`.nothrow();
-console.log(`  Published tg-cli@${version}`);
+const wrapperArgs = ['npm', 'publish', '--access', 'public'];
+if (dryRun) wrapperArgs.push('--dry-run');
+await $`${wrapperArgs}`.cwd(path.resolve(wrapperDir)).nothrow();
+console.log(`  Published agent-telegram@${version}`);
 
 // --- Generate Homebrew formula ---
 
@@ -121,7 +123,7 @@ async function sha256(filePath: string): Promise<string> {
 
 const archiveFiles: Record<string, string | null> = {};
 for (const { os, arch } of platforms) {
-  const name = `tg-${os}-${arch}`;
+  const name = `agent-telegram-${os}-${arch}`;
   const ext = os === 'linux' ? 'tar.gz' : 'zip';
   const archivePath = `dist/${name}.${ext}`;
   archiveFiles[`${os}-${arch}`] = existsSync(archivePath) ? archivePath : null;
@@ -134,50 +136,50 @@ for (const [key, filePath] of Object.entries(archiveFiles)) {
   }
 }
 
-const ghBase = `https://github.com/nicedayzhu/telegram-ai/releases/download/v${version}`;
+const ghBase = `https://github.com/avemeva/kurier/releases/download/v${version}`;
 
 const formula = `# typed: false
 # frozen_string_literal: true
 
-class TgCli < Formula
+class AgentTelegram < Formula
   desc "AI-powered Telegram CLI"
-  homepage "https://github.com/nicedayzhu/telegram-ai"
+  homepage "https://github.com/avemeva/kurier"
   version "${version}"
 
   on_macos do
     if Hardware::CPU.intel?
-      url "${ghBase}/tg-darwin-x64.zip"
+      url "${ghBase}/agent-telegram-darwin-x64.zip"
       sha256 "${shas['darwin-x64'] ?? 'MISSING'}"
 
       def install
-        bin.install "tg"
+        bin.install "agent-telegram"
       end
     end
     if Hardware::CPU.arm?
-      url "${ghBase}/tg-darwin-arm64.zip"
+      url "${ghBase}/agent-telegram-darwin-arm64.zip"
       sha256 "${shas['darwin-arm64'] ?? 'MISSING'}"
 
       def install
-        bin.install "tg"
+        bin.install "agent-telegram"
       end
     end
   end
 
   on_linux do
     if Hardware::CPU.intel? and Hardware::CPU.is_64_bit?
-      url "${ghBase}/tg-linux-x64.tar.gz"
+      url "${ghBase}/agent-telegram-linux-x64.tar.gz"
       sha256 "${shas['linux-x64'] ?? 'MISSING'}"
 
       def install
-        bin.install "tg"
+        bin.install "agent-telegram"
       end
     end
     if Hardware::CPU.arm? and Hardware::CPU.is_64_bit?
-      url "${ghBase}/tg-linux-arm64.tar.gz"
+      url "${ghBase}/agent-telegram-linux-arm64.tar.gz"
       sha256 "${shas['linux-arm64'] ?? 'MISSING'}"
 
       def install
-        bin.install "tg"
+        bin.install "agent-telegram"
       end
     end
   end

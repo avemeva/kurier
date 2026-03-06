@@ -151,7 +151,7 @@ export function getDaemonPort(): number {
 
 /**
  * Build the command to spawn the daemon as a background process.
- * Compiled binary: ['/path/to/tg', '--daemon']
+ * Compiled binary: ['/path/to/agent-telegram', '--daemon']
  * Dev mode:        ['/path/to/bun', '/path/to/index.ts', '--daemon']
  */
 function getDaemonSpawnArgs(): string[] {

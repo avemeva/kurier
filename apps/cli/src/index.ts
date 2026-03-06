@@ -4,6 +4,7 @@ import { register as registerAction } from './commands/action';
 import { register as registerAuth } from './commands/auth';
 import { register as registerChats } from './commands/chats';
 import { register as registerDaemon } from './commands/daemon';
+import { register as registerDoctor } from './commands/doctor';
 import { register as registerEval } from './commands/eval';
 import { register as registerListen } from './commands/listen';
 import { register as registerMe } from './commands/me';
@@ -28,7 +29,7 @@ if (process.argv.includes('--caption-daemon')) {
 const MAX_FLOOD_WAIT_SEC = 30;
 
 const program = new Command()
-  .name('tg')
+  .name('agent-telegram')
   .description('Telegram CLI for AI agents')
   .version('0.1.0', '--version')
   .option('--timeout <seconds>', 'Timeout in seconds')
@@ -49,6 +50,7 @@ registerListen(program);
 registerEval(program);
 registerAuth(program);
 registerDaemon(program);
+registerDoctor(program);
 
 try {
   await program.parseAsync();
@@ -62,8 +64,8 @@ try {
     if (e.code === 'commander.unknownCommand') {
       const match = msg.match(/unknown command '([^']+)'/);
       msg = match
-        ? `Unknown command: "${match[1]}". Run 'tg --help' for available commands.`
-        : `Unknown command. Run 'tg --help' for available commands.`;
+        ? `Unknown command: "${match[1]}". Run 'agent-telegram --help' for available commands.`
+        : `Unknown command. Run 'agent-telegram --help' for available commands.`;
     } else if (e.code === 'commander.missingArgument') {
       msg = `${msg}. See --help for usage.`;
     } else if (e.code === 'commander.unknownOption') {

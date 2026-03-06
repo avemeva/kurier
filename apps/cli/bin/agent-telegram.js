@@ -46,13 +46,13 @@ const arch = archMap[os.arch()];
 if (!platform || !arch) {
   console.error(
     `Unsupported platform: ${os.platform()}-${os.arch()}\n` +
-      'tg-cli supports: darwin-arm64, darwin-x64, linux-arm64, linux-x64, win32-x64',
+      'agent-telegram supports: darwin-arm64, darwin-x64, linux-arm64, linux-x64, win32-x64',
   );
   process.exit(1);
 }
 
-const packageName = `tg-${platform}-${arch}`;
-const binary = platform === 'win32' ? 'tg.exe' : 'tg';
+const packageName = `agent-telegram-${platform}-${arch}`;
+const binary = platform === 'win32' ? 'agent-telegram.exe' : 'agent-telegram';
 
 // Walk up from script directory to find node_modules
 function findBinary(startDir) {
@@ -72,9 +72,9 @@ if (!resolved) {
   console.error(
     `Could not find the "${packageName}" package.\n\n` +
       'Your package manager may have failed to install the platform-specific binary.\n' +
-      'Try reinstalling: npm i -g tg-cli\n\n' +
+      'Try reinstalling: npm i -g agent-telegram\n\n' +
       `If your platform (${os.platform()}-${os.arch()}) is not supported, ` +
-      'see https://github.com/nicedayzhu/telegram-ai for alternatives.',
+      'see https://github.com/avemeva/kurier for alternatives.',
   );
   process.exit(1);
 }

@@ -87,9 +87,9 @@ const CATEGORIES: Category[] = [
 
 function formatRootHelp(): string {
   const lines: string[] = [];
-  lines.push('tg — Telegram CLI for AI agents');
+  lines.push('agent-telegram — Telegram CLI for AI agents');
   lines.push('');
-  lines.push('Usage: tg <command> [args] [--flags]');
+  lines.push('Usage: agent-telegram <command> [args] [--flags]');
   lines.push('');
   lines.push('stdout: JSON { ok, data } | { ok, error, code }');
   lines.push('stderr: warnings');
@@ -108,7 +108,7 @@ function formatRootHelp(): string {
   }
 
   lines.push('');
-  lines.push("Run 'tg <command> --help' for command-specific usage.");
+  lines.push("Run 'agent-telegram <command> --help' for command-specific usage.");
   lines.push('');
   return lines.join('\n');
 }
@@ -128,7 +128,7 @@ function formatGroupHelp(cmd: Command): string {
   }
 
   lines.push('');
-  lines.push(`Run 'tg ${name} <command> --help' for usage.`);
+  lines.push(`Run 'agent-telegram ${name} <command> --help' for usage.`);
   lines.push('');
   return lines.join('\n');
 }
@@ -140,7 +140,7 @@ function formatLeafHelp(cmd: Command): string {
   const parts: string[] = [];
   let c: Command | null = cmd;
   while (c) {
-    if (c.name() !== 'tg') parts.unshift(c.name());
+    if (c.name() !== 'agent-telegram') parts.unshift(c.name());
     c = c.parent;
   }
   const fullName = parts.join(' ');
@@ -162,7 +162,7 @@ function formatLeafHelp(cmd: Command): string {
     return `[${flag} ${(valueMatch[1] ?? 'N').toUpperCase()}]`;
   });
 
-  const usageLine = ['tg', ...parts, ...args, ...flagParts].join(' ');
+  const usageLine = ['agent-telegram', ...parts, ...args, ...flagParts].join(' ');
   lines.push(`  ${usageLine}`);
 
   // Flags section

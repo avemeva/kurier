@@ -21,8 +21,8 @@ try {
     process.exit(0);
   }
 
-  const packageName = `tg-${platform}-${arch}`;
-  const binaryName = platform === 'win32' ? 'tg.exe' : 'tg';
+  const packageName = `agent-telegram-${platform}-${arch}`;
+  const binaryName = platform === 'win32' ? 'agent-telegram.exe' : 'agent-telegram';
 
   // Find the platform package binary via require.resolve
   let binaryPath;
@@ -40,7 +40,7 @@ try {
   }
 
   // Create hardlink at bin/.tg so the wrapper can exec it directly
-  // In the published tg-cli package, postinstall.mjs and bin/ are siblings at root
+  // In the published agent-telegram package, postinstall.mjs and bin/ are siblings at root
   const binDir = path.join(__dirname, 'bin');
   const target = path.join(binDir, '.tg');
 

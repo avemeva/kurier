@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP=tg
-REPO="nicedayzhu/telegram-ai"
+APP=agent-telegram
+REPO="avemeva/kurier"
 
 MUTED='\033[0;2m'
 RED='\033[0;31m'
@@ -12,7 +12,7 @@ NC='\033[0m'
 
 usage() {
     cat <<EOF
-tg CLI Installer
+agent-telegram CLI Installer
 
 Usage: install.sh [options]
 
@@ -153,7 +153,7 @@ else
 
     # Verify the release exists
     if [ "$downloader" = "curl" ]; then
-        http_status=$(curl -sI -o /dev/null -w "%{http_code}" "https://github.com/${REPO}/releases/tag/v${requested_version}")
+        http_status=$(curl -sIL -o /dev/null -w "%{http_code}" "https://github.com/${REPO}/releases/tag/v${requested_version}")
     else
         http_status=$(wget --spider -qS "https://github.com/${REPO}/releases/tag/v${requested_version}" 2>&1 | awk '/HTTP/{print $2}' | tail -1)
     fi
@@ -167,10 +167,10 @@ fi
 
 # --- Version check ---
 
-if command -v tg >/dev/null 2>&1; then
-    installed_version=$(tg --version 2>/dev/null || echo "")
+if command -v agent-telegram >/dev/null 2>&1; then
+    installed_version=$(agent-telegram --version 2>/dev/null || echo "")
     if [[ "$installed_version" == "$specific_version" ]]; then
-        echo -e "${MUTED}tg v${specific_version} is already installed${NC}"
+        echo -e "${MUTED}agent-telegram v${specific_version} is already installed${NC}"
         exit 0
     fi
 fi
@@ -218,7 +218,7 @@ download_with_progress() {
     fi
 
     local tmp_dir=${TMPDIR:-/tmp}
-    local basename="${tmp_dir}/tg_install_$$"
+    local basename="${tmp_dir}/agent_telegram_install_$$"
     local tracefile="${basename}.trace"
 
     rm -f "$tracefile"
@@ -268,9 +268,9 @@ download_with_progress() {
 
 # --- Download and install ---
 
-echo -e "\n${MUTED}Installing ${NC}tg ${MUTED}v${NC}${specific_version}${MUTED} (${os}/${arch})${NC}"
+echo -e "\n${MUTED}Installing ${NC}agent-telegram ${MUTED}v${NC}${specific_version}${MUTED} (${os}/${arch})${NC}"
 
-tmp_dir="${TMPDIR:-/tmp}/tg_install_$$"
+tmp_dir="${TMPDIR:-/tmp}/agent_telegram_install_$$"
 mkdir -p "$tmp_dir"
 
 download_ok=false
@@ -309,6 +309,15 @@ else
 fi
 
 chmod 755 "$INSTALL_DIR/$APP"
+
+# Install tdjson library if bundled
+LIB_DIR="$HOME/.local/lib/agent-telegram"
+if [ -d "$tmp_dir/lib" ]; then
+    mkdir -p "$LIB_DIR"
+    cp "$tmp_dir"/lib/* "$LIB_DIR/"
+    echo -e "${MUTED}Installed tdjson to ${NC}${LIB_DIR}"
+fi
+
 rm -rf "$tmp_dir"
 
 # --- Update PATH ---
@@ -320,9 +329,9 @@ add_to_path() {
     if grep -Fxq "$command" "$config_file"; then
         echo -e "${MUTED}PATH entry already exists in $config_file, skipping.${NC}"
     elif [[ -w $config_file ]]; then
-        echo -e "\n# tg" >> "$config_file"
+        echo -e "\n# agent-telegram" >> "$config_file"
         echo "$command" >> "$config_file"
-        echo -e "${MUTED}Added ${NC}tg ${MUTED}to \$PATH in ${NC}$config_file"
+        echo -e "${MUTED}Added ${NC}agent-telegram ${MUTED}to \$PATH in ${NC}$config_file"
     else
         echo -e "${ORANGE}Manually add to $config_file:${NC}"
         echo -e "  $command"
@@ -380,11 +389,11 @@ fi
 # --- Success message ---
 
 echo -e ""
-echo -e "${CYAN}tg${NC} ${MUTED}v${specific_version} installed successfully${NC}"
+echo -e "${CYAN}agent-telegram${NC} ${MUTED}v${specific_version} installed successfully${NC}"
 echo -e ""
 echo -e "${MUTED}To get started:${NC}"
 echo -e ""
-echo -e "  tg  ${MUTED}# Launch the Telegram CLI${NC}"
+echo -e "  agent-telegram  ${MUTED}# Launch the Telegram CLI${NC}"
 echo -e ""
 if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
     echo -e "${MUTED}Restart your shell or run:${NC}"
