@@ -64,7 +64,10 @@ const publishTasks = platforms.map(async ({ os, arch }) => {
 
   const args = ['npm', 'publish', '--access', 'public'];
   if (dryRun) args.push('--dry-run');
-  await $`${args}`.cwd(distDir).nothrow();
+  const result = await $`${args}`.cwd(distDir).nothrow();
+  if (result.exitCode !== 0) {
+    throw new Error(`Failed to publish ${name}@${version} (exit code ${result.exitCode})`);
+  }
   console.log(`  Published ${name}@${version}`);
 });
 
@@ -109,7 +112,12 @@ if (existsSync(licenseFile)) {
 console.log('Publishing wrapper package...');
 const wrapperArgs = ['npm', 'publish', '--access', 'public'];
 if (dryRun) wrapperArgs.push('--dry-run');
-await $`${wrapperArgs}`.cwd(path.resolve(wrapperDir)).nothrow();
+const wrapperResult = await $`${wrapperArgs}`.cwd(path.resolve(wrapperDir)).nothrow();
+if (wrapperResult.exitCode !== 0) {
+  throw new Error(
+    `Failed to publish @avemeva/agent-telegram@${version} (exit code ${wrapperResult.exitCode})`,
+  );
+}
 console.log(`  Published @avemeva/agent-telegram@${version}`);
 
 // --- Generate Homebrew formula ---

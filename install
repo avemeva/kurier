@@ -136,9 +136,9 @@ if [ -z "$requested_version" ]; then
     url="https://github.com/${REPO}/releases/latest/download/$filename"
 
     if [ "$downloader" = "curl" ]; then
-        specific_version=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')
+        specific_version=$(curl -sI "https://github.com/${REPO}/releases/latest" | sed -n 's|^[Ll]ocation:.*/tag/v\(.*\)$|\1|p' | tr -d '\r')
     else
-        specific_version=$(wget -qO- "https://api.github.com/repos/${REPO}/releases/latest" | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')
+        specific_version=$(wget --spider -qS "https://github.com/${REPO}/releases/latest" 2>&1 | sed -n 's|^.*[Ll]ocation:.*/tag/v\(.*\)$|\1|p' | tr -d '\r')
     fi
 
     if [[ -z "$specific_version" ]]; then
