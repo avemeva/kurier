@@ -198,6 +198,7 @@ ${osSections.join('\n\n')}
 
   def install
     bin.install "bin/agent-telegram"
+    (bin/"prebuilds").install Dir["bin/prebuilds/*"] if (buildpath/"bin/prebuilds").exist?
     (lib/"agent-telegram").install Dir["lib/*"] if (buildpath/"lib").exist?
   end
 end
