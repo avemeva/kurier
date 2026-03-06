@@ -112,7 +112,13 @@ if (result.exitCode !== 0) {
 // Platform package.json for npm publishing
 await Bun.file(`dist/${name}/package.json`).write(
   JSON.stringify(
-    { name, version: pkg.version, os: [os], cpu: [arch], files: ['bin', 'lib'] },
+    {
+      name: `@avemeva/${name}`,
+      version: pkg.version,
+      os: [os],
+      cpu: [arch],
+      files: ['bin', 'lib'],
+    },
     null,
     2,
   ),

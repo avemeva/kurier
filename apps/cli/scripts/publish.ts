@@ -81,11 +81,11 @@ await $`cp scripts/postinstall.mjs ${wrapperDir}/postinstall.mjs`;
 
 const optionalDependencies: Record<string, string> = {};
 for (const { os, arch } of platforms) {
-  optionalDependencies[`agent-telegram-${os}-${arch}`] = version;
+  optionalDependencies[`@avemeva/agent-telegram-${os}-${arch}`] = version;
 }
 
 const wrapperPkg = {
-  name: 'agent-telegram',
+  name: '@avemeva/agent-telegram',
   version,
   description: 'AI-powered Telegram CLI',
   bin: { 'agent-telegram': './bin/agent-telegram.js' },
@@ -110,7 +110,7 @@ console.log('Publishing wrapper package...');
 const wrapperArgs = ['npm', 'publish', '--access', 'public'];
 if (dryRun) wrapperArgs.push('--dry-run');
 await $`${wrapperArgs}`.cwd(path.resolve(wrapperDir)).nothrow();
-console.log(`  Published agent-telegram@${version}`);
+console.log(`  Published @avemeva/agent-telegram@${version}`);
 
 // --- Generate Homebrew formula ---
 

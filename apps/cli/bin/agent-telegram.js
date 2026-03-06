@@ -51,7 +51,7 @@ if (!platform || !arch) {
   process.exit(1);
 }
 
-const packageName = `agent-telegram-${platform}-${arch}`;
+const packageName = `@avemeva/agent-telegram-${platform}-${arch}`;
 const binary = platform === 'win32' ? 'agent-telegram.exe' : 'agent-telegram';
 
 // Walk up from script directory to find node_modules
@@ -72,7 +72,7 @@ if (!resolved) {
   console.error(
     `Could not find the "${packageName}" package.\n\n` +
       'Your package manager may have failed to install the platform-specific binary.\n' +
-      'Try reinstalling: npm i -g agent-telegram\n\n' +
+      'Try reinstalling: npm i -g @avemeva/agent-telegram\n\n' +
       `If your platform (${os.platform()}-${os.arch()}) is not supported, ` +
       'see https://github.com/avemeva/kurier for alternatives.',
   );

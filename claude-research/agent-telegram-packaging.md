@@ -61,7 +61,7 @@ git push && git push --tags ──────→ tag v0.1.1 arrives
 After ~10 min, users can install:
 
   curl -fsSL https://raw.githubusercontent.com/avemeva/kurier/main/install | bash
-  npm i -g agent-telegram
+  npm i -g @avemeva/agent-telegram
   brew install avemeva/tap/agent-telegram
 ```
 
@@ -84,7 +84,7 @@ agent-telegram binary (compiled Bun, bundles tdjson)
 
 Distribution channels:
 ```
-npm i -g agent-telegram   → wrapper + platform optionalDep → hardlink → binary
+npm i -g @avemeva/agent-telegram   → wrapper + platform optionalDep → hardlink → binary
 brew install avemeva/tap/agent-telegram → archive from GitHub release
 curl install | bash       → archive from GitHub release → ~/.local/bin/
 bun run release <patch|minor|major>    → bump, tag, push → CI does the rest
@@ -172,7 +172,7 @@ Can also trigger manually: Actions → "Publish agent-telegram" → Run workflow
 | 7 | Platform pkg correct | `bun run scripts/publish.ts --dry-run` → 3 files (binary + tdjson + package.json) | Workspace resolution bug | PASSED |
 | 8 | Wrapper pkg correct | Same → 3 files (agent-telegram.js + postinstall.mjs + package.json) | Wrong bin path | PASSED |
 | 9 | postinstall hardlinks | Simulate `node postinstall.mjs` in fake node_modules | Can't resolve platform pkg | NOT TESTED post-rename |
-| 10 | `npm i -g agent-telegram` | CI verify job or verdaccio | Name taken, NPM_TOKEN missing, postinstall fails | NEEDS CI |
+| 10 | `npm i -g @avemeva/agent-telegram` | CI verify job or verdaccio | Name taken, NPM_TOKEN missing, postinstall fails | NEEDS CI |
 | **curl install** | | | | |
 | 11 | Script downloads + extracts | `bash install --version X.Y.Z --no-modify-path` | 404 (archive name mismatch) | NEEDS NEW RELEASE |
 | 12 | Script places tdjson | Check `~/.local/lib/agent-telegram/libtdjson.dylib` | lib/ not in archive | NEEDS NEW RELEASE |

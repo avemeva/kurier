@@ -21,7 +21,7 @@ try {
     process.exit(0);
   }
 
-  const packageName = `agent-telegram-${platform}-${arch}`;
+  const packageName = `@avemeva/agent-telegram-${platform}-${arch}`;
   const binaryName = platform === 'win32' ? 'agent-telegram.exe' : 'agent-telegram';
 
   // Find the platform package binary via require.resolve

@@ -141,7 +141,7 @@ jobs:
           sha_linux_arm64=$(sha256sum apps/cli/dist/agent-telegram-linux-arm64.tar.gz 2>/dev/null | cut -d' ' -f1 || echo "MISSING")
 
           # Clone tap, update formula, push
-          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/avemeva/homebrew-tap.git /tmp/homebrew-tap
+          git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/avemeva/homebrew-tap.git /tmp/homebrew-tap
           cat > /tmp/homebrew-tap/Formula/agent-telegram.rb << FORMULA
           # typed: false
           # frozen_string_literal: true
@@ -198,7 +198,7 @@ jobs:
           git commit -m "Update agent-telegram to v${VERSION}"
           git push
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
   verify:
     name: Verify (${{ matrix.method }} on ${{ matrix.os }})
