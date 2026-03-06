@@ -85,16 +85,22 @@ export async function runCaptionDaemon(): Promise<void> {
   // Load model (WebGPU → CPU fallback)
   // ---------------------------------------------------------------------------
 
-  const { Florence2ForConditionalGeneration, AutoProcessor, RawImage } = await import(
-    '@huggingface/transformers'
-  );
+  // biome-ignore lint/suspicious/noExplicitAny: dynamically imported, types unavailable in compiled binary
+  let Florence2ForConditionalGeneration: any, AutoProcessor: any, RawImage: any;
+  try {
+    ({ Florence2ForConditionalGeneration, AutoProcessor, RawImage } = await import(
+      '@huggingface/transformers'
+    ));
+  } catch {
+    captionLog(
+      'Caption feature requires @huggingface/transformers. Install it with: bun add @huggingface/transformers',
+    );
+    process.exit(1);
+  }
 
   let device: 'webgpu' | 'cpu' = 'webgpu';
-  let model: ReturnType<typeof Florence2ForConditionalGeneration.from_pretrained> extends Promise<
-    infer T
-  >
-    ? T
-    : never;
+  // biome-ignore lint/suspicious/noExplicitAny: dynamically imported model instance
+  let model: any;
 
   const processorPromise = AutoProcessor.from_pretrained(MODEL_ID, { cache_dir: MODELS_DIR });
 

@@ -93,7 +93,7 @@ const result = Bun.spawnSync(
     '--target',
     bunTarget,
     '--external',
-    'onnxruntime-node',
+    '@huggingface/transformers',
     '--outfile',
     outfile,
     '--define',

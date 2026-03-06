@@ -27,8 +27,6 @@ jobs:
         include:
           - target: darwin-arm64
             os: macos-14
-          - target: darwin-x64
-            os: macos-13
           - target: linux-x64
             os: ubuntu-latest
           - target: win32-x64
@@ -227,7 +225,7 @@ jobs:
 
       - name: Install via npm
         if: matrix.method == 'npm'
-        run: npm i -g agent-telegram
+        run: npm i -g @avemeva/agent-telegram
 
       - name: Verify
         run: |

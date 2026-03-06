@@ -152,9 +152,18 @@ export function isModelDownloaded(): boolean {
 
 /** Download the Florence-2 model with progress output to stderr. */
 export async function downloadModel(): Promise<void> {
-  const { Florence2ForConditionalGeneration, AutoProcessor } = await import(
-    '@huggingface/transformers'
-  );
+  // biome-ignore lint/suspicious/noExplicitAny: dynamically imported, types unavailable in compiled binary
+  let Florence2ForConditionalGeneration: any, AutoProcessor: any;
+  try {
+    ({ Florence2ForConditionalGeneration, AutoProcessor } = await import(
+      '@huggingface/transformers'
+    ));
+  } catch {
+    console.error(
+      'Caption feature requires @huggingface/transformers. Install it with: bun add @huggingface/transformers',
+    );
+    process.exit(1);
+  }
 
   function progressCallback(info: {
     status: string;
