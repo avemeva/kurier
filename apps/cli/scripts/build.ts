@@ -224,6 +224,14 @@ if (releaseFlag) {
 
   if (os === 'linux') {
     await $`tar -czf ../${name}.tar.gz ${dirs}`.cwd(distDir);
+  } else if (os === 'win32') {
+    // Windows CI doesn't have zip; use PowerShell Compress-Archive
+    const zipPath = path.resolve(`dist/${name}.zip`);
+    const sources = dirs.map((d) => path.join(distDir, d)).join(',');
+    Bun.spawnSync(
+      ['powershell', '-Command', `Compress-Archive -Path ${sources} -DestinationPath '${zipPath}'`],
+      { stdio: ['inherit', 'inherit', 'inherit'] },
+    );
   } else {
     await $`zip -r ../${name}.zip ${dirs}`.cwd(distDir);
   }
