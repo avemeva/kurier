@@ -139,6 +139,19 @@ try {
   console.warn(`Warning: Could not bundle tdjson: ${e}`);
 }
 
+// Copy tdl.node native addon into dist
+try {
+  const prebuildsDir = `prebuilds/${os}-${arch}`;
+  const tdlSrc = path.resolve(`../../node_modules/tdl/${prebuildsDir}/tdl.node`);
+  const tdlDestDir = `dist/${name}/bin/${prebuildsDir}`;
+  const tdlDest = `${tdlDestDir}/tdl.node`;
+  mkdirSync(tdlDestDir, { recursive: true });
+  copyFileSync(tdlSrc, tdlDest);
+  console.log(`Bundled tdl.node: ${tdlDest}`);
+} catch (e) {
+  console.warn(`Warning: Could not bundle tdl.node: ${e}`);
+}
+
 const binaries: Record<string, string> = { [name]: pkg.version };
 console.log(`Built ${name}`);
 
@@ -158,6 +171,19 @@ if (singleFlag) {
   mkdirSync(libDir, { recursive: true });
   copyFileSync(`dist/${name}/lib/${getTdjsonFilename()}`, path.join(libDir, getTdjsonFilename()));
   console.log(`Installed tdjson: ${libDir}`);
+
+  // Copy tdl.node native addon next to the binary
+  try {
+    const prebuildsDir = `prebuilds/${os}-${arch}`;
+    const tdlSrc = path.resolve(`dist/${name}/bin/${prebuildsDir}/tdl.node`);
+    const tdlDestDir = path.join(homedir(), '.local', 'bin', prebuildsDir);
+    const tdlDest = path.join(tdlDestDir, 'tdl.node');
+    mkdirSync(tdlDestDir, { recursive: true });
+    copyFileSync(tdlSrc, tdlDest);
+    console.log(`Installed tdl.node: ${tdlDest}`);
+  } catch (e) {
+    console.warn(`Warning: Could not install tdl.node: ${e}`);
+  }
 
   // Create ~/.tg symlink -> media_cache
   if (process.platform !== 'win32') {

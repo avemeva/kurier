@@ -62,7 +62,7 @@ const publishTasks = platforms.map(async ({ os, arch }) => {
     await $`chmod -R 755 ${distDir}`;
   }
 
-  const args = ['npm', 'publish', '--access', 'public'];
+  const args = ['npm', 'publish', '--access', 'public', '--provenance'];
   if (dryRun) args.push('--dry-run');
   const result = await $`${args}`.cwd(distDir).nothrow();
   if (result.exitCode !== 0) {
@@ -110,7 +110,7 @@ if (existsSync(licenseFile)) {
 }
 
 console.log('Publishing wrapper package...');
-const wrapperArgs = ['npm', 'publish', '--access', 'public'];
+const wrapperArgs = ['npm', 'publish', '--access', 'public', '--provenance'];
 if (dryRun) wrapperArgs.push('--dry-run');
 const wrapperResult = await $`${wrapperArgs}`.cwd(path.resolve(wrapperDir)).nothrow();
 if (wrapperResult.exitCode !== 0) {
@@ -193,7 +193,6 @@ class AgentTelegram < Formula
   desc "AI-powered Telegram CLI"
   homepage "https://github.com/avemeva/kurier"
   version "${version}"
-  bottle :unneeded
 
 ${osSections.join('\n\n')}
 

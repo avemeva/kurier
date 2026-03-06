@@ -48,6 +48,23 @@ jobs:
         run: |
           chmod +x apps/cli/dist/agent-telegram-${{ matrix.target }}/bin/agent-telegram
           apps/cli/dist/agent-telegram-${{ matrix.target }}/bin/agent-telegram --version
+          # Test daemon starts and health check responds
+          apps/cli/dist/agent-telegram-${{ matrix.target }}/bin/agent-telegram --daemon &
+          for i in $(seq 1 15); do
+            if curl -s http://localhost:7312/health | grep -q '"ok":true'; then
+              echo "Daemon health check passed"
+              kill %1 2>/dev/null || true
+              wait 2>/dev/null || true
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Daemon health check failed after 15 seconds"
+          kill %1 2>/dev/null || true
+          exit 1
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
       - name: Smoke test (Windows)
         if: matrix.target == 'win32-x64'
         shell: bash
@@ -66,6 +83,9 @@ jobs:
     name: Publish
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -159,6 +179,12 @@ jobs:
             method: npm
           - os: windows-latest
             method: npm
+          - os: macos-14
+            method: bun
+          - os: ubuntu-latest
+            method: bun
+          - os: macos-14
+            method: brew
     runs-on: ${{ matrix.os }}
     steps:
       - name: Install via curl
@@ -170,7 +196,42 @@ jobs:
         if: matrix.method == 'npm'
         run: npm i -g @avemeva/agent-telegram
 
+      - name: Setup Bun
+        if: matrix.method == 'bun'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install via bun
+        if: matrix.method == 'bun'
+        run: bun i -g @avemeva/agent-telegram
+
+      - name: Install via brew
+        if: matrix.method == 'brew'
+        run: |
+          brew install avemeva/tap/agent-telegram
+
       - name: Verify
         run: |
           agent-telegram --version
           agent-telegram doctor
+
+      - name: Verify daemon
+        if: matrix.os != 'windows-latest'
+        run: |
+          agent-telegram --daemon &
+          for i in $(seq 1 15); do
+            if curl -s http://localhost:7312/health | grep -q '"ok":true'; then
+              echo "Daemon health check passed"
+              kill %1 2>/dev/null || true
+              wait 2>/dev/null || true
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Daemon health check failed after 15 seconds"
+          kill %1 2>/dev/null || true
+          exit 1
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
