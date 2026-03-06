@@ -1,0 +1,393 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP=tg
+REPO="nicedayzhu/telegram-ai"
+
+MUTED='\033[0;2m'
+RED='\033[0;31m'
+ORANGE='\033[38;5;214m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+usage() {
+    cat <<EOF
+tg CLI Installer
+
+Usage: install.sh [options]
+
+Options:
+    -h, --help              Display this help message
+    -v, --version <version> Install a specific version (e.g., 0.1.0)
+        --no-modify-path    Don't modify shell config files (.zshrc, .bashrc, etc.)
+
+Examples:
+    curl -fsSL <url> | bash
+    curl -fsSL <url> | bash -s -- --version 0.1.0
+EOF
+}
+
+requested_version=${VERSION:-}
+no_modify_path=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -v|--version)
+            if [[ -n "${2:-}" ]]; then
+                requested_version="$2"
+                shift 2
+            else
+                echo -e "${RED}Error: --version requires a version argument${NC}"
+                exit 1
+            fi
+            ;;
+        --no-modify-path)
+            no_modify_path=true
+            shift
+            ;;
+        *)
+            echo -e "${ORANGE}Warning: Unknown option '$1'${NC}" >&2
+            shift
+            ;;
+    esac
+done
+
+INSTALL_DIR="$HOME/.local/bin"
+mkdir -p "$INSTALL_DIR"
+
+# --- Detect platform ---
+
+raw_os=$(uname -s)
+case "$raw_os" in
+    Darwin*)  os="darwin" ;;
+    Linux*)   os="linux" ;;
+    MINGW*|MSYS*|CYGWIN*)
+        echo -e "${RED}Error: Windows is not supported. Use WSL instead.${NC}"
+        exit 1
+        ;;
+    *)
+        echo -e "${RED}Error: Unsupported operating system: $raw_os${NC}"
+        exit 1
+        ;;
+esac
+
+# --- Detect architecture ---
+
+arch=$(uname -m)
+case "$arch" in
+    aarch64|arm64) arch="arm64" ;;
+    x86_64)        arch="x64" ;;
+    *)
+        echo -e "${RED}Error: Unsupported architecture: $arch${NC}"
+        exit 1
+        ;;
+esac
+
+# Check for Rosetta on macOS
+if [ "$os" = "darwin" ] && [ "$arch" = "x64" ]; then
+    rosetta_flag=$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)
+    if [ "$rosetta_flag" = "1" ]; then
+        arch="arm64"
+    fi
+fi
+
+# --- Archive format ---
+
+archive_ext=".tar.gz"
+if [ "$os" = "darwin" ]; then
+    archive_ext=".zip"
+fi
+
+filename="$APP-$os-$arch$archive_ext"
+
+# --- Check extraction tools ---
+
+if [ "$archive_ext" = ".tar.gz" ]; then
+    if ! command -v tar >/dev/null 2>&1; then
+        echo -e "${RED}Error: 'tar' is required but not installed.${NC}"
+        exit 1
+    fi
+else
+    if ! command -v unzip >/dev/null 2>&1; then
+        echo -e "${RED}Error: 'unzip' is required but not installed.${NC}"
+        exit 1
+    fi
+fi
+
+# --- Check download tool ---
+
+downloader=""
+if command -v curl >/dev/null 2>&1; then
+    downloader="curl"
+elif command -v wget >/dev/null 2>&1; then
+    downloader="wget"
+else
+    echo -e "${RED}Error: 'curl' or 'wget' is required but neither is installed.${NC}"
+    exit 1
+fi
+
+# --- Resolve version ---
+
+if [ -z "$requested_version" ]; then
+    url="https://github.com/${REPO}/releases/latest/download/$filename"
+
+    if [ "$downloader" = "curl" ]; then
+        specific_version=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')
+    else
+        specific_version=$(wget -qO- "https://api.github.com/repos/${REPO}/releases/latest" | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p')
+    fi
+
+    if [[ -z "$specific_version" ]]; then
+        echo -e "${RED}Error: Failed to fetch latest version information${NC}"
+        exit 1
+    fi
+else
+    # Strip leading 'v' if present
+    requested_version="${requested_version#v}"
+    url="https://github.com/${REPO}/releases/download/v${requested_version}/$filename"
+    specific_version="$requested_version"
+
+    # Verify the release exists
+    if [ "$downloader" = "curl" ]; then
+        http_status=$(curl -sI -o /dev/null -w "%{http_code}" "https://github.com/${REPO}/releases/tag/v${requested_version}")
+    else
+        http_status=$(wget --spider -qS "https://github.com/${REPO}/releases/tag/v${requested_version}" 2>&1 | awk '/HTTP/{print $2}' | tail -1)
+    fi
+
+    if [ "$http_status" = "404" ]; then
+        echo -e "${RED}Error: Release v${requested_version} not found${NC}"
+        echo -e "${MUTED}Available releases: https://github.com/${REPO}/releases${NC}"
+        exit 1
+    fi
+fi
+
+# --- Version check ---
+
+if command -v tg >/dev/null 2>&1; then
+    installed_version=$(tg --version 2>/dev/null || echo "")
+    if [[ "$installed_version" == "$specific_version" ]]; then
+        echo -e "${MUTED}tg v${specific_version} is already installed${NC}"
+        exit 0
+    fi
+fi
+
+# --- Progress helpers ---
+
+unbuffered_sed() {
+    if echo | sed -u -e "" >/dev/null 2>&1; then
+        sed -nu "$@"
+    elif echo | sed -l -e "" >/dev/null 2>&1; then
+        sed -nl "$@"
+    else
+        local pad="$(printf "\n%512s" "")"
+        sed -ne "s/$/\\${pad}/" "$@"
+    fi
+}
+
+print_progress() {
+    local bytes="$1"
+    local length="$2"
+    [ "$length" -gt 0 ] || return 0
+
+    local width=50
+    local percent=$(( bytes * 100 / length ))
+    [ "$percent" -gt 100 ] && percent=100
+    local on=$(( percent * width / 100 ))
+    local off=$(( width - on ))
+
+    local filled=$(printf "%*s" "$on" "")
+    filled=${filled// /■}
+    local empty=$(printf "%*s" "$off" "")
+    empty=${empty// /･}
+
+    printf "\r${CYAN}%s%s %3d%%${NC}" "$filled" "$empty" "$percent" >&4
+}
+
+download_with_progress() {
+    local url="$1"
+    local output="$2"
+
+    if [ -t 2 ]; then
+        exec 4>&2
+    else
+        exec 4>/dev/null
+    fi
+
+    local tmp_dir=${TMPDIR:-/tmp}
+    local basename="${tmp_dir}/tg_install_$$"
+    local tracefile="${basename}.trace"
+
+    rm -f "$tracefile"
+    mkfifo "$tracefile"
+
+    printf "\033[?25l" >&4
+
+    trap "trap - RETURN; rm -f \"$tracefile\"; printf '\033[?25h' >&4; exec 4>&-" RETURN
+
+    (
+        curl --trace-ascii "$tracefile" -s -L -o "$output" "$url"
+    ) &
+    local curl_pid=$!
+
+    unbuffered_sed \
+        -e 'y/ACDEGHLNORTV/acdeghlnortv/' \
+        -e '/^0000: content-length:/p' \
+        -e '/^<= recv data/p' \
+        "$tracefile" | \
+    {
+        local length=0
+        local bytes=0
+
+        while IFS=" " read -r -a line; do
+            [ "${#line[@]}" -lt 2 ] && continue
+            local tag="${line[0]} ${line[1]}"
+
+            if [ "$tag" = "0000: content-length:" ]; then
+                length="${line[2]}"
+                length=$(echo "$length" | tr -d '\r')
+                bytes=0
+            elif [ "$tag" = "<= recv" ]; then
+                local size="${line[3]}"
+                bytes=$(( bytes + size ))
+                if [ "$length" -gt 0 ]; then
+                    print_progress "$bytes" "$length"
+                fi
+            fi
+        done
+    }
+
+    wait $curl_pid
+    local ret=$?
+    echo "" >&4
+    return $ret
+}
+
+# --- Download and install ---
+
+echo -e "\n${MUTED}Installing ${NC}tg ${MUTED}v${NC}${specific_version}${MUTED} (${os}/${arch})${NC}"
+
+tmp_dir="${TMPDIR:-/tmp}/tg_install_$$"
+mkdir -p "$tmp_dir"
+
+download_ok=false
+if [ "$downloader" = "curl" ]; then
+    if [ -t 2 ] && download_with_progress "$url" "$tmp_dir/$filename" 2>/dev/null; then
+        download_ok=true
+    fi
+    if [ "$download_ok" = "false" ]; then
+        curl -# -fL -o "$tmp_dir/$filename" "$url"
+    fi
+else
+    wget --show-progress -qO "$tmp_dir/$filename" "$url"
+fi
+
+if [ "$archive_ext" = ".tar.gz" ]; then
+    tar -xzf "$tmp_dir/$filename" -C "$tmp_dir"
+else
+    unzip -q "$tmp_dir/$filename" -d "$tmp_dir"
+fi
+
+# Find the binary (might be at top level or in a subdirectory)
+if [ -f "$tmp_dir/$APP" ]; then
+    mv "$tmp_dir/$APP" "$INSTALL_DIR/$APP"
+elif [ -f "$tmp_dir/bin/$APP" ]; then
+    mv "$tmp_dir/bin/$APP" "$INSTALL_DIR/$APP"
+else
+    # Search for it
+    found=$(find "$tmp_dir" -name "$APP" -type f | head -1)
+    if [ -n "$found" ]; then
+        mv "$found" "$INSTALL_DIR/$APP"
+    else
+        echo -e "${RED}Error: Could not find '$APP' binary in the archive${NC}"
+        rm -rf "$tmp_dir"
+        exit 1
+    fi
+fi
+
+chmod 755 "$INSTALL_DIR/$APP"
+rm -rf "$tmp_dir"
+
+# --- Update PATH ---
+
+add_to_path() {
+    local config_file=$1
+    local command=$2
+
+    if grep -Fxq "$command" "$config_file"; then
+        echo -e "${MUTED}PATH entry already exists in $config_file, skipping.${NC}"
+    elif [[ -w $config_file ]]; then
+        echo -e "\n# tg" >> "$config_file"
+        echo "$command" >> "$config_file"
+        echo -e "${MUTED}Added ${NC}tg ${MUTED}to \$PATH in ${NC}$config_file"
+    else
+        echo -e "${ORANGE}Manually add to $config_file:${NC}"
+        echo -e "  $command"
+    fi
+}
+
+XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
+
+current_shell=$(basename "$SHELL")
+case $current_shell in
+    fish)
+        config_files="$HOME/.config/fish/config.fish"
+        ;;
+    zsh)
+        config_files="${ZDOTDIR:-$HOME}/.zshrc ${ZDOTDIR:-$HOME}/.zshenv $XDG_CONFIG_HOME/zsh/.zshrc $XDG_CONFIG_HOME/zsh/.zshenv"
+        ;;
+    bash)
+        config_files="$HOME/.bashrc $HOME/.bash_profile $HOME/.profile $XDG_CONFIG_HOME/bash/.bashrc $XDG_CONFIG_HOME/bash/.bash_profile"
+        ;;
+    *)
+        config_files="$HOME/.bashrc $HOME/.bash_profile $HOME/.profile"
+        ;;
+esac
+
+if [[ "$no_modify_path" != "true" ]]; then
+    config_file=""
+    for file in $config_files; do
+        if [[ -f $file ]]; then
+            config_file=$file
+            break
+        fi
+    done
+
+    if [[ -z $config_file ]]; then
+        echo -e "${ORANGE}No config file found for $current_shell. Add to PATH manually:${NC}"
+        echo -e "  export PATH=$INSTALL_DIR:\$PATH"
+    elif [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+        case $current_shell in
+            fish)
+                add_to_path "$config_file" "fish_add_path $INSTALL_DIR"
+                ;;
+            *)
+                add_to_path "$config_file" "export PATH=$INSTALL_DIR:\$PATH"
+                ;;
+        esac
+    fi
+fi
+
+# GitHub Actions support
+if [ -n "${GITHUB_ACTIONS-}" ] && [ "${GITHUB_ACTIONS}" == "true" ]; then
+    echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+    echo -e "${MUTED}Added $INSTALL_DIR to \$GITHUB_PATH${NC}"
+fi
+
+# --- Success message ---
+
+echo -e ""
+echo -e "${CYAN}tg${NC} ${MUTED}v${specific_version} installed successfully${NC}"
+echo -e ""
+echo -e "${MUTED}To get started:${NC}"
+echo -e ""
+echo -e "  tg  ${MUTED}# Launch the Telegram CLI${NC}"
+echo -e ""
+if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+    echo -e "${MUTED}Restart your shell or run:${NC}"
+    echo -e "  export PATH=$INSTALL_DIR:\$PATH"
+    echo -e ""
+fi

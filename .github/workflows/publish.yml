@@ -1,0 +1,168 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type'
+        required: false
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      dry_run:
+        description: 'Dry run (no actual publishing)'
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build all platforms
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build all platforms
+        run: bun run apps/cli/scripts/build.ts --release
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+
+      - name: Verify build artifacts
+        run: |
+          EXPECTED=(
+            "tg-darwin-arm64"
+            "tg-darwin-x64"
+            "tg-linux-arm64"
+            "tg-linux-x64"
+            "tg-win32-x64"
+          )
+          ERRORS=0
+          for name in "${EXPECTED[@]}"; do
+            bin="apps/cli/dist/${name}/bin/tg"
+            pkg="apps/cli/dist/${name}/package.json"
+            if [ ! -f "$bin" ]; then
+              echo "ERROR: Missing $bin"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "OK: $bin ($(stat -c%s "$bin") bytes)"
+            fi
+            if [ ! -f "$pkg" ]; then
+              echo "ERROR: Missing $pkg"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+          # Check archives
+          for name in "${EXPECTED[@]}"; do
+            if [[ "$name" == *linux* ]]; then
+              archive="apps/cli/dist/${name}.tar.gz"
+            else
+              archive="apps/cli/dist/${name}.zip"
+            fi
+            if [ ! -f "$archive" ]; then
+              echo "ERROR: Missing $archive"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "OK: $archive"
+            fi
+          done
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "Error: $ERRORS issues found"
+            exit 1
+          fi
+          echo "All build artifacts verified"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: apps/cli/dist/
+          retention-days: 7
+
+  publish:
+    name: Publish to npm + GitHub
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: apps/cli/dist/
+
+      - name: Publish to npm
+        run: |
+          cd apps/cli
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            bun run scripts/publish.ts --dry-run
+          else
+            bun run scripts/publish.ts
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(cd apps/cli && node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        if: ${{ !inputs.dry_run }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+
+          # Collect archives
+          ARCHIVES=()
+          for f in apps/cli/dist/*.zip apps/cli/dist/*.tar.gz; do
+            [ -f "$f" ] && ARCHIVES+=("$f")
+          done
+
+          if gh release view "$TAG" &>/dev/null; then
+            echo "Release $TAG exists, uploading archives..."
+            gh release upload "$TAG" "${ARCHIVES[@]}" --clobber
+          else
+            echo "Creating release $TAG..."
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --generate-notes \
+              "${ARCHIVES[@]}"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

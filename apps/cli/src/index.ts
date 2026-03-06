@@ -20,6 +20,11 @@ if (process.argv.includes('--daemon')) {
   await runDaemonMode();
 }
 
+if (process.argv.includes('--caption-daemon')) {
+  const { runCaptionDaemon } = await import('./caption-daemon');
+  await runCaptionDaemon();
+}
+
 const MAX_FLOOD_WAIT_SEC = 30;
 
 const program = new Command()

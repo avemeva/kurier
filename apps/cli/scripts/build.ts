@@ -1,12 +1,16 @@
 /**
  * Build the CLI binary with hardcoded API credentials.
  *
- * Reads credentials from the same sources as loadCredentials() and
- * embeds them into the compiled binary via Bun's --define flag.
- * This eliminates the need for .env files or tg auth setup.
+ * Uses `bun build --compile` for cross-platform compilation.
+ * Embeds API credentials via --define at compile time.
+ *
+ * Flags:
+ *   --single   Build only for current platform, install to ~/.local/bin/tg
+ *   --release  Create distributable archives after building
  */
 
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -16,11 +20,21 @@ import {
 } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { $ } from 'bun';
+
+const cliDir = path.resolve(import.meta.dir, '..');
+process.chdir(cliDir);
+
+const pkg = await Bun.file('package.json').json();
+
+// --- Flags ---
+
+const singleFlag = process.argv.includes('--single');
+const releaseFlag = process.argv.includes('--release');
 
 // --- Resolve credentials (same search order as loadCredentials) ---
 
 function findCredentials(): { apiId: number; apiHash: string } {
-  // Environment variables
   const envId = process.env.TG_API_ID ?? process.env.VITE_TG_API_ID;
   const envHash = process.env.TG_API_HASH ?? process.env.VITE_TG_API_HASH;
   if (envId && envHash) {
@@ -28,11 +42,10 @@ function findCredentials(): { apiId: number; apiHash: string } {
     if (apiId && envHash) return { apiId, apiHash: envHash };
   }
 
-  // Config/env files
   const candidates = [
     path.join(homedir(), '.config', 'tg', 'credentials'),
     path.join(homedir(), 'Library', 'Application Support', 'dev.telegramai.app', '.env'),
-    path.resolve(import.meta.dir, '../../../.env'), // monorepo root
+    path.resolve('../../.env'), // monorepo root
   ];
 
   for (const filePath of candidates) {
@@ -57,62 +70,127 @@ function findCredentials(): { apiId: number; apiHash: string } {
   );
 }
 
+// --- Targets ---
+
+const allTargets: { os: string; arch: 'arm64' | 'x64' }[] = [
+  { os: 'darwin', arch: 'arm64' },
+  { os: 'darwin', arch: 'x64' },
+  { os: 'linux', arch: 'arm64' },
+  { os: 'linux', arch: 'x64' },
+  { os: 'win32', arch: 'x64' },
+];
+
+const targets = singleFlag
+  ? allTargets.filter((t) => t.os === process.platform && t.arch === process.arch)
+  : allTargets;
+
+if (targets.length === 0) {
+  throw new Error(`No matching target for ${process.platform}-${process.arch}`);
+}
+
 // --- Build ---
 
 const { apiId, apiHash } = findCredentials();
-const outfile = path.join(homedir(), '.local', 'bin', 'tg');
+console.log(`Building v${pkg.version} for ${targets.length} target(s) (API ID: ${apiId})`);
 
-console.log(`Embedding API ID: ${apiId}`);
+await $`rm -rf dist`;
 
-const result = Bun.spawnSync(
-  [
-    'bun',
-    'build',
-    'src/index.ts',
-    '--compile',
-    '--outfile',
-    outfile,
-    '--define',
-    `process.env.TG_BUILTIN_API_ID="${apiId}"`,
-    '--define',
-    `process.env.TG_BUILTIN_API_HASH="${apiHash}"`,
-  ],
-  {
-    stdio: ['inherit', 'inherit', 'inherit'],
-    cwd: path.resolve(import.meta.dir, '..'),
-  },
-);
+const binaries: Record<string, string> = {};
 
-if (result.exitCode !== 0) {
-  process.exit(result.exitCode ?? 1);
+for (const target of targets) {
+  const name = `tg-${target.os}-${target.arch}`;
+  const bunTarget = `bun-${target.os}-${target.arch}`;
+  const outfile = `dist/${name}/bin/tg`;
+  console.log(`Building ${name}...`);
+
+  await $`mkdir -p dist/${name}/bin`;
+
+  const result = Bun.spawnSync(
+    [
+      'bun',
+      'build',
+      'src/index.ts',
+      '--compile',
+      '--target',
+      bunTarget,
+      '--external',
+      'onnxruntime-node',
+      '--outfile',
+      outfile,
+      '--define',
+      `process.env.TG_BUILTIN_API_ID="${apiId}"`,
+      '--define',
+      `process.env.TG_BUILTIN_API_HASH="${apiHash}"`,
+    ],
+    { stdio: ['inherit', 'inherit', 'inherit'] },
+  );
+
+  if (result.exitCode !== 0) {
+    console.error(`Build failed for ${name}`);
+    process.exit(result.exitCode ?? 1);
+  }
+
+  // Platform package.json for npm publishing
+  await Bun.file(`dist/${name}/package.json`).write(
+    JSON.stringify({ name, version: pkg.version, os: [target.os], cpu: [target.arch] }, null, 2),
+  );
+
+  binaries[name] = pkg.version;
+  console.log(`Built ${name}`);
 }
 
-console.log(`Built: ${outfile}`);
+// --- Single mode: install locally ---
 
-// --- Create ~/.tg symlink → media_cache for short file paths in CLI output ---
-// Uses the same cross-platform getAppDir() logic as the daemon.
-// Symlinks don't work reliably on Windows without admin rights — skip there.
+if (singleFlag && targets.length > 0) {
+  const target = targets[0];
+  const name = `tg-${target.os}-${target.arch}`;
+  const builtBinary = path.resolve(`dist/${name}/bin/tg`);
+  const installPath = path.join(homedir(), '.local', 'bin', 'tg');
 
-if (process.platform !== 'win32') {
-  const { getAppDir } = await import('@tg/protocol/paths');
-  const mediaCacheDir = path.join(getAppDir(), 'media_cache');
-  const symlink = path.join(homedir(), '.tg');
+  mkdirSync(path.dirname(installPath), { recursive: true });
+  copyFileSync(builtBinary, installPath);
+  console.log(`Installed: ${installPath}`);
 
-  mkdirSync(mediaCacheDir, { recursive: true });
+  // Create ~/.tg symlink -> media_cache
+  if (process.platform !== 'win32') {
+    const { getAppDir } = await import('@tg/protocol/paths');
+    const mediaCacheDir = path.join(getAppDir(), 'media_cache');
+    const symlink = path.join(homedir(), '.tg');
 
-  try {
-    if (existsSync(symlink)) {
-      const target = readlinkSync(symlink);
-      if (target !== mediaCacheDir) {
-        unlinkSync(symlink);
+    mkdirSync(mediaCacheDir, { recursive: true });
+
+    try {
+      if (existsSync(symlink)) {
+        const current = readlinkSync(symlink);
+        if (current !== mediaCacheDir) {
+          unlinkSync(symlink);
+          symlinkSync(mediaCacheDir, symlink);
+          console.log(`Updated symlink: ${symlink} -> ${mediaCacheDir}`);
+        }
+      } else {
         symlinkSync(mediaCacheDir, symlink);
-        console.log(`Updated symlink: ${symlink} → ${mediaCacheDir}`);
+        console.log(`Created symlink: ${symlink} -> ${mediaCacheDir}`);
       }
-    } else {
-      symlinkSync(mediaCacheDir, symlink);
-      console.log(`Created symlink: ${symlink} → ${mediaCacheDir}`);
+    } catch (err) {
+      console.warn(`Could not create symlink ${symlink}: ${err}`);
     }
-  } catch (err) {
-    console.warn(`Could not create symlink ${symlink}: ${err}`);
   }
 }
+
+// --- Release mode: create archives ---
+
+if (releaseFlag) {
+  for (const name of Object.keys(binaries)) {
+    const binDir = path.resolve(`dist/${name}/bin`);
+    if (name.includes('linux')) {
+      await $`tar -czf ../../${name}.tar.gz *`.cwd(binDir);
+    } else {
+      await $`zip -r ../../${name}.zip *`.cwd(binDir);
+    }
+    console.log(`Archived ${name}`);
+  }
+}
+
+console.log(`Done: ${Object.keys(binaries).join(', ')}`);
+
+export { binaries };

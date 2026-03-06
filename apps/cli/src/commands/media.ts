@@ -1,9 +1,10 @@
-import { copyFileSync } from 'node:fs';
+import { copyFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import type { Command } from 'commander';
 import type * as Td from 'tdlib-types';
+import { captionFiles, downloadModel, isModelDownloaded } from '../caption';
 import { getFileId } from '../enrich';
-import { fail, success } from '../output';
+import { fail, success, warn } from '../output';
 import { pending } from '../pending';
 import { resolveChatId } from '../resolve';
 import { getContentMimeType } from './_helpers';
@@ -132,5 +133,47 @@ export function register(parent: Command): void {
         }
         fail('Speech recognition timed out', 'UNKNOWN');
       };
+    });
+
+  // --- Caption subcommands (no TDLib needed) ---
+
+  const caption = media
+    .command('caption')
+    .description('Image captioning with local Florence-2 model');
+
+  caption
+    .command('download')
+    .description('Download the Florence-2-base model (q4, ~330 MB)')
+    .action(async () => {
+      warn('Downloading Florence-2-base (q4)...');
+      try {
+        await downloadModel();
+        success({ status: 'downloaded' });
+      } catch (e) {
+        fail(`Download failed: ${e instanceof Error ? e.message : String(e)}`, 'UNKNOWN');
+      }
+    });
+
+  caption
+    .command('run')
+    .description('Caption one or more image files')
+    .argument('<files...>', 'Image file paths')
+    .option('--max-tokens <n>', 'Max tokens per caption', '30')
+    .action(async (files: string[], opts: { maxTokens: string }) => {
+      if (!isModelDownloaded()) {
+        fail('Model not downloaded. Run "tg media caption download" first.', 'NOT_FOUND');
+      }
+
+      const resolved = files.map((f) => (path.isAbsolute(f) ? f : path.resolve(f)));
+      for (const f of resolved) {
+        if (!existsSync(f)) fail(`File not found: ${f}`, 'NOT_FOUND');
+      }
+
+      try {
+        const data = await captionFiles(resolved, Number(opts.maxTokens));
+        success(data);
+      } catch (e) {
+        fail(e instanceof Error ? e.message : String(e), 'UNKNOWN');
+      }
     });
 }

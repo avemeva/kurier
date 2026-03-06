@@ -12,6 +12,7 @@
     "build": "bun run scripts/build.ts && bun run scripts/install-tdjson.ts"
   },
   "dependencies": {
+    "@huggingface/transformers": "next",
     "@tg/protocol": "workspace:*",
     "commander": "^14.0.3"
   },
