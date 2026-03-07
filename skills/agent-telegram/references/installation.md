@@ -9,16 +9,16 @@ Pick the method that matches your platform:
 | Any platform | npm | `npm i -g @avemeva/agent-telegram` |
 | Any platform | Bun | `bun i -g @avemeva/agent-telegram` |
 | macOS (Apple Silicon) | Homebrew | `brew install avemeva/tap/agent-telegram` |
-| macOS (Intel) | curl | `curl -fsSL https://raw.githubusercontent.com/avemeva/kurier/main/install \| bash` |
-| Linux (x64/arm64) | curl | `curl -fsSL https://raw.githubusercontent.com/avemeva/kurier/main/install \| bash` |
-| Windows | PowerShell | `irm https://raw.githubusercontent.com/avemeva/kurier/main/install.ps1 \| iex` |
+| macOS (Intel) | curl | `curl -fsSL kurier.sh/install \| bash` |
+| Linux (x64/arm64) | curl | `curl -fsSL kurier.sh/install \| bash` |
+| Windows | PowerShell | `irm kurier.sh/install.ps1 \| iex` |
 
 ### Windows CMD fallback
 
 If PowerShell is unavailable:
 
 ```cmd
-curl -fsSL https://raw.githubusercontent.com/avemeva/kurier/main/install.cmd -o install.cmd && install.cmd
+curl -fsSL kurier.sh/install.cmd -o install.cmd && install.cmd
 ```
 
 ## Verify Installation
