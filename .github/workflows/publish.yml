@@ -187,6 +187,7 @@ jobs:
 
       - name: Update skill repo
         if: ${{ !inputs.dry_run }}
+        continue-on-error: true
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/avemeva/agent-telegram.git /tmp/skill-repo
