@@ -185,25 +185,8 @@ jobs:
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
-      - name: Update skill repo
-        if: ${{ !inputs.dry_run }}
-        continue-on-error: true
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/avemeva/agent-telegram.git /tmp/skill-repo
-          # Clean existing files (except .git) so removed files don't linger
-          find /tmp/skill-repo -mindepth 1 -not -path '/tmp/skill-repo/.git*' -delete
-          cp -r .claude/skills/agent-telegram/* /tmp/skill-repo/
-          cp apps/cli/README.md /tmp/skill-repo/README.md
-          cd /tmp/skill-repo
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff --cached --quiet && echo "No changes to skill repo" && exit 0
-          git commit -m "Update skill to v${VERSION}"
-          git push
-        env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+      # Skill files live in skills/agent-telegram/ and are read directly
+      # from this repo by skills.sh — no separate skill repo needed.
 
   verify:
     name: Verify (${{ matrix.method }} on ${{ matrix.os }})
