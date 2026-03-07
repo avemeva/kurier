@@ -240,6 +240,22 @@ jobs:
           agent-telegram --version
           agent-telegram doctor
 
+      - name: Debug prebuilds
+        if: matrix.os != 'windows-latest'
+        run: |
+          BINARY=$(which agent-telegram)
+          echo "Binary: $BINARY"
+          RESOLVED=$(readlink -f "$BINARY" 2>/dev/null || realpath "$BINARY" 2>/dev/null || echo "$BINARY")
+          echo "Resolved: $RESOLVED"
+          BINDIR=$(dirname "$RESOLVED")
+          echo "Bindir: $BINDIR"
+          echo "--- Prebuilds next to binary ---"
+          find "$BINDIR/prebuilds" -type f 2>/dev/null || echo "No prebuilds next to binary"
+          echo "--- Prebuilds in ~/.local/bin ---"
+          find ~/.local/bin/prebuilds -type f 2>/dev/null || echo "No prebuilds in ~/.local/bin"
+          echo "--- npm global ---"
+          find $(npm root -g) -name "tdl.node" 2>/dev/null || echo "No tdl.node in npm global"
+
       - name: Verify daemon
         if: matrix.os != 'windows-latest'
         run: |
