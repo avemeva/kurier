@@ -191,6 +191,8 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/avemeva/agent-telegram.git /tmp/skill-repo
+          # Clean existing files (except .git) so removed files don't linger
+          find /tmp/skill-repo -mindepth 1 -not -path '/tmp/skill-repo/.git*' -delete
           cp -r .claude/skills/agent-telegram/* /tmp/skill-repo/
           cp apps/cli/README.md /tmp/skill-repo/README.md
           cd /tmp/skill-repo
