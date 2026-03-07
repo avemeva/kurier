@@ -1,0 +1,20 @@
+{
+  "redirects": [
+    { "source": "/", "destination": "https://github.com/avemeva/kurier", "statusCode": 302 },
+    {
+      "source": "/install",
+      "destination": "https://raw.githubusercontent.com/avemeva/kurier/main/install",
+      "statusCode": 302
+    },
+    {
+      "source": "/install.ps1",
+      "destination": "https://raw.githubusercontent.com/avemeva/kurier/main/install.ps1",
+      "statusCode": 302
+    },
+    {
+      "source": "/install.cmd",
+      "destination": "https://raw.githubusercontent.com/avemeva/kurier/main/install.cmd",
+      "statusCode": 302
+    }
+  ]
+}
