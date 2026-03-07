@@ -355,9 +355,10 @@ The `avemeva/agent-telegram` skill repo should include an `INSTALLATION.md` (or 
 
 | # | What | Status |
 |---|------|--------|
-| 16.1 | Create installation guide file | DONE — `.claude/skills/agent-telegram/INSTALLATION.md` |
-| 16.2 | Add to skill repo publish step (copy alongside SKILL.md) | DONE — `publish.yml` copies INSTALLATION.md |
-| 16.3 | Reference from SKILL.md setup section | DONE — links to INSTALLATION.md |
+| 16.1 | Create installation guide file | DONE — `references/installation.md` |
+| 16.2 | Add to skill repo publish step | DONE — `cp -r` copies whole skill dir |
+| 16.3 | Reference from SKILL.md setup section | DONE — links to `references/installation.md` |
+| 16.4 | Release, reinstall skill, verify references/installation.md is present and readable | TODO |
 
 ### FUTURE: GitHub org
 
