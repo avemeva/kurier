@@ -1,11 +1,11 @@
-# Telegram AI v2
+# Kurier
 
 Bun monorepo. Workspaces: `packages/*`, `apps/*`.
 
 ## Architecture
 
 ```
-TDLib (C++) → daemon (HTTP+SSE) → cli | app | web
+TDLib (C++) → daemon (HTTP+SSE) → cli | app
 ```
 
 Daemon is the **only** process that talks to TDLib. Everything else is an HTTP client.
@@ -16,11 +16,7 @@ Daemon does NOT: cache TDLib data, make policy decisions, transform data for UI,
 
 | Package | Purpose |
 |---------|---------|
-| `@tg/types` | Shared TypeScript types (protocol, updates, errors) |
-| `@tg/logger` | Structured logging with pluggable transports |
 | `@tg/protocol` | HTTP/SSE client for daemon communication |
-| `@tg/ui` | Pure React components (no data fetching) |
-| `@tg/store` | Zustand state management |
 
 ## Apps
 
@@ -28,13 +24,38 @@ Daemon does NOT: cache TDLib data, make policy decisions, transform data for UI,
 |-----|---------|
 | `daemon` | TDLib ↔ HTTP bridge |
 | `cli` | Terminal client (no auth — that's the UI's job) |
-| `app` | Electrobun desktop app |
-| `web` | Vite web app |
+| `app` | Electrobun desktop app (React, Vite, Zustand) |
 
 ## TDLib Types
 
 Source of truth: `node_modules/@prebuilt-tdlib/types/tdlib-types.d.ts`
 Always grep that file — do not search across `node_modules`.
+
+## Dev
+
+```sh
+bun run dev:daemon   # daemon with --watch
+bun run dev:app      # vite dev server
+bun run cli          # run CLI (pass args after --)
+```
+
+## Linting
+
+Biome, not ESLint. Auto-fix first, then check:
+
+```sh
+bun run lint:fix
+bun run lint
+```
+
+## Testing
+
+```sh
+bun run test         # all workspace tests
+bun run test:e2e     # cli e2e tests
+bun run test:perf    # app perf tests (Playwright)
+bun run typecheck    # all workspace type checks
+```
 
 ## Conventions
 
@@ -44,7 +65,11 @@ Always grep that file — do not search across `node_modules`.
 - **Styling:** Tailwind v4, OKLCH color space
 - **State:** Zustand
 - **Components:** pure where possible (props → JSX, no hooks)
-- **Tests:** Vitest
+- **Tests:** `bun test` (daemon, cli), Vitest (app)
+
+## Git Commits
+
+Use conventional prefixes in commit messages: `[fix]`, `[bug]`, `[feat]`.
 
 ## Certainty Labels
 
