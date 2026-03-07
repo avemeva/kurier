@@ -6,12 +6,12 @@ Pick the method that matches your platform:
 
 | Platform | Recommended | Command |
 |----------|-------------|---------|
+| Any platform | npm | `npm i -g @avemeva/agent-telegram` |
+| Any platform | Bun | `bun i -g @avemeva/agent-telegram` |
 | macOS (Apple Silicon) | Homebrew | `brew install avemeva/tap/agent-telegram` |
 | macOS (Intel) | curl | `curl -fsSL https://raw.githubusercontent.com/avemeva/kurier/main/install \| bash` |
 | Linux (x64/arm64) | curl | `curl -fsSL https://raw.githubusercontent.com/avemeva/kurier/main/install \| bash` |
 | Windows | PowerShell | `irm https://raw.githubusercontent.com/avemeva/kurier/main/install.ps1 \| iex` |
-| Any platform | npm | `npm i -g @avemeva/agent-telegram` |
-| Any platform | Bun | `bun i -g @avemeva/agent-telegram` |
 
 ### Windows CMD fallback
 
@@ -44,16 +44,10 @@ agent-telegram doctor       # Should show all checks passed
 agent-telegram connects to your **real Telegram account**. You must authenticate before first use:
 
 ```bash
-# Step 1: Start auth flow with your phone number
-agent-telegram auth phone +1234567890
+# Interactive login — prompts for phone, code, and 2FA password (masked input)
+agent-telegram login
 
-# Step 2: Enter the code Telegram sends you
-agent-telegram auth code 12345
-
-# Step 3: If you have 2FA enabled
-agent-telegram auth password <your-2fa-password>
-
-# Step 4: Verify connection
+# Verify connection
 agent-telegram me
 ```
 

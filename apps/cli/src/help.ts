@@ -70,7 +70,10 @@ const CATEGORIES: Category[] = [
   },
   {
     title: 'Auth',
-    entries: [['auth', 'Check auth state or authenticate (phone/code/password/logout)']],
+    entries: [
+      ['login', 'Log in to Telegram (interactive)'],
+      ['logout', 'Log out of Telegram'],
+    ],
   },
   {
     title: 'Daemon',

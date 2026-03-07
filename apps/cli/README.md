@@ -52,9 +52,7 @@ agent-telegram doctor
 agent-telegram connects to your **real Telegram account** — it reads and sends actual messages, not a sandbox. Authenticate before first use:
 
 ```bash
-agent-telegram auth phone +1234567890    # Your phone number
-agent-telegram auth code 12345           # Code from Telegram
-agent-telegram auth password <pass>      # 2FA password (if enabled)
+agent-telegram login                     # Log in to Telegram (interactive)
 agent-telegram me                        # Verify connection
 ```
 
@@ -133,10 +131,8 @@ agent-telegram daemon start | stop | status | log
 ### Auth
 
 ```bash
-agent-telegram auth                            # Check auth state
-agent-telegram auth phone <number>             # Submit phone number
-agent-telegram auth code <code>                # Submit verification code
-agent-telegram auth password <password>        # Submit 2FA password
+agent-telegram login                           # Log in to Telegram (interactive)
+agent-telegram logout                          # Log out of Telegram
 ```
 
 ### Advanced

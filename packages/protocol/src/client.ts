@@ -101,6 +101,16 @@ export class TelegramClient {
     return json.data;
   }
 
+  async resendCode(): Promise<AuthState> {
+    const res = await fetch(`${this.baseUrl}/api/tg/auth/resend`, {
+      method: 'POST',
+      signal: this.signal,
+    });
+    const json = (await res.json()) as DaemonResponse<AuthState>;
+    if (!json.ok) throw new TelegramError(json.error);
+    return json.data;
+  }
+
   async submitPassword(password: string): Promise<AuthState> {
     const res = await fetch(`${this.baseUrl}/api/tg/auth/password`, {
       method: 'POST',

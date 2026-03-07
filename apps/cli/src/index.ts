@@ -1,12 +1,13 @@
 import { TelegramClient, TelegramError } from '@tg/protocol';
 import { Command, CommanderError } from 'commander';
 import { register as registerAction } from './commands/action';
-import { register as registerAuth } from './commands/auth';
 import { register as registerChats } from './commands/chats';
 import { register as registerDaemon } from './commands/daemon';
 import { register as registerDoctor } from './commands/doctor';
 import { register as registerEval } from './commands/eval';
 import { register as registerListen } from './commands/listen';
+import { register as registerLogin } from './commands/login';
+import { register as registerLogout } from './commands/logout';
 import { register as registerMe } from './commands/me';
 import { register as registerMedia } from './commands/media';
 import { register as registerMsg } from './commands/msg';
@@ -48,7 +49,8 @@ registerAction(program);
 registerMedia(program);
 registerListen(program);
 registerEval(program);
-registerAuth(program);
+registerLogin(program);
+registerLogout(program);
 registerDaemon(program);
 registerDoctor(program);
 
