@@ -13,6 +13,7 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   readlinkSync,
   symlinkSync,
@@ -144,14 +145,18 @@ try {
 }
 
 // Copy tdl.node native addon into dist
+// File names vary by platform: tdl.node (darwin/win32), tdl.glibc.node (linux-x64), tdl.armv8.glibc.node (linux-arm64)
 try {
   const prebuildsDir = `prebuilds/${os}-${arch}`;
-  const tdlSrc = path.resolve(`../../node_modules/tdl/${prebuildsDir}/tdl.node`);
+  const tdlSrcDir = path.resolve(`../../node_modules/tdl/${prebuildsDir}`);
   const tdlDestDir = `dist/${name}/bin/${prebuildsDir}`;
-  const tdlDest = `${tdlDestDir}/tdl.node`;
   mkdirSync(tdlDestDir, { recursive: true });
-  copyFileSync(tdlSrc, tdlDest);
-  console.log(`Bundled tdl.node: ${tdlDest}`);
+  const nodeFiles = readdirSync(tdlSrcDir).filter((f) => f.endsWith('.node'));
+  if (nodeFiles.length === 0) throw new Error(`No .node files in ${tdlSrcDir}`);
+  for (const file of nodeFiles) {
+    copyFileSync(path.join(tdlSrcDir, file), path.join(tdlDestDir, file));
+  }
+  console.log(`Bundled tdl prebuilds: ${nodeFiles.join(', ')} → ${tdlDestDir}`);
 } catch (e) {
   console.warn(`Warning: Could not bundle tdl.node: ${e}`);
 }
@@ -179,12 +184,14 @@ if (singleFlag) {
   // Copy tdl.node native addon next to the binary
   try {
     const prebuildsDir = `prebuilds/${os}-${arch}`;
-    const tdlSrc = path.resolve(`dist/${name}/bin/${prebuildsDir}/tdl.node`);
+    const tdlSrcDir = path.resolve(`dist/${name}/bin/${prebuildsDir}`);
     const tdlDestDir = path.join(homedir(), '.local', 'bin', prebuildsDir);
-    const tdlDest = path.join(tdlDestDir, 'tdl.node');
     mkdirSync(tdlDestDir, { recursive: true });
-    copyFileSync(tdlSrc, tdlDest);
-    console.log(`Installed tdl.node: ${tdlDest}`);
+    const nodeFiles = readdirSync(tdlSrcDir).filter((f) => f.endsWith('.node'));
+    for (const file of nodeFiles) {
+      copyFileSync(path.join(tdlSrcDir, file), path.join(tdlDestDir, file));
+    }
+    console.log(`Installed tdl prebuilds: ${nodeFiles.join(', ')} → ${tdlDestDir}`);
   } catch (e) {
     console.warn(`Warning: Could not install tdl.node: ${e}`);
   }

@@ -90,7 +90,7 @@ for (const { os, arch } of platforms) {
 const wrapperPkg = {
   name: '@avemeva/agent-telegram',
   version,
-  description: 'AI-powered Telegram CLI',
+  description: 'Telegram CLI for AI agents',
   bin: { 'agent-telegram': './bin/agent-telegram.js' },
   scripts: { postinstall: 'node ./postinstall.mjs' },
   optionalDependencies,
@@ -98,15 +98,21 @@ const wrapperPkg = {
   repository: {
     type: 'git',
     url: 'https://github.com/avemeva/kurier',
+    directory: 'apps/cli',
   },
+  homepage: 'https://github.com/avemeva/kurier/tree/main/apps/cli#readme',
 };
 
 await Bun.file(`${wrapperDir}/package.json`).write(JSON.stringify(wrapperPkg, null, 2));
 
-// Copy LICENSE if it exists
+// Copy LICENSE and README if they exist
 const licenseFile = path.resolve('../../LICENSE');
 if (existsSync(licenseFile)) {
   await $`cp ${licenseFile} ${wrapperDir}/LICENSE`;
+}
+const readmeFile = path.resolve('README.md');
+if (existsSync(readmeFile)) {
+  await $`cp ${readmeFile} ${wrapperDir}/README.md`;
 }
 
 console.log('Publishing wrapper package...');

@@ -46,14 +46,15 @@ jobs:
         shell: bash
         run: |
           TDL_DIR="node_modules/tdl"
-          if [ ! -f "$TDL_DIR/prebuilds/${{ matrix.target }}/tdl.node" ]; then
+          PREBUILD_DIR="$TDL_DIR/prebuilds/${{ matrix.target }}"
+          if ! ls "$PREBUILD_DIR"/*.node 1>/dev/null 2>&1; then
             echo "Prebuild missing, extracting from npm package..."
             npm pack tdl --pack-destination /tmp
             tar xzf /tmp/tdl-*.tgz -C /tmp
             cp -r /tmp/package/prebuilds "$TDL_DIR/"
             echo "Prebuilds restored"
           fi
-          ls -la "$TDL_DIR/prebuilds/${{ matrix.target }}/"
+          ls -la "$PREBUILD_DIR/"
       - name: Build
         run: bun run apps/cli/scripts/build.ts --release
         env:
