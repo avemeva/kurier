@@ -185,8 +185,24 @@ jobs:
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
-      # Skill files live in skills/agent-telegram/ and are read directly
-      # from this repo by skills.sh — no separate skill repo needed.
+      - name: Sync skill repo
+        run: |
+          cd "$(mktemp -d)"
+          git clone --depth 1 "https://x-access-token:${SKILL_REPO_TOKEN}@github.com/avemeva/agent-telegram.git" .
+          git rm -rf . 2>/dev/null || true
+          cp -r ${GITHUB_WORKSPACE}/skills/agent-telegram/* .
+          cp -r ${GITHUB_WORKSPACE}/skills/agent-telegram/.* . 2>/dev/null || true
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No skill changes to sync"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git commit -m "Sync from avemeva/kurier@${GITHUB_SHA::7}"
+            git push
+          fi
+        env:
+          SKILL_REPO_TOKEN: ${{ secrets.SKILL_REPO_TOKEN }}
 
   verify:
     name: Verify (${{ matrix.method }} on ${{ matrix.os }})
