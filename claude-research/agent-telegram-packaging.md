@@ -181,78 +181,98 @@ Fix: recreated token with Bypass 2FA checked. Immutable after creation — must 
 
 ## TODO
 
-### Step 6.5: Local clean brew install verification (BLOCKING)
+### Step 7: Fix daemon on Linux (BLOCKING)
 
-Full clean-slate verification on the developer's machine:
+**Status as of v0.1.11:** Daemon works on macOS (all channels), fails on ALL Linux verify jobs.
 
-| # | What | How to verify | Status |
-|---|------|-------------|--------|
-| 6.5.1 | Uninstall existing brew formula | `brew uninstall agent-telegram` | TODO |
-| 6.5.2 | Remove brew cache | `rm ~/Library/Caches/Homebrew/downloads/*agent-telegram*` | TODO |
-| 6.5.3 | Remove any leftover tdjson/tdl.node | Check `~/.local/lib/agent-telegram/`, `/opt/homebrew/Cellar/agent-telegram/` | TODO |
-| 6.5.4 | Fresh `brew install avemeva/tap/agent-telegram` | Installs without errors | TODO |
-| 6.5.5 | `agent-telegram --version` | Returns version | TODO |
-| 6.5.6 | `agent-telegram doctor` | All checks green | TODO |
-| 6.5.7 | `agent-telegram --daemon` starts + health check | `curl http://localhost:7312/health` returns `{"ok":true}` | TODO |
-| 6.5.8 | `agent-telegram me` returns live data | Returns user JSON | TODO |
+**What works (v0.1.11 CI run 22786956864):**
+- All 5 builds pass (including daemon smoke test on all non-Windows)
+- macOS verify: curl, npm, bun, brew — ALL PASS
+- Windows verify: npm — PASS
 
-**This requires a release with the prebuilds fix for all install channels.**
+**What fails:**
+- Linux verify: curl, npm, bun on ubuntu-latest AND ubuntu-24.04-arm — ALL FAIL
+- Error: `No native build was found for platform=linux arch=x64 runtime=node ...`
+- `loaded from: /home/runner/work/kurier/kurier/node_modules/tdl` (baked CI path)
 
-### Step 7: Fix daemon crash in distributed binary (BLOCKING) — DONE
+**Confirmed facts:**
+- Prebuilds ARE installed by curl script (log: `Installed tdl.node prebuilds to /home/runner/.local/bin/prebuilds`)
+- Build smoke test passes (prebuilds found because baked path EXISTS on build runner — same machine)
+- macOS verify passes (prebuilds found via `process.execPath` fallback in node-gyp-build)
+- Linux verify fails (prebuilds NOT found via `process.execPath` fallback)
 
-**Root cause:** `tdl.node` native addon was not shipped, and even after shipping in the archive, the curl install script and npm postinstall didn't copy the `prebuilds/` directory to where `node-gyp-build` searches.
+**Root cause hypothesis:**
+`node-gyp-build` falls back to `path.dirname(process.execPath)` to search for prebuilds. This works on macOS but fails on Linux. [assumption] Possible Bun compiled binary behavior difference — `process.execPath` may resolve differently on Linux (e.g. via `/proc/self/exe` to a different resolved path), or `fs.readdirSync` may behave differently in the Bun virtual filesystem context.
 
-**Fix (multi-step):**
-1. `build.ts` copies `node_modules/tdl/prebuilds/<platform>-<arch>/tdl.node` into `dist/<name>/bin/prebuilds/`
-2. Homebrew formula installs `bin/prebuilds/` (done in v0.1.8)
-3. `install` script (curl channel) copies `bin/prebuilds/` to `~/.local/bin/prebuilds/`
-4. `postinstall.mjs` (npm channel) copies prebuilds from platform package to wrapper's `bin/`
+**Investigation approach:**
+- Debug locally with Docker: `docker run --rm -v $(pwd)/apps/cli/dist:/dist ubuntu:24.04 /dist/agent-telegram-linux-x64/bin/agent-telegram --daemon`
+- Check `process.execPath` value on Linux compiled binary
+- Check if `fs.readdirSync(path.dirname(process.execPath) + '/prebuilds')` works
 
-| # | What | How to verify | Status |
-|---|------|-------------|--------|
-| 7.1 | Ship `tdl.node` in build.ts | `build.ts` copies prebuild to `bin/prebuilds/` | DONE |
-| 7.2 | Local: daemon starts outside monorepo | Copied dist to `/tmp/`, daemon started, health check passed | DONE |
-| 7.3 | Local: `me` returns data | `getMe` returned user JSON (id: 91754006, username: avemeva) | DONE |
-
-### Step 8: Harden CI smoke tests (BLOCKING) — DONE
-
-| # | What | How to verify | Status |
-|---|------|-------------|--------|
-| 8.1 | Build job: test `--daemon` starts + health check responds | Smoke test now starts daemon, polls /health for 15s | DONE |
-| 8.2 | Verify job: test `--daemon` starts + health check responds | "Verify daemon" step added (skipped on Windows) | DONE |
-| 8.3 | Add bun as install channel in verify | `bun i -g` on macos-14 + ubuntu-latest | DONE |
-| 8.4 | Add brew as install channel in verify (macOS) | `brew install avemeva/tap/agent-telegram` on macos-14 | DONE |
-
-### Step 9: npm trusted publishers
-
-Move npm publishing from long-lived granular token to OIDC-based trusted publishers (GitHub Actions identity → npm, no stored secret needed).
+**Fix options:**
+1. **Debug process.execPath on Linux** — understand why the fallback search fails
+2. **Bypass node-gyp-build entirely** — preload the addon from a known path before tdl imports it
+3. **Replace `tdl` with `bun:ffi`** — dlopen tdjson directly, no native addon needed at all (cleanest but largest change)
+4. **Set env var** — `process.env.TDL_PREBUILD = path.dirname(process.execPath)` before tdl is loaded (only works if the baked package.json is readable from bundled filesystem)
 
 | # | What | Status |
 |---|------|--------|
-| 9.1 | Configure trusted publisher on npmjs.com for `@avemeva/agent-telegram` | TODO |
-| 9.2 | Update `publish.yml` to use OIDC token instead of `NPM_TOKEN` | TODO |
-| 9.3 | Remove `NPM_TOKEN` secret from GitHub | TODO |
+| 7.4 | Understand why node-gyp-build process.execPath fallback fails on Linux | TODO |
+| 7.5 | Fix Linux daemon to find tdl.node | TODO |
+| 7.6 | CI verify: all Linux jobs pass | TODO |
 
-### Step 10: Missing platforms
+### Step 6.5: Local clean brew install verification — DONE
 
-| # | What | How | Status |
-|---|------|-----|--------|
-| 10.1 | darwin-x64 build | Find Intel macOS runner or cross-compile | TODO |
-| 10.2 | linux-arm64 build | Find ARM Linux runner or cross-compile | TODO |
+Full clean-slate verification on the developer's machine (v0.1.11):
+
+| # | What | How to verify | Status |
+|---|------|-------------|--------|
+| 6.5.1 | Uninstall existing brew formula | `brew uninstall agent-telegram` | DONE |
+| 6.5.2 | Remove brew cache | Cleared cached downloads | DONE |
+| 6.5.3 | Remove any leftover tdjson/tdl.node | Verified no leftovers | DONE |
+| 6.5.4 | Fresh `brew install avemeva/tap/agent-telegram` | v0.1.11 installed, 6 files, 91.4MB | DONE |
+| 6.5.5 | `agent-telegram --version` | Returns `0.1.11` | DONE |
+| 6.5.6 | `agent-telegram doctor` | All checks passed (binary, tdjson, config, daemon) | DONE |
+| 6.5.7 | `agent-telegram --daemon` starts + health check | `{"ok":true,"uptime":0,"pid":29408}` | DONE |
+| 6.5.8 | `agent-telegram me` returns live data | `getMe` returned user JSON (avemeva, id: 91754006) | DONE |
+
+### Step 8: Harden CI smoke tests — DONE
+
+| # | What | Status |
+|---|------|--------|
+| 8.1 | Build job: daemon smoke test | DONE — all 4 non-Windows builds test daemon health |
+| 8.2 | Verify job: daemon test | DONE — "Verify daemon" step (skipped on Windows) |
+| 8.3 | Bun install channel | DONE — macos-14, ubuntu-latest |
+| 8.4 | Brew install channel | DONE — macos-14 |
+
+### Step 9: npm trusted publishers — PARTIALLY DONE
+
+| # | What | Status |
+|---|------|--------|
+| 9.1 | Configure trusted publisher on npmjs.com | TODO — requires browser/web UI |
+| 9.2 | `publish.yml` has `id-token: write` + `--provenance` | DONE (v0.1.7) |
+| 9.3 | Remove `NPM_TOKEN` secret from GitHub | TODO — after 9.1 verified working |
+
+### Step 10: Missing platforms — DONE
+
+| # | What | Runner | Status |
+|---|------|--------|--------|
+| 10.1 | darwin-x64 build | macos-15-intel | DONE (v0.1.7) |
+| 10.2 | linux-arm64 build | ubuntu-24.04-arm | DONE (v0.1.7) |
 
 ### Step 11: Cleanup — DONE
 
 | # | What | Status |
 |---|------|--------|
-| 11.1 | Remove cask from `avemeva/homebrew-tap` (formula is correct approach, cask causes ambiguity warning) | DONE — commit b90bf7a |
+| 11.1 | Remove cask from homebrew tap | DONE — commit b90bf7a |
 
-### Step 12: winget
+### Step 12: winget — PARTIALLY DONE
 
 | # | What | Status |
 |---|------|--------|
-| 12.1 | Create winget manifest | TODO |
-| 12.2 | Submit to winget-pkgs repo | TODO |
-| 12.3 | Add winget to CI verify matrix (windows) | TODO |
+| 12.1 | Create winget manifest | DONE — generated by `publish.ts` (v0.1.7) |
+| 12.2 | Submit to winget-pkgs repo | TODO — requires PR to `microsoft/winget-pkgs` |
+| 12.3 | Add winget to CI verify matrix (windows) | TODO — after 12.2 accepted |
 
 ---
 
@@ -263,24 +283,24 @@ Move npm publishing from long-lived granular token to OIDC-based trusted publish
 | Platform | Runner | Status |
 |----------|--------|--------|
 | darwin-arm64 | macos-14 | DONE |
-| darwin-x64 | TBD | TODO |
+| darwin-x64 | macos-15-intel | DONE |
 | linux-x64 | ubuntu-latest | DONE |
-| linux-arm64 | TBD | TODO |
+| linux-arm64 | ubuntu-24.04-arm | DONE |
 | win32-x64 | windows-latest | DONE |
 
 ### Verify matrix (CI must test install + daemon)
 
 `full` = --version + doctor + daemon starts + health check responds.
-`partial` = --version + doctor only (no daemon test — e.g. Windows).
-`TODO` = not set up at all.
+`partial` = --version + doctor only (no daemon test).
+`broken` = install works, daemon crashes (tdl.node not found).
 
 | | curl | npm | bun | brew | winget |
 |---|---|---|---|---|---|
 | darwin-arm64 | full | full | full | full | — |
-| darwin-x64 | TODO | TODO | TODO | TODO | — |
-| linux-x64 | full | full | full | TODO | — |
-| linux-arm64 | TODO | TODO | TODO | TODO | — |
-| win32-x64 | — | partial | TODO | — | TODO |
+| darwin-x64 | full | full | — | — | — |
+| linux-x64 | broken | broken | broken | — | — |
+| linux-arm64 | broken | broken | — | — | — |
+| win32-x64 | — | partial | — | — | TODO |
 
 ---
 
