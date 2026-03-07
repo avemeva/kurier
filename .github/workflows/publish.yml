@@ -191,11 +191,8 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/avemeva/agent-telegram.git /tmp/skill-repo
-          cp .claude/skills/agent-telegram/SKILL.md /tmp/skill-repo/SKILL.md
+          cp -r .claude/skills/agent-telegram/* /tmp/skill-repo/
           cp apps/cli/README.md /tmp/skill-repo/README.md
-          if [ -d ".claude/skills/agent-telegram/reports" ]; then
-            cp -r .claude/skills/agent-telegram/reports /tmp/skill-repo/reports
-          fi
           cd /tmp/skill-repo
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -312,6 +309,39 @@ jobs:
           echo "Daemon health check failed after 15 seconds"
           kill %1 2>/dev/null || true
           exit 1
+        env:
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+
+      - name: Verify daemon (Windows)
+        if: matrix.method == 'ps1'
+        shell: pwsh
+        run: |
+          $daemonProcess = Start-Process -FilePath "agent-telegram.exe" -ArgumentList "--daemon" -PassThru -NoNewWindow
+          $timeout = 30
+          $elapsed = 0
+          $success = $false
+          while ($elapsed -lt $timeout) {
+            Start-Sleep -Seconds 2
+            $elapsed += 2
+            try {
+              $response = Invoke-RestMethod -Uri "http://localhost:7312/health" -TimeoutSec 3
+              if ($response.ok -eq $true) {
+                Write-Host "Daemon health check passed"
+                $success = $true
+                break
+              }
+            } catch {
+              Write-Host "Waiting for daemon... ($elapsed/$timeout s)"
+            }
+          }
+          if ($daemonProcess -and !$daemonProcess.HasExited) {
+            Stop-Process -Id $daemonProcess.Id -Force -ErrorAction SilentlyContinue
+          }
+          if (-not $success) {
+            Write-Error "Daemon health check failed after $timeout seconds"
+            exit 1
+          }
         env:
           TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}

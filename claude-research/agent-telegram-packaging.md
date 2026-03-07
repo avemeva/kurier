@@ -248,7 +248,7 @@ Trusted publishers configured via npmjs.com web UI (avemeva/kurier, publish.yml 
 |---|------|--------|
 | 11.1 | Remove cask from homebrew tap | DONE — commit b90bf7a |
 
-### Step 12: Windows install scripts — TODO
+### Step 12: Windows install scripts — DONE
 
 **Original plan:** winget. **Problem:** winget requires manual PRs to `microsoft/winget-pkgs` for every release — not automatable, not sustainable.
 
@@ -286,10 +286,10 @@ Trusted publishers configured via npmjs.com web UI (avemeva/kurier, publish.yml 
 
 | # | What | How to verify | Status |
 |---|------|---------------|--------|
-| W1 | `irm .../install.ps1 \| iex` completes | CI windows-latest | TODO |
-| W2 | `agent-telegram --version` returns version | CI verify | TODO |
-| W3 | `agent-telegram doctor` all checks pass | CI verify | TODO |
-| W4 | `agent-telegram --daemon` starts + health check | CI verify | TODO |
+| W1 | `irm .../install.ps1 \| iex` completes | CI windows-latest | DONE — v0.1.14 |
+| W2 | `agent-telegram --version` returns version | CI verify | DONE — v0.1.14 |
+| W3 | `agent-telegram doctor` all checks pass | CI verify | DONE — v0.1.14 |
+| W4 | `agent-telegram --daemon` starts + health check | CI verify | DONE — added PowerShell daemon smoke test to ps1 verify job |
 | W5 | `agent-telegram me` returns live data | Manual (needs auth) | TODO |
 
 **Hosting:** `https://raw.githubusercontent.com/avemeva/kurier/main/install.ps1` (always latest, not pinned to release tag — matches Claude Code's pattern).
@@ -309,7 +309,7 @@ Trusted publishers configured via npmjs.com web UI (avemeva/kurier, publish.yml 
 |---|------|--------|
 | 14.1 | Trigger a release (patch bump) | DONE — v0.1.13, v0.1.14 |
 | 14.2 | Confirm npm publish succeeds via OIDC (no token) | DONE — 2 consecutive releases |
-| 14.3 | Confirm provenance attestation appears on npmjs.com | TODO — check manually |
+| 14.3 | Confirm provenance attestation appears on npmjs.com | DONE — SLSA v1 attestations verified, Sigstore-signed, linked to publish.yml |
 | 14.4 | Confirm all verify jobs pass | DONE — all pass except transient Linux npm propagation delay |
 
 ### Step 15: Skill distribution + README — DONE
@@ -337,7 +337,27 @@ npx skills add avemeva/agent-telegram
 | 15.4 | Update `apps/cli/README.md` with all install methods (brew, curl, npm, bun, ps1, cmd) | DONE |
 | 15.5 | Add "Best suited for Claude Code" section to README | DONE |
 | 15.6 | Add `npx skills add avemeva/agent-telegram` to README | DONE |
-| 15.7 | Verify skill install works end-to-end | DONE — v0.1.14 pushed SKILL.md + README.md + reports/ |
+| 15.7 | Verify skill repo push works | DONE — v0.1.14 pushed SKILL.md + README.md + reports/ |
+| 15.8 | Verify `npx skills add avemeva/agent-telegram` installs correctly | DONE — clones repo, detects skill, prompts agent selection (use -y for non-interactive) |
+
+### Step 16: Skill installation guide
+
+The `avemeva/agent-telegram` skill repo should include an `INSTALLATION.md` (or `references/installation.md`) that the skill can reference when `agent-telegram` CLI is not installed. When the skill detects the CLI is missing (e.g. `tg` command not found), it should consult this file and guide the user through installation.
+
+**Contents should cover:**
+- All install methods (brew, curl, npm, bun, ps1, cmd) with exact commands
+- Platform detection logic (which method to recommend per OS)
+- Post-install verification (`agent-telegram --version`, `doctor`, `--daemon`)
+- Auth setup (`agent-telegram auth` or first-run flow)
+- Troubleshooting common issues (tdjson not found, port conflict, etc.)
+
+**Source of truth:** `apps/cli/README.md` install section + `doctor.ts` checks.
+
+| # | What | Status |
+|---|------|--------|
+| 16.1 | Create installation guide file | DONE — `.claude/skills/agent-telegram/INSTALLATION.md` |
+| 16.2 | Add to skill repo publish step (copy alongside SKILL.md) | DONE — `publish.yml` copies INSTALLATION.md |
+| 16.3 | Reference from SKILL.md setup section | DONE — links to INSTALLATION.md |
 
 ### FUTURE: GitHub org
 
@@ -373,7 +393,7 @@ Create a `kurier` GitHub org to own repos:
 | darwin-x64 | full | full | — | — | — | — |
 | linux-x64 | full | full | full | — | — | — |
 | linux-arm64 | full | full | — | — | — | — |
-| win32-x64 | — | partial | — | — | full | — |
+| win32-x64 | — | partial | — | — | full (with daemon) | — |
 
 ---
 

@@ -14,3 +14,4 @@ stderr.txt
 stdout.txt
 tg
 test-results/
+.claude/skills/*/reports/

@@ -1,6 +1,6 @@
 ---
 name: agent-telegram
-description: Telegram CLI for AI agents. Use when the user needs to interact with Telegram — read messages, send messages, search chats, download media, monitor conversations, or automate any Telegram task. Triggers on requests to "check my messages", "send a message", "search Telegram", "read unread", "listen to chat", "download from Telegram", or any task requiring programmatic Telegram interaction via the `tg` CLI.
+description: Telegram CLI for AI agents. Use when the user needs to interact with Telegram — read messages, send messages, search chats, download media, monitor conversations, or automate any Telegram task. Triggers on requests to "check my messages", "send a message", "search Telegram", "read unread", "listen to chat", "download from Telegram", or any task requiring programmatic Telegram interaction via the `agent-telegram` CLI.
 ---
 
 # Telegram Automation with agent-telegram
@@ -11,28 +11,28 @@ All output is JSON to stdout. Warnings go to stderr. Prefer `jq` over `python3` 
 
 ## Setup
 
-The CLI reuses the session from the Telegram AI desktop app. You must be logged in via the web app first.
+If `agent-telegram` is not installed, read [references/installation.md](references/installation.md) for platform-specific install instructions, authentication, and troubleshooting.
 
 ```bash
-tg me   # Verify connection works
+agent-telegram me   # Verify connection works
 ```
 
 A background daemon auto-starts on first command and keeps the Telegram connection alive, making subsequent commands fast (~0.2s vs ~2-3s).
 
 ## Finding People
 
-**Prefer `tg chats search` and `tg msg search` over `tg chats search --type user` when looking for a person by name.** `chats search --type user` searches contacts and global directory, which may not include people the user actually talks to. `chats search` and `msg search` match against real chat history — far more reliable for finding someone the user has communicated with.
+**Prefer `agent-telegram chats search` and `agent-telegram msg search` over `agent-telegram chats search --type user` when looking for a person by name.** `chats search --type user` searches contacts and global directory, which may not include people the user actually talks to. `chats search` and `msg search` match against real chat history — far more reliable for finding someone the user has communicated with.
 
 ```bash
 # GOOD: search actual chats and message history
-tg chats search "boris"                          # Find in chat list by name
-tg msg search "boris" --type private --limit 5   # Find messages mentioning/from boris
+agent-telegram chats search "boris"                          # Find in chat list by name
+agent-telegram msg search "boris" --type private --limit 5   # Find messages mentioning/from boris
 
 # LESS RELIABLE: searches contacts/global directory, may miss non-contacts
-tg chats search "boris" --type user
+agent-telegram chats search "boris" --type user
 ```
 
-If the name doesn't match in chats, fall back to `tg msg search "<name>" --type private` to find messages in private chats — this reveals the chat ID and title even for people not in contacts.
+If the name doesn't match in chats, fall back to `agent-telegram msg search "<name>" --type private` to find messages in private chats — this reveals the chat ID and title even for people not in contacts.
 
 ## Entity Arguments
 
@@ -43,7 +43,7 @@ All commands accepting `<chat>` or `<user>` support:
 - Link: `t.me/username` or `https://t.me/username`
 - Special: `me` or `self` (your own Saved Messages)
 
-Use `--` to separate flags from negative positional arguments if needed: `tg msg list -- -1001234567890 --limit 20`.
+Use `--` to separate flags from negative positional arguments if needed: `agent-telegram msg list -- -1001234567890 --limit 20`.
 
 ## Global Flags
 
@@ -55,121 +55,121 @@ Use `--` to separate flags from negative positional arguments if needed: `tg msg
 
 ```bash
 # Identity
-tg me                                    # Current user info
-tg info <id|username|phone|link>         # Detailed info (entity, chat, shared groups)
+agent-telegram me                                    # Current user info
+agent-telegram info <id|username|phone|link>         # Detailed info (entity, chat, shared groups)
 
 # Chat Discovery (local by default — searches your chats, not global)
-tg chats search "query"                      # Find in your chats (local + server-backed)
-tg chats search "query" --global             # Also search public Telegram (network)
-tg chats search "query" --type chat          # Direct chats only (1:1)
-tg chats search "query" --type bot           # Bots only
-tg chats search "query" --type channel       # Channels only
-tg chats search "query" --type group         # Groups only
-tg chats search "query" --limit 10           # Cap results
-tg chats search "query" --archived           # Only archived chats (default: excludes archived)
+agent-telegram chats search "query"                      # Find in your chats (local + server-backed)
+agent-telegram chats search "query" --global             # Also search public Telegram (network)
+agent-telegram chats search "query" --type chat          # Direct chats only (1:1)
+agent-telegram chats search "query" --type bot           # Bots only
+agent-telegram chats search "query" --type channel       # Channels only
+agent-telegram chats search "query" --type group         # Groups only
+agent-telegram chats search "query" --limit 10           # Cap results
+agent-telegram chats search "query" --archived           # Only archived chats (default: excludes archived)
 
 # Chat Lists
-tg chats list [--limit N] [--archived]       # List chats (paginated)
-tg chats list --type user|group|channel      # Filter by chat type
-tg chats list --unread                       # Only chats with unread messages
-tg chats list --offset-date N                # Paginate (unix timestamp from nextOffset)
-tg chats members <chat> [--limit N] [--query text] [--offset N]  # Group/channel members
-tg chats members <chat> --type bot|admin|recent                   # Filter by participant type
-tg chats members <chat> --filter bot|admin|recent                 # Alias for --type
+agent-telegram chats list [--limit N] [--archived]       # List chats (paginated)
+agent-telegram chats list --type user|group|channel      # Filter by chat type
+agent-telegram chats list --unread                       # Only chats with unread messages
+agent-telegram chats list --offset-date N                # Paginate (unix timestamp from nextOffset)
+agent-telegram chats members <chat> [--limit N] [--query text] [--offset N]  # Group/channel members
+agent-telegram chats members <chat> --type bot|admin|recent                   # Filter by participant type
+agent-telegram chats members <chat> --filter bot|admin|recent                 # Alias for --type
 
 # Messages
-tg msg list <chat> [--limit N]               # Message history (paginated)
-tg msg list <chat> --offset-id N             # Continue from message ID (pagination cursor)
-tg msg list <chat> --min-id N                # Only messages newer than this ID (exclusive floor)
-tg msg list <chat> --since N                 # Only messages after unix timestamp
-tg msg list <chat> --query "keyword"         # Search in chat
-tg msg list <chat> --from <user>             # Filter by sender
-tg msg list <chat> --filter photo            # Filter: photo|video|document|url|voice|gif|music
-tg msg list <chat> --auto-download           # Auto-download photos/stickers/voice
-tg msg list <chat> --auto-transcribe         # Auto-transcribe voice/video notes (Premium)
-tg msg get <chat> <msgId>                    # Single message by ID
+agent-telegram msg list <chat> [--limit N]               # Message history (paginated)
+agent-telegram msg list <chat> --offset-id N             # Continue from message ID (pagination cursor)
+agent-telegram msg list <chat> --min-id N                # Only messages newer than this ID (exclusive floor)
+agent-telegram msg list <chat> --since N                 # Only messages after unix timestamp
+agent-telegram msg list <chat> --query "keyword"         # Search in chat
+agent-telegram msg list <chat> --from <user>             # Filter by sender
+agent-telegram msg list <chat> --filter photo            # Filter: photo|video|document|url|voice|gif|music
+agent-telegram msg list <chat> --auto-download           # Auto-download photos/stickers/voice
+agent-telegram msg list <chat> --auto-transcribe         # Auto-transcribe voice/video notes (Premium)
+agent-telegram msg get <chat> <msgId>                    # Single message by ID
 
 # Message Search
-tg msg search "query"                            # Cross-chat search (your chats only)
-tg msg search "query" --type channel             # Only messages in channels
-tg msg search "query" --type group               # Only messages in groups
-tg msg search "query" --type private             # Only messages in private chats
-tg msg search "query" --filter photo             # Filter: photo|video|document|url|voice|gif|music|media|videonote|mention|pinned
-tg msg search "query" --since N                  # Messages after unix timestamp
-tg msg search "query" --until N                  # Messages before unix timestamp
-tg msg search "query" --chat <id>                # Search within a specific chat
-tg msg search "query" --chat <id> --from <user>  # Filter by sender (per-chat only)
-tg msg search "query" --context N                # Include N before + hit + N after in context array
-tg msg search "query" --auto-download            # Auto-download photos/stickers/voice
-tg msg search "query" --auto-transcribe          # Auto-transcribe voice/video notes (Premium)
-tg msg search "query" --full                     # Disable 500-char text truncation
-tg msg search "query" --archived                 # Search archived chats only (default: main list)
+agent-telegram msg search "query"                            # Cross-chat search (your chats only)
+agent-telegram msg search "query" --type channel             # Only messages in channels
+agent-telegram msg search "query" --type group               # Only messages in groups
+agent-telegram msg search "query" --type private             # Only messages in private chats
+agent-telegram msg search "query" --filter photo             # Filter: photo|video|document|url|voice|gif|music|media|videonote|mention|pinned
+agent-telegram msg search "query" --since N                  # Messages after unix timestamp
+agent-telegram msg search "query" --until N                  # Messages before unix timestamp
+agent-telegram msg search "query" --chat <id>                # Search within a specific chat
+agent-telegram msg search "query" --chat <id> --from <user>  # Filter by sender (per-chat only)
+agent-telegram msg search "query" --context N                # Include N before + hit + N after in context array
+agent-telegram msg search "query" --auto-download            # Auto-download photos/stickers/voice
+agent-telegram msg search "query" --auto-transcribe          # Auto-transcribe voice/video notes (Premium)
+agent-telegram msg search "query" --full                     # Disable 500-char text truncation
+agent-telegram msg search "query" --archived                 # Search archived chats only (default: main list)
 
 # Send & Edit (plain text by default — no implicit markdown parsing)
-tg action send <chat> "text"                    # Send message (plain text)
-tg action send <chat> "text" --reply-to 123     # Reply to message
-tg action send <chat> "text" --html             # With HTML formatting
-tg action send <chat> "text" --md               # With MarkdownV2
-tg action send <chat> "text" --silent           # No notification
-tg action send <chat> "text" --no-preview       # Disable link preview
-echo "text" | tg action send <chat> --stdin     # Read text from stdin
-tg action send <chat> --file /path/to/msg.txt   # Read text from file
-tg action edit <chat> <msgId> "new text"        # Edit message (plain text)
-tg action edit <chat> <msgId> "text" --html     # Edit with formatting
-tg action edit <chat> <msgId> "text" --md       # Edit with MarkdownV2
-echo "text" | tg action edit <chat> <msgId> --stdin  # Read text from stdin
-tg action edit <chat> <msgId> --file /path/to/msg.txt  # Read text from file
+agent-telegram action send <chat> "text"                    # Send message (plain text)
+agent-telegram action send <chat> "text" --reply-to 123     # Reply to message
+agent-telegram action send <chat> "text" --html             # With HTML formatting
+agent-telegram action send <chat> "text" --md               # With MarkdownV2
+agent-telegram action send <chat> "text" --silent           # No notification
+agent-telegram action send <chat> "text" --no-preview       # Disable link preview
+echo "text" | agent-telegram action send <chat> --stdin     # Read text from stdin
+agent-telegram action send <chat> --file /path/to/msg.txt   # Read text from file
+agent-telegram action edit <chat> <msgId> "new text"        # Edit message (plain text)
+agent-telegram action edit <chat> <msgId> "text" --html     # Edit with formatting
+agent-telegram action edit <chat> <msgId> "text" --md       # Edit with MarkdownV2
+echo "text" | agent-telegram action edit <chat> <msgId> --stdin  # Read text from stdin
+agent-telegram action edit <chat> <msgId> --file /path/to/msg.txt  # Read text from file
 
 # Actions
-tg action delete <chat> <msgId> [msgId...] [--revoke]  # Delete (--revoke = for everyone)
-tg action forward <from> <to> <msgId> [msgId...] [--silent]  # Forward messages
-tg action pin <chat> <msgId> [--silent]         # Pin message
-tg action unpin <chat> <msgId>                  # Unpin message
-tg action unpin <chat> --all                    # Unpin all messages
-tg action react <chat> <msgId> <emoji>          # Add reaction
-tg action react <chat> <msgId> <emoji> --remove # Remove reaction
-tg action react <chat> <msgId> <emoji> --big    # Big animation
-tg action click <chat> <msgId> <button>         # Click inline keyboard button (index or text)
+agent-telegram action delete <chat> <msgId> [msgId...] [--revoke]  # Delete (--revoke = for everyone)
+agent-telegram action forward <from> <to> <msgId> [msgId...] [--silent]  # Forward messages
+agent-telegram action pin <chat> <msgId> [--silent]         # Pin message
+agent-telegram action unpin <chat> <msgId>                  # Unpin message
+agent-telegram action unpin <chat> --all                    # Unpin all messages
+agent-telegram action react <chat> <msgId> <emoji>          # Add reaction
+agent-telegram action react <chat> <msgId> <emoji> --remove # Remove reaction
+agent-telegram action react <chat> <msgId> <emoji> --big    # Big animation
+agent-telegram action click <chat> <msgId> <button>         # Click inline keyboard button (index or text)
 
 # Real-time
-tg listen --type user                        # Stream all user chat events (NDJSON)
-tg listen --chat 12345,-1001234567890        # Stream specific chats
-tg listen --type group --exclude-chat 12345  # All groups except one
-tg listen --type user --auto-download        # Auto-download photos/stickers/voice
-tg listen --type user --incoming             # Only incoming messages
-tg listen --event new_message,edit_message   # Custom event types
+agent-telegram listen --type user                        # Stream all user chat events (NDJSON)
+agent-telegram listen --chat 12345,-1001234567890        # Stream specific chats
+agent-telegram listen --type group --exclude-chat 12345  # All groups except one
+agent-telegram listen --type user --auto-download        # Auto-download photos/stickers/voice
+agent-telegram listen --type user --incoming             # Only incoming messages
+agent-telegram listen --event new_message,edit_message   # Custom event types
 
 # Media
-tg media download <chat> <msgId> [--output path]  # Download message media
-tg media download --file-id <id> [--output path]  # Download by TDLib file ID
-tg media transcribe <chat> <msgId>                 # Transcribe voice/video note (Premium)
+agent-telegram media download <chat> <msgId> [--output path]  # Download message media
+agent-telegram media download --file-id <id> [--output path]  # Download by TDLib file ID
+agent-telegram media transcribe <chat> <msgId>                 # Transcribe voice/video note (Premium)
 
 # Advanced
-tg eval '<javascript>'                   # Run JS with connected client
-tg eval --file script.js                 # Run JS from file
-tg eval <<'EOF'                          # Run JS via heredoc (recommended)
+agent-telegram eval '<javascript>'                   # Run JS with connected client
+agent-telegram eval --file script.js                 # Run JS from file
+agent-telegram eval <<'EOF'                          # Run JS via heredoc (recommended)
 <code>
 EOF
 
 # Daemon
-tg daemon start                          # Start background daemon
-tg daemon stop                           # Stop daemon
-tg daemon status                         # Check if daemon is running
-tg daemon log                            # Show recent daemon log
+agent-telegram daemon start                          # Start background daemon
+agent-telegram daemon stop                           # Stop daemon
+agent-telegram daemon status                         # Check if daemon is running
+agent-telegram daemon log                            # Show recent daemon log
 
 # Auth
-tg auth                                  # Show current auth state
-tg auth phone <number>                   # Submit phone number (e.g. +1234567890)
-tg auth code <code>                      # Submit verification code
-tg auth password <password>              # Submit 2FA password
-tg auth logout                           # Log out of Telegram
+agent-telegram auth                                  # Show current auth state
+agent-telegram auth phone <number>                   # Submit phone number (e.g. +1234567890)
+agent-telegram auth code <code>                      # Submit verification code
+agent-telegram auth password <password>              # Submit 2FA password
+agent-telegram auth logout                           # Log out of Telegram
 
 # Discovery
-tg <command> --help                      # Per-command help
-tg chats                                 # List available chats subcommands
-tg msg                                   # List available msg subcommands
-tg action                                # List available action subcommands
-tg media                                 # List available media subcommands
+agent-telegram <command> --help                      # Per-command help
+agent-telegram chats                                 # List available chats subcommands
+agent-telegram msg                                   # List available msg subcommands
+agent-telegram action                                # List available action subcommands
+agent-telegram media                                 # List available media subcommands
 ```
 
 ## Pagination
@@ -237,70 +237,70 @@ When the user asks for a contextual task — summarizing a chat, catching up on 
 
 ```bash
 # Always transcribe when reading for context
-tg msg list <chat> --limit 50 --auto-transcribe
+agent-telegram msg list <chat> --limit 50 --auto-transcribe
 ```
 
 ## Common Patterns
 
 ### Find and respond to unread messages
 ```bash
-tg chats list --unread --type user
+agent-telegram chats list --unread --type user
 # Use last_read_inbox_message_id from each entry to fetch exactly the unread messages
-tg msg list <chatId> --min-id <last_read_inbox_message_id>
-tg action send <chatId> "response" --html
+agent-telegram msg list <chatId> --min-id <last_read_inbox_message_id>
+agent-telegram action send <chatId> "response" --html
 ```
 
 ### Paginate through history
 ```bash
-tg msg list <chat> --limit 50
+agent-telegram msg list <chat> --limit 50
 # Use nextOffset from response
-tg msg list <chat> --limit 50 --offset-id <nextOffset>
+agent-telegram msg list <chat> --limit 50 --offset-id <nextOffset>
 ```
 
 ### Search with context
 ```bash
-tg msg search "keyword" --context 3 --limit 10
+agent-telegram msg search "keyword" --context 3 --limit 10
 # Each result includes 3 messages before and 3 after
 ```
 
 ### Send programmatic messages
 ```bash
-echo "<b>Report</b>" | tg action send me --stdin --html
-tg action send me --file /tmp/report.html --html
+echo "<b>Report</b>" | agent-telegram action send me --stdin --html
+agent-telegram action send me --file /tmp/report.html --html
 ```
 
 ### Download media from messages
 ```bash
-tg msg list <chat> --filter photo --limit 5
-tg media download <chat> <msgId> --output /tmp/file.jpg
+agent-telegram msg list <chat> --filter photo --limit 5
+agent-telegram media download <chat> <msgId> --output /tmp/file.jpg
 ```
 
 ### Find entities
 ```bash
-tg chats search "Boris" --type chat         # Find a person in your chats
-tg chats search "chatgpt" --type bot        # Find bots in your chats
-tg chats search "telegram" --type channel   # Find channels in your chats
-tg chats search "news" --global             # Discover public entities you haven't joined
+agent-telegram chats search "Boris" --type chat         # Find a person in your chats
+agent-telegram chats search "chatgpt" --type bot        # Find bots in your chats
+agent-telegram chats search "telegram" --type channel   # Find channels in your chats
+agent-telegram chats search "news" --global             # Discover public entities you haven't joined
 ```
 
 ### Monitor a chat
 ```bash
-tg listen --chat -1001731417779
+agent-telegram listen --chat -1001731417779
 # Each event is a JSON line; parse with jq
-tg listen --type user | while read line; do echo "$line" | jq .type; done
+agent-telegram listen --type user | while read line; do echo "$line" | jq .type; done
 ```
 
 ### Interact with bot inline keyboards
 ```bash
 # View a bot message with its inline keyboard
-tg msg get <chat> <msgId>
+agent-telegram msg get <chat> <msgId>
 # Output includes reply_markup.rows with button text, type, and data
 
 # Click by flat index (0 = first button across all rows)
-tg action click <chat> <msgId> 0
+agent-telegram action click <chat> <msgId> 0
 
 # Click by button text (case-insensitive exact match)
-tg action click <chat> <msgId> "Записаться"
+agent-telegram action click <chat> <msgId> "Записаться"
 ```
 
 ### Custom TDLib calls
@@ -309,10 +309,10 @@ tg action click <chat> <msgId> "Записаться"
 
 ```bash
 # Simple expressions work with single quotes
-tg eval 'const me = await client.invoke({ _: "getMe" }); success({ id: me.id, name: me.first_name })'
+agent-telegram eval 'const me = await client.invoke({ _: "getMe" }); success({ id: me.id, name: me.first_name })'
 
 # Complex JS: use heredoc (RECOMMENDED)
-tg eval <<'EOF'
+agent-telegram eval <<'EOF'
 const me = await client.invoke({ _: "getMe" });
 const chats = await client.invoke({ _: "getChats", chat_list: { _: "chatListMain" }, limit: 5 });
 const titles = [];
@@ -324,11 +324,11 @@ success({ user: me.first_name, top_chats: titles });
 EOF
 
 # Or from a file
-tg eval --file /tmp/my-script.js
+agent-telegram eval --file /tmp/my-script.js
 ```
 
 **Rules of thumb:**
-- Single-line, no `!` or nested quotes → `tg eval 'expression'` is fine
+- Single-line, no `!` or nested quotes → `agent-telegram eval 'expression'` is fine
 - Anything with `!==`, `!flag`, nested quotes, multiline → use heredoc `<<'EOF'`
 - Reusable scripts → use `--file`
 
@@ -339,10 +339,10 @@ tg eval --file /tmp/my-script.js
 Auto-starts on first command. Shuts down after 10 minutes of inactivity. All commands go through it.
 
 ```bash
-tg daemon status   # Check if running
-tg daemon stop     # Stop manually
-tg daemon start    # Start manually
-tg daemon log      # View recent daemon log
+agent-telegram daemon status   # Check if running
+agent-telegram daemon stop     # Stop manually
+agent-telegram daemon start    # Start manually
+agent-telegram daemon log      # View recent daemon log
 ```
 
 ## Feedback
