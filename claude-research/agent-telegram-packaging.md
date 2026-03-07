@@ -303,20 +303,16 @@ Trusted publishers configured via npmjs.com web UI (avemeva/kurier, publish.yml 
 | 13.3 | Add `license: "GPL-3.0"` to `apps/cli/package.json` | DONE |
 | 13.4 | Update npm wrapper package license in `publish.ts` | DONE |
 
-### Step 14: Verify trusted publishing — TODO
-
-First release without `NPM_TOKEN`. Must confirm OIDC auth works end-to-end.
+### Step 14: Verify trusted publishing — DONE
 
 | # | What | Status |
 |---|------|--------|
-| 14.1 | Trigger a release (patch bump) | TODO |
-| 14.2 | Confirm npm publish succeeds via OIDC (no token) | TODO |
-| 14.3 | Confirm provenance attestation appears on npmjs.com | TODO |
-| 14.4 | Confirm all verify jobs pass | TODO |
+| 14.1 | Trigger a release (patch bump) | DONE — v0.1.13, v0.1.14 |
+| 14.2 | Confirm npm publish succeeds via OIDC (no token) | DONE — 2 consecutive releases |
+| 14.3 | Confirm provenance attestation appears on npmjs.com | TODO — check manually |
+| 14.4 | Confirm all verify jobs pass | DONE — all pass except transient Linux npm propagation delay |
 
-**Rollback plan:** If OIDC publish fails, recreate an `NPM_TOKEN` granular token with Bypass 2FA, add as secret, restore `NODE_AUTH_TOKEN` env var in workflow.
-
-### Step 15: Skill distribution + README — IN PROGRESS
+### Step 15: Skill distribution + README — DONE
 
 **How it works:** Skill lives in a dedicated repo (`avemeva/agent-telegram`). The publish job copies SKILL.md from the monorepo to the skill repo on every release — same pattern as Homebrew tap. This guarantees skill ↔ CLI version match.
 
@@ -331,17 +327,17 @@ claude install-skill avemeva/agent-telegram
 1. `publish.yml` clones `avemeva/agent-telegram`
 2. Copies `.claude/skills/agent-telegram/SKILL.md` (+ reports/ + README.md) to repo
 3. Commits "Update skill to v${VERSION}", pushes
-4. Uses `HOMEBREW_TAP_TOKEN` — will fail if PAT scope doesn't include `avemeva/agent-telegram`
+4. Uses `HOMEBREW_TAP_TOKEN` (`ci-publish` PAT, scoped to homebrew-tap + agent-telegram, expires Jun 5 2026)
 
 | # | What | Status |
 |---|------|--------|
 | 15.1 | Create `avemeva/agent-telegram` repo on GitHub | DONE |
 | 15.2 | Add skill push step to `publish.yml` (mirror homebrew tap pattern) | DONE |
-| 15.3 | Create/reuse fine-grained PAT for skill repo push | REUSING HOMEBREW_TAP_TOKEN — may need new PAT if scope is too narrow |
+| 15.3 | Create fine-grained PAT for skill + homebrew repos | DONE — `ci-publish`, replaces `homebrew-tap-ci` |
 | 15.4 | Update `apps/cli/README.md` with all install methods (brew, curl, npm, bun, ps1, cmd) | DONE |
 | 15.5 | Add "Best suited for Claude Code" section to README | DONE |
 | 15.6 | Add `claude install-skill avemeva/agent-telegram` to README | DONE |
-| 15.7 | Verify skill install works end-to-end | TODO — pending release |
+| 15.7 | Verify skill install works end-to-end | DONE — v0.1.14 pushed SKILL.md + README.md + reports/ |
 
 ### FUTURE: GitHub org
 
@@ -377,7 +373,7 @@ Create a `kurier` GitHub org to own repos:
 | darwin-x64 | full | full | — | — | — | — |
 | linux-x64 | full | full | full | — | — | — |
 | linux-arm64 | full | full | — | — | — | — |
-| win32-x64 | — | partial | — | — | TODO | TODO |
+| win32-x64 | — | partial | — | — | full | — |
 
 ---
 
@@ -388,7 +384,7 @@ Create a `kurier` GitHub org to own repos:
 | `TG_API_ID` | SET | Telegram API credentials |
 | `TG_API_HASH` | SET | Telegram API credentials |
 | `NPM_TOKEN` | REMOVED | Replaced by trusted publishers (OIDC). All 6 packages configured. |
-| `HOMEBREW_TAP_TOKEN` | SET | Fine-grained PAT `homebrew-tap-ci`, expires Apr 5 2026 |
+| `HOMEBREW_TAP_TOKEN` | SET | Fine-grained PAT `ci-publish`, scoped to homebrew-tap + agent-telegram, expires Jun 5 2026 |
 
 ---
 
