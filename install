@@ -285,6 +285,45 @@ else
     wget --show-progress -qO "$tmp_dir/$filename" "$url"
 fi
 
+# --- Verify checksum ---
+
+checksums_url="https://github.com/${REPO}/releases/download/v${specific_version}/checksums.txt"
+checksums_ok=false
+
+if [ "$downloader" = "curl" ]; then
+    if curl -fsSL -o "$tmp_dir/checksums.txt" "$checksums_url" 2>/dev/null; then
+        checksums_ok=true
+    fi
+else
+    if wget -qO "$tmp_dir/checksums.txt" "$checksums_url" 2>/dev/null; then
+        checksums_ok=true
+    fi
+fi
+
+if [ "$checksums_ok" = "true" ]; then
+    expected_hash=$(grep "  ${filename}$" "$tmp_dir/checksums.txt" | awk '{print $1}')
+    if [ -n "$expected_hash" ]; then
+        if command -v sha256sum >/dev/null 2>&1; then
+            actual_hash=$(sha256sum "$tmp_dir/$filename" | awk '{print $1}')
+        else
+            actual_hash=$(shasum -a 256 "$tmp_dir/$filename" | awk '{print $1}')
+        fi
+
+        if [ "$actual_hash" != "$expected_hash" ]; then
+            echo -e "${RED}Error: Checksum verification failed${NC}"
+            echo -e "${RED}  Expected: ${expected_hash}${NC}"
+            echo -e "${RED}  Actual:   ${actual_hash}${NC}"
+            rm -rf "$tmp_dir"
+            exit 1
+        fi
+        echo -e "${MUTED}Checksum verified${NC}"
+    else
+        echo -e "${ORANGE}Warning: No checksum found for ${filename}, skipping verification${NC}"
+    fi
+else
+    echo -e "${ORANGE}Warning: Could not download checksums.txt, skipping verification${NC}"
+fi
+
 if [ "$archive_ext" = ".tar.gz" ]; then
     tar -xzf "$tmp_dir/$filename" -C "$tmp_dir"
 else

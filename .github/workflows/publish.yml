@@ -114,6 +114,8 @@ jobs:
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
+      - name: Update npm for trusted publishing (OIDC)
+        run: npm install -g npm@latest
       - run: bun install --frozen-lockfile
 
       - name: Download all artifacts
@@ -138,8 +140,6 @@ jobs:
         run: |
           cd apps/cli
           bun run scripts/publish.ts
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish to npm (dry run)
         if: ${{ inputs.dry_run }}
@@ -147,12 +147,19 @@ jobs:
           cd apps/cli
           bun run scripts/publish.ts --dry-run
 
+      - name: Generate checksums
+        run: |
+          cd apps/cli/dist
+          sha256sum *.zip *.tar.gz 2>/dev/null > checksums.txt
+          echo "Generated checksums:"
+          cat checksums.txt
+
       - name: Create GitHub Release
         if: ${{ !inputs.dry_run }}
         run: |
           TAG="v${{ steps.version.outputs.version }}"
           ARCHIVES=()
-          for f in apps/cli/dist/*.zip apps/cli/dist/*.tar.gz; do
+          for f in apps/cli/dist/*.zip apps/cli/dist/*.tar.gz apps/cli/dist/checksums.txt; do
             [ -f "$f" ] && ARCHIVES+=("$f")
           done
           if gh release view "$TAG" &>/dev/null; then
@@ -174,6 +181,26 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/agent-telegram.rb
           git commit -m "Update agent-telegram to v${VERSION}"
+          git push
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Update skill repo
+        if: ${{ !inputs.dry_run }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/avemeva/agent-telegram.git /tmp/skill-repo
+          cp .claude/skills/agent-telegram/SKILL.md /tmp/skill-repo/SKILL.md
+          cp apps/cli/README.md /tmp/skill-repo/README.md
+          if [ -d ".claude/skills/agent-telegram/reports" ]; then
+            cp -r .claude/skills/agent-telegram/reports /tmp/skill-repo/reports
+          fi
+          cd /tmp/skill-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && echo "No changes to skill repo" && exit 0
+          git commit -m "Update skill to v${VERSION}"
           git push
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -210,12 +237,23 @@ jobs:
             method: bun
           - os: macos-14
             method: brew
+          - os: windows-latest
+            method: ps1
     runs-on: ${{ matrix.os }}
     steps:
       - name: Install via curl
         if: matrix.method == 'curl'
         run: |
           curl -fsSL https://raw.githubusercontent.com/avemeva/kurier/main/install | bash -s -- --no-modify-path
+
+      - name: Install via PowerShell
+        if: matrix.method == 'ps1'
+        shell: pwsh
+        run: |
+          $script = Invoke-WebRequest -Uri "https://raw.githubusercontent.com/avemeva/kurier/main/install.ps1" -UseBasicParsing
+          $scriptPath = Join-Path $env:TEMP "install-agent-telegram.ps1"
+          Set-Content -Path $scriptPath -Value $script.Content
+          & $scriptPath
 
       - name: Install via npm
         if: matrix.method == 'npm'

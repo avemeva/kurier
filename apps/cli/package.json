@@ -2,6 +2,7 @@
   "name": "@tg/cli",
   "version": "0.1.12",
   "private": true,
+  "license": "GPL-3.0",
   "type": "module",
   "scripts": {
     "dev": "bun run src/index.ts",

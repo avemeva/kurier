@@ -7,7 +7,13 @@ Telegram CLI for AI agents. Read messages, send messages, search, download media
 ### npm (all platforms)
 
 ```bash
-npm install -g @avemeva/agent-telegram
+npm i -g @avemeva/agent-telegram
+```
+
+### Bun (all platforms)
+
+```bash
+bun i -g @avemeva/agent-telegram
 ```
 
 ### Homebrew (macOS)
@@ -20,6 +26,18 @@ brew install avemeva/tap/agent-telegram
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/avemeva/kurier/main/install | bash
+```
+
+### PowerShell (Windows)
+
+```powershell
+irm https://raw.githubusercontent.com/avemeva/kurier/main/install.ps1 | iex
+```
+
+### CMD (Windows)
+
+```cmd
+curl -fsSL https://raw.githubusercontent.com/avemeva/kurier/main/install.cmd -o install.cmd && install.cmd
 ```
 
 ### Verify
@@ -155,6 +173,14 @@ agent-telegram msg list <chat> --limit 50
 agent-telegram msg list <chat> --limit 50 --offset-id <nextOffset>
 ```
 
+## Claude Code Skill
+
+Best suited for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Install the skill to give Claude full Telegram access:
+
+```bash
+claude install-skill avemeva/agent-telegram
+```
+
 ## License
 
-MIT
+GPL-3.0

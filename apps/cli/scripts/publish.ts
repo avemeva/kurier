@@ -62,7 +62,7 @@ const publishTasks = platforms.map(async ({ os, arch }) => {
     await $`chmod -R 755 ${distDir}`;
   }
 
-  const args = ['npm', 'publish', '--access', 'public', '--provenance'];
+  const args = ['npm', 'publish', '--access', 'public'];
   if (dryRun) args.push('--dry-run');
   const result = await $`${args}`.cwd(distDir).nothrow();
   if (result.exitCode !== 0) {
@@ -94,7 +94,7 @@ const wrapperPkg = {
   bin: { 'agent-telegram': './bin/agent-telegram.js' },
   scripts: { postinstall: 'node ./postinstall.mjs' },
   optionalDependencies,
-  license: 'MIT',
+  license: 'GPL-3.0',
   repository: {
     type: 'git',
     url: 'https://github.com/avemeva/kurier',
@@ -116,7 +116,7 @@ if (existsSync(readmeFile)) {
 }
 
 console.log('Publishing wrapper package...');
-const wrapperArgs = ['npm', 'publish', '--access', 'public', '--provenance'];
+const wrapperArgs = ['npm', 'publish', '--access', 'public'];
 if (dryRun) wrapperArgs.push('--dry-run');
 const wrapperResult = await $`${wrapperArgs}`.cwd(path.resolve(wrapperDir)).nothrow();
 if (wrapperResult.exitCode !== 0) {
@@ -215,62 +215,5 @@ const formulaPath = 'dist/agent-telegram.rb';
 await writeFile(formulaPath, formula);
 console.log(`Formula written to ${formulaPath}`);
 console.log(formula);
-
-// --- Generate winget manifest ---
-
-if (shas['win32-x64']) {
-  console.log('\n--- Winget Manifest ---\n');
-
-  const wingetDir = `dist/winget/manifests/a/avemeva/agent-telegram/${version}`;
-  const { mkdirSync: mkdirS } = await import('node:fs');
-  mkdirS(wingetDir, { recursive: true });
-
-  const versionManifest = `PackageIdentifier: avemeva.agent-telegram
-PackageVersion: ${version}
-DefaultLocale: en-US
-ManifestType: version
-ManifestVersion: 1.9.0
-`;
-
-  const localeManifest = `PackageIdentifier: avemeva.agent-telegram
-PackageVersion: ${version}
-PackageLocale: en-US
-Publisher: avemeva
-PublisherUrl: https://github.com/avemeva
-PackageName: agent-telegram
-PackageUrl: https://github.com/avemeva/kurier
-License: MIT
-LicenseUrl: https://github.com/avemeva/kurier/blob/main/LICENSE
-ShortDescription: AI-powered Telegram CLI
-Tags:
-  - telegram
-  - cli
-  - ai
-ManifestType: defaultLocale
-ManifestVersion: 1.9.0
-`;
-
-  const installerManifest = `PackageIdentifier: avemeva.agent-telegram
-PackageVersion: ${version}
-InstallerType: zip
-NestedInstallerType: portable
-NestedInstallerFiles:
-  - RelativeFilePath: bin\\agent-telegram.exe
-    PortableCommandAlias: agent-telegram
-Installers:
-  - Architecture: x64
-    InstallerUrl: ${ghBase}/agent-telegram-win32-x64.zip
-    InstallerSha256: ${shas['win32-x64']}
-ManifestType: installer
-ManifestVersion: 1.9.0
-`;
-
-  await writeFile(`${wingetDir}/avemeva.agent-telegram.yaml`, versionManifest);
-  await writeFile(`${wingetDir}/avemeva.agent-telegram.locale.en-US.yaml`, localeManifest);
-  await writeFile(`${wingetDir}/avemeva.agent-telegram.installer.yaml`, installerManifest);
-
-  console.log(`Winget manifests written to ${wingetDir}/`);
-  console.log(installerManifest);
-}
 
 console.log('Done.');

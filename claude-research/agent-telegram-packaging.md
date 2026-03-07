@@ -5,11 +5,12 @@
 A person runs one command and gets a working Telegram CLI. No build tools, no dependencies, no second step.
 
 ```bash
-brew install avemeva/tap/agent-telegram        # macOS/Linux
+brew install avemeva/tap/agent-telegram        # macOS
 curl -fsSL .../install | bash                  # macOS/Linux
 npm i -g @avemeva/agent-telegram               # all platforms
 bun i -g @avemeva/agent-telegram               # all platforms
-winget install agent-telegram                  # Windows
+irm .../install.ps1 | iex                      # Windows PowerShell
+curl -fsSL .../install.cmd -o i.cmd && i.cmd   # Windows CMD
 ```
 
 After any of these:
@@ -181,45 +182,19 @@ Fix: recreated token with Bypass 2FA checked. Immutable after creation — must 
 
 ## TODO
 
-### Step 7: Fix daemon on Linux (BLOCKING)
+### Step 7: Fix daemon on Linux — DONE
 
-**Status as of v0.1.11:** Daemon works on macOS (all channels), fails on ALL Linux verify jobs.
+**Root cause:** `tdl` ships prebuilds with platform-specific filenames: `tdl.node` (macOS/Windows), `tdl.glibc.node` (linux-x64), `tdl.armv8.glibc.node` (linux-arm64). Build script hardcoded `tdl.node`, so `copyFileSync` silently failed on Linux — the prebuilds directory was created but empty. `node-gyp-build` found nothing and fell back to the baked CI path.
 
-**What works (v0.1.11 CI run 22786956864):**
-- All 5 builds pass (including daemon smoke test on all non-Windows)
-- macOS verify: curl, npm, bun, brew — ALL PASS
-- Windows verify: npm — PASS
+**Fix (v0.1.12):** Changed `build.ts` to copy all `*.node` files from the prebuilds directory instead of hardcoding the filename. Also fixed the CI prebuild check in `publish.yml` to use `*.node` glob.
 
-**What fails:**
-- Linux verify: curl, npm, bun on ubuntu-latest AND ubuntu-24.04-arm — ALL FAIL
-- Error: `No native build was found for platform=linux arch=x64 runtime=node ...`
-- `loaded from: /home/runner/work/kurier/kurier/node_modules/tdl` (baked CI path)
-
-**Confirmed facts:**
-- Prebuilds ARE installed by curl script (log: `Installed tdl.node prebuilds to /home/runner/.local/bin/prebuilds`)
-- Build smoke test passes (prebuilds found because baked path EXISTS on build runner — same machine)
-- macOS verify passes (prebuilds found via `process.execPath` fallback in node-gyp-build)
-- Linux verify fails (prebuilds NOT found via `process.execPath` fallback)
-
-**Root cause hypothesis:**
-`node-gyp-build` falls back to `path.dirname(process.execPath)` to search for prebuilds. This works on macOS but fails on Linux. [assumption] Possible Bun compiled binary behavior difference — `process.execPath` may resolve differently on Linux (e.g. via `/proc/self/exe` to a different resolved path), or `fs.readdirSync` may behave differently in the Bun virtual filesystem context.
-
-**Investigation approach:**
-- Debug locally with Docker: `docker run --rm -v $(pwd)/apps/cli/dist:/dist ubuntu:24.04 /dist/agent-telegram-linux-x64/bin/agent-telegram --daemon`
-- Check `process.execPath` value on Linux compiled binary
-- Check if `fs.readdirSync(path.dirname(process.execPath) + '/prebuilds')` works
-
-**Fix options:**
-1. **Debug process.execPath on Linux** — understand why the fallback search fails
-2. **Bypass node-gyp-build entirely** — preload the addon from a known path before tdl imports it
-3. **Replace `tdl` with `bun:ffi`** — dlopen tdjson directly, no native addon needed at all (cleanest but largest change)
-4. **Set env var** — `process.env.TDL_PREBUILD = path.dirname(process.execPath)` before tdl is loaded (only works if the baked package.json is readable from bundled filesystem)
+**Verified:** CI run 22787845543 — all 18 jobs passed, including all Linux verify jobs (curl, npm, bun on ubuntu-latest + ubuntu-24.04-arm).
 
 | # | What | Status |
 |---|------|--------|
-| 7.4 | Understand why node-gyp-build process.execPath fallback fails on Linux | TODO |
-| 7.5 | Fix Linux daemon to find tdl.node | TODO |
-| 7.6 | CI verify: all Linux jobs pass | TODO |
+| 7.4 | Root cause: prebuild filename mismatch (tdl.node vs tdl.glibc.node) | DONE |
+| 7.5 | Fix: copy all *.node files from prebuilds dir | DONE (v0.1.12) |
+| 7.6 | CI verify: all Linux jobs pass | DONE — run 22787845543 |
 
 ### Step 6.5: Local clean brew install verification — DONE
 
@@ -245,13 +220,20 @@ Full clean-slate verification on the developer's machine (v0.1.11):
 | 8.3 | Bun install channel | DONE — macos-14, ubuntu-latest |
 | 8.4 | Brew install channel | DONE — macos-14 |
 
-### Step 9: npm trusted publishers — PARTIALLY DONE
+### Step 9: npm trusted publishers — DONE
+
+Trusted publishers configured via npmjs.com web UI (avemeva/kurier, publish.yml workflow).
 
 | # | What | Status |
 |---|------|--------|
-| 9.1 | Configure trusted publisher on npmjs.com | TODO — requires browser/web UI |
+| 9.1a | Configure trusted publisher: `@avemeva/agent-telegram` | DONE |
+| 9.1b | Configure trusted publisher: `@avemeva/agent-telegram-darwin-arm64` | DONE |
+| 9.1c | Configure trusted publisher: `@avemeva/agent-telegram-darwin-x64` | DONE |
+| 9.1d | Configure trusted publisher: `@avemeva/agent-telegram-linux-x64` | DONE |
+| 9.1e | Configure trusted publisher: `@avemeva/agent-telegram-linux-arm64` | DONE |
+| 9.1f | Configure trusted publisher: `@avemeva/agent-telegram-win32-x64` | DONE |
 | 9.2 | `publish.yml` has `id-token: write` + `--provenance` | DONE (v0.1.7) |
-| 9.3 | Remove `NPM_TOKEN` secret from GitHub | TODO — after 9.1 verified working |
+| 9.3 | Remove `NPM_TOKEN` secret from GitHub | DONE |
 
 ### Step 10: Missing platforms — DONE
 
@@ -266,13 +248,108 @@ Full clean-slate verification on the developer's machine (v0.1.11):
 |---|------|--------|
 | 11.1 | Remove cask from homebrew tap | DONE — commit b90bf7a |
 
-### Step 12: winget — PARTIALLY DONE
+### Step 12: Windows install scripts — TODO
+
+**Original plan:** winget. **Problem:** winget requires manual PRs to `microsoft/winget-pkgs` for every release — not automatable, not sustainable.
+
+**New plan:** Follow Claude Code's approach — PowerShell and CMD install scripts that download from GitHub Releases directly. No package manager dependency.
+
+**Reference implementations fetched and analyzed:**
+- `claude.ai/install.sh` → GCS bucket, manifest.json checksums, `claude install` subcommand
+- `claude.ai/install.ps1` → PowerShell, same pattern for Windows
+- `claude.ai/install.cmd` → CMD fallback, delegates to PowerShell when possible
+
+**Key difference:** Claude Code has a `claude install` subcommand that handles placement. We don't — our install scripts must handle placement directly because the binary needs companion files (prebuilds, tdjson) already in place to function.
+
+**Windows install locations:**
+```
+%LOCALAPPDATA%\Programs\agent-telegram\
+  bin\agent-telegram.exe                        → binary
+  bin\prebuilds\win32-x64\tdl.node              → native addon (next to binary for node-gyp-build)
+  lib\tdjson.dll                                → TDLib shared library
+```
+
+**Checksum verification:** Generate `checksums.txt` during CI (sha256sum of all archives), upload as release asset. Scripts verify against it. Standard pattern (goreleaser, Deno, Bun).
 
 | # | What | Status |
 |---|------|--------|
-| 12.1 | Create winget manifest | DONE — generated by `publish.ts` (v0.1.7) |
-| 12.2 | Submit to winget-pkgs repo | TODO — requires PR to `microsoft/winget-pkgs` |
-| 12.3 | Add winget to CI verify matrix (windows) | TODO — after 12.2 accepted |
+| 12.1 | ~~winget manifest~~ | ABANDONED — manual PRs not sustainable |
+| 12.2 | ~~winget-pkgs PR~~ | ABANDONED — close PR #346119 |
+| 12.3 | Generate `checksums.txt` in publish job | DONE |
+| 12.4 | Add SHA256 verification to bash `install` script | DONE |
+| 12.5 | Create `install.ps1` (PowerShell, primary Windows installer) | DONE |
+| 12.6 | Create `install.cmd` (CMD fallback, delegates to PS1 when possible) | DONE |
+| 12.7 | Verify `paths.ts` returns correct Windows paths for `%LOCALAPPDATA%` | DONE (already correct) |
+| 12.8 | Add Windows ps1 to CI verify matrix | DONE |
+
+**Acceptance criteria (Windows ps1/cmd):**
+
+| # | What | How to verify | Status |
+|---|------|---------------|--------|
+| W1 | `irm .../install.ps1 \| iex` completes | CI windows-latest | TODO |
+| W2 | `agent-telegram --version` returns version | CI verify | TODO |
+| W3 | `agent-telegram doctor` all checks pass | CI verify | TODO |
+| W4 | `agent-telegram --daemon` starts + health check | CI verify | TODO |
+| W5 | `agent-telegram me` returns live data | Manual (needs auth) | TODO |
+
+**Hosting:** `https://raw.githubusercontent.com/avemeva/kurier/main/install.ps1` (always latest, not pinned to release tag — matches Claude Code's pattern).
+
+### Step 13: License — DONE
+
+| # | What | Status |
+|---|------|--------|
+| 13.1 | Add `LICENSE` file to repo root (GPL v3) | DONE |
+| 13.2 | Add `license: "GPL-3.0"` to root `package.json` | DONE |
+| 13.3 | Add `license: "GPL-3.0"` to `apps/cli/package.json` | DONE |
+| 13.4 | Update npm wrapper package license in `publish.ts` | DONE |
+
+### Step 14: Verify trusted publishing — TODO
+
+First release without `NPM_TOKEN`. Must confirm OIDC auth works end-to-end.
+
+| # | What | Status |
+|---|------|--------|
+| 14.1 | Trigger a release (patch bump) | TODO |
+| 14.2 | Confirm npm publish succeeds via OIDC (no token) | TODO |
+| 14.3 | Confirm provenance attestation appears on npmjs.com | TODO |
+| 14.4 | Confirm all verify jobs pass | TODO |
+
+**Rollback plan:** If OIDC publish fails, recreate an `NPM_TOKEN` granular token with Bypass 2FA, add as secret, restore `NODE_AUTH_TOKEN` env var in workflow.
+
+### Step 15: Skill distribution + README — IN PROGRESS
+
+**How it works:** Skill lives in a dedicated repo (`avemeva/agent-telegram`). The publish job copies SKILL.md from the monorepo to the skill repo on every release — same pattern as Homebrew tap. This guarantees skill ↔ CLI version match.
+
+**Source of truth:** `.claude/skills/agent-telegram/SKILL.md` in kurier (already exists, 17KB).
+
+**Distribution repo:** `avemeva/agent-telegram` — users install with:
+```bash
+claude install-skill avemeva/agent-telegram
+```
+
+**Publish flow (same as homebrew tap):**
+1. `publish.yml` clones `avemeva/agent-telegram`
+2. Copies `.claude/skills/agent-telegram/SKILL.md` (+ reports/ + README.md) to repo
+3. Commits "Update skill to v${VERSION}", pushes
+4. Uses `HOMEBREW_TAP_TOKEN` — will fail if PAT scope doesn't include `avemeva/agent-telegram`
+
+| # | What | Status |
+|---|------|--------|
+| 15.1 | Create `avemeva/agent-telegram` repo on GitHub | DONE |
+| 15.2 | Add skill push step to `publish.yml` (mirror homebrew tap pattern) | DONE |
+| 15.3 | Create/reuse fine-grained PAT for skill repo push | REUSING HOMEBREW_TAP_TOKEN — may need new PAT if scope is too narrow |
+| 15.4 | Update `apps/cli/README.md` with all install methods (brew, curl, npm, bun, ps1, cmd) | DONE |
+| 15.5 | Add "Best suited for Claude Code" section to README | DONE |
+| 15.6 | Add `claude install-skill avemeva/agent-telegram` to README | DONE |
+| 15.7 | Verify skill install works end-to-end | TODO — pending release |
+
+### FUTURE: GitHub org
+
+Create a `kurier` GitHub org to own repos:
+- `kurier/kurier` (monorepo, replaces `avemeva/kurier`)
+- `kurier/agent-telegram` (skill repo)
+- `kurier/homebrew-tap` (replaces `avemeva/homebrew-tap`)
+- npm scope: `@kurier/agent-telegram` (replaces `@avemeva/agent-telegram`)
 
 ---
 
@@ -294,13 +371,13 @@ Full clean-slate verification on the developer's machine (v0.1.11):
 `partial` = --version + doctor only (no daemon test).
 `broken` = install works, daemon crashes (tdl.node not found).
 
-| | curl | npm | bun | brew | winget |
-|---|---|---|---|---|---|
-| darwin-arm64 | full | full | full | full | — |
-| darwin-x64 | full | full | — | — | — |
-| linux-x64 | broken | broken | broken | — | — |
-| linux-arm64 | broken | broken | — | — | — |
-| win32-x64 | — | partial | — | — | TODO |
+| | curl/bash | npm | bun | brew | ps1 | cmd |
+|---|---|---|---|---|---|---|
+| darwin-arm64 | full | full | full | full | — | — |
+| darwin-x64 | full | full | — | — | — | — |
+| linux-x64 | full | full | full | — | — | — |
+| linux-arm64 | full | full | — | — | — | — |
+| win32-x64 | — | partial | — | — | TODO | TODO |
 
 ---
 
@@ -310,7 +387,7 @@ Full clean-slate verification on the developer's machine (v0.1.11):
 |--------|--------|-------|
 | `TG_API_ID` | SET | Telegram API credentials |
 | `TG_API_HASH` | SET | Telegram API credentials |
-| `NPM_TOKEN` | SET | Granular token `ci-publish`, Bypass 2FA, expires Jun 4 2026. TODO: replace with trusted publishers |
+| `NPM_TOKEN` | REMOVED | Replaced by trusted publishers (OIDC). All 6 packages configured. |
 | `HOMEBREW_TAP_TOKEN` | SET | Fine-grained PAT `homebrew-tap-ci`, expires Apr 5 2026 |
 
 ---
@@ -359,6 +436,9 @@ node_modules/tdl/prebuilds/
 |--------|-------------|
 | opencode (`/Users/andrey/Projects/opencode`) | Bun.build() compile, npm wrapper, postinstall hardlink, publish pipeline, Homebrew formula (conditional url/sha256 per platform) |
 | agent-browser (`/Users/andrey/Projects/agent-browser`) | Simpler npm wrapper, in homebrew-core (not a tap) |
+| Claude Code (`claude.ai/install.{sh,ps1,cmd}`) | PowerShell/CMD install scripts pattern, checksums.txt, always-latest bootstrap from main branch |
+| skills.sh | Skill distribution format: SKILL.md with YAML frontmatter, references/ dir for detailed docs |
+| tdesktop (`/Users/andrey/Projects/tdesktop`) | GPL v3 license (standard for Telegram ecosystem) |
 
 ### Lessons learned
 
@@ -370,3 +450,4 @@ node_modules/tdl/prebuilds/
 6. **Cached Homebrew downloads carry xattrs** — if you previously installed a cask, the cached zip has quarantine. Clear cache before testing formula.
 7. **`node-gyp-build` searches `path.dirname(process.execPath)`** — ship `prebuilds/<platform>-<arch>/tdl.node` next to the binary and it just works
 8. **Hoisted deps in monorepos** — `tdl` lives at root `node_modules/`, not `apps/cli/node_modules/`. Paths in build scripts must account for this (`../../node_modules/tdl/`)
+9. **winget requires manual PRs** — every release needs a PR to `microsoft/winget-pkgs`. Not automatable. Direct install scripts (PowerShell/CMD) are better — see Claude Code's approach (`claude.ai/install.ps1`, `claude.ai/install.cmd`)
