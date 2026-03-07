@@ -25,19 +25,19 @@ brew install avemeva/tap/agent-telegram
 ### curl (macOS/Linux)
 
 ```bash
-curl -fsSL kurier.sh/install | bash
+curl -fsSL https://kurier.sh/install | bash
 ```
 
 ### PowerShell (Windows)
 
 ```powershell
-irm kurier.sh/install.ps1 | iex
+irm https://kurier.sh/install.ps1 | iex
 ```
 
 ### CMD (Windows)
 
 ```cmd
-curl -fsSL kurier.sh/install.cmd -o install.cmd && install.cmd
+curl -fsSL https://kurier.sh/install.cmd -o install.cmd && install.cmd
 ```
 
 ### Verify

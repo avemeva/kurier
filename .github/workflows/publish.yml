@@ -227,13 +227,13 @@ jobs:
       - name: Install via curl
         if: matrix.method == 'curl'
         run: |
-          curl -fsSL https://raw.githubusercontent.com/avemeva/kurier/main/install | bash -s -- --no-modify-path
+          curl -fsSL https://kurier.sh/install | bash -s -- --no-modify-path
 
       - name: Install via PowerShell
         if: matrix.method == 'ps1'
         shell: pwsh
         run: |
-          $script = Invoke-WebRequest -Uri "https://raw.githubusercontent.com/avemeva/kurier/main/install.ps1" -UseBasicParsing
+          $script = Invoke-WebRequest -Uri "https://kurier.sh/install.ps1" -UseBasicParsing
           $scriptPath = Join-Path $env:TEMP "install-agent-telegram.ps1"
           Set-Content -Path $scriptPath -Value $script.Content
           & $scriptPath

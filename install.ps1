@@ -1,8 +1,8 @@
 # agent-telegram CLI Installer for Windows
 #
 # Usage:
-#   irm https://raw.githubusercontent.com/avemeva/kurier/main/install.ps1 | iex
-#   irm https://raw.githubusercontent.com/avemeva/kurier/main/install.ps1 | iex -Version 0.1.0
+#   irm https://kurier.sh/install.ps1 | iex
+#   irm https://kurier.sh/install.ps1 | iex -Version 0.1.0
 #
 # Or download and run:
 #   .\install.ps1 [-Version <version>] [-NoModifyPath]
@@ -33,7 +33,7 @@ Options:
     -Help               Display this help message
 
 Examples:
-    irm https://raw.githubusercontent.com/avemeva/kurier/main/install.ps1 | iex
+    irm https://kurier.sh/install.ps1 | iex
     .\install.ps1 -Version 0.1.0
 "@
     exit 0

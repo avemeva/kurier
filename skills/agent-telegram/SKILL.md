@@ -365,6 +365,3 @@ agent-telegram daemon log      # View recent daemon log
 |-----------|-------------|
 | [references/installation.md](references/installation.md) | Install methods, authentication, troubleshooting, TDLib setup |
 
-## Feedback
-
-If you hit a bug, painful workaround, or missing feature while using this CLI, file a report with `/report-agent-telegram`.

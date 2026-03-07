@@ -10,13 +10,13 @@
 
 where powershell >nul 2>nul
 if %errorlevel% equ 0 (
-    powershell -ExecutionPolicy Bypass -Command "& { irm https://raw.githubusercontent.com/avemeva/kurier/main/install.ps1 -OutFile '%TEMP%\agent-telegram-install.ps1'; & '%TEMP%\agent-telegram-install.ps1' %*; Remove-Item '%TEMP%\agent-telegram-install.ps1' -ErrorAction SilentlyContinue }"
+    powershell -ExecutionPolicy Bypass -Command "& { irm https://kurier.sh/install.ps1 -OutFile '%TEMP%\agent-telegram-install.ps1'; & '%TEMP%\agent-telegram-install.ps1' %*; Remove-Item '%TEMP%\agent-telegram-install.ps1' -ErrorAction SilentlyContinue }"
     exit /b %errorlevel%
 )
 
 where pwsh >nul 2>nul
 if %errorlevel% equ 0 (
-    pwsh -ExecutionPolicy Bypass -Command "& { irm https://raw.githubusercontent.com/avemeva/kurier/main/install.ps1 -OutFile '%TEMP%\agent-telegram-install.ps1'; & '%TEMP%\agent-telegram-install.ps1' %*; Remove-Item '%TEMP%\agent-telegram-install.ps1' -ErrorAction SilentlyContinue }"
+    pwsh -ExecutionPolicy Bypass -Command "& { irm https://kurier.sh/install.ps1 -OutFile '%TEMP%\agent-telegram-install.ps1'; & '%TEMP%\agent-telegram-install.ps1' %*; Remove-Item '%TEMP%\agent-telegram-install.ps1' -ErrorAction SilentlyContinue }"
     exit /b %errorlevel%
 )
 
