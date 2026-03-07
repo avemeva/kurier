@@ -178,7 +178,7 @@ agent-telegram msg list <chat> --limit 50 --offset-id <nextOffset>
 Best suited for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Install the skill to give Claude full Telegram access:
 
 ```bash
-claude install-skill avemeva/agent-telegram
+npx skills add avemeva/agent-telegram
 ```
 
 ## License

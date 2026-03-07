@@ -320,7 +320,7 @@ Trusted publishers configured via npmjs.com web UI (avemeva/kurier, publish.yml 
 
 **Distribution repo:** `avemeva/agent-telegram` — users install with:
 ```bash
-claude install-skill avemeva/agent-telegram
+npx skills add avemeva/agent-telegram
 ```
 
 **Publish flow (same as homebrew tap):**
@@ -336,7 +336,7 @@ claude install-skill avemeva/agent-telegram
 | 15.3 | Create fine-grained PAT for skill + homebrew repos | DONE — `ci-publish`, replaces `homebrew-tap-ci` |
 | 15.4 | Update `apps/cli/README.md` with all install methods (brew, curl, npm, bun, ps1, cmd) | DONE |
 | 15.5 | Add "Best suited for Claude Code" section to README | DONE |
-| 15.6 | Add `claude install-skill avemeva/agent-telegram` to README | DONE |
+| 15.6 | Add `npx skills add avemeva/agent-telegram` to README | DONE |
 | 15.7 | Verify skill install works end-to-end | DONE — v0.1.14 pushed SKILL.md + README.md + reports/ |
 
 ### FUTURE: GitHub org
