@@ -9,12 +9,34 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { existsSync, unlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, unlinkSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 
 const CLI_ENTRY = path.resolve(import.meta.dir, '../../src/index.ts');
 const TIMEOUT = 30_000;
+
+// --- Cold-cache test infrastructure ---
+const PROD_DB_DIR = path.join(
+  homedir(),
+  'Library',
+  'Application Support',
+  'dev.telegramai.app',
+  'tdlib_db',
+);
+const TEST_PORT = '7399';
+const testAppDir = mkdtempSync(path.join(tmpdir(), 'kurier-e2e-'));
+const testDbDir = path.join(testAppDir, 'tdlib_db');
+
+// Copy only td.binlog (auth keys) — no db.sqlite means cold cache
+mkdirSync(testDbDir, { recursive: true });
+cpSync(path.join(PROD_DB_DIR, 'td.binlog'), path.join(testDbDir, 'td.binlog'));
+
+const testEnv = {
+  ...process.env,
+  TG_APP_DIR: testAppDir,
+  TG_DAEMON_PORT: TEST_PORT,
+};
 
 type TgResult = {
   ok: boolean;
@@ -35,7 +57,7 @@ async function tg(...args: string[]): Promise<TgResult> {
   const proc = Bun.spawn(['bun', 'run', CLI_ENTRY, ...args], {
     stdout: 'pipe',
     stderr: 'pipe',
-    env: { ...process.env },
+    env: testEnv,
   });
   const stdout = await new Response(proc.stdout).text();
   const stderr = await new Response(proc.stderr).text();
@@ -75,6 +97,14 @@ beforeAll(async () => {
 afterAll(async () => {
   for (const id of cleanupIds) {
     await tg('action', 'delete', 'me', String(id));
+  }
+  // Stop the test daemon and clean up temp dir
+  await tg('daemon', 'stop');
+  try {
+    const { execSync } = await import('node:child_process');
+    execSync(`trash "${testAppDir}"`);
+  } catch {
+    // Ignore cleanup errors
   }
 }, TIMEOUT);
 
@@ -605,6 +635,24 @@ describe('msg list', () => {
     },
     TIMEOUT,
   );
+
+  it(
+    'cold-cache: returns multiple messages on first fetch',
+    async () => {
+      // Find a group/channel that will have cold cache (no db.sqlite in test dir)
+      const chats = await tg('chats', 'list', '--type', 'group', '--limit', '3');
+      expect(chats.ok).toBe(true);
+      expect(chats.data.length).toBeGreaterThan(0);
+      const chatId = String(chats.data[0].id);
+
+      // On cold cache, TDLib returns only 1 locally-known message without the fix.
+      // With the fix, the pagination loop fetches from server until limit is met.
+      const r = await tg('msg', 'list', chatId, '--limit', '20');
+      expect(r.ok).toBe(true);
+      expect(r.data.length).toBeGreaterThan(1);
+    },
+    TIMEOUT,
+  );
 });
 
 // ─── Search ───
@@ -818,7 +866,7 @@ describe('action send', () => {
         {
           stdout: 'pipe',
           stderr: 'pipe',
-          env: { ...process.env },
+          env: testEnv,
         },
       );
       const stdout = await new Response(proc.stdout).text();

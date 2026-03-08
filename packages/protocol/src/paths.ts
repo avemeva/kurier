@@ -18,6 +18,7 @@ const platform = process.platform;
 // ---------------------------------------------------------------------------
 
 export function getAppDir(): string {
+  if (process.env.TG_APP_DIR) return process.env.TG_APP_DIR;
   switch (platform) {
     case 'darwin':
       return path.join(homedir(), 'Library', 'Application Support', 'dev.telegramai.app');

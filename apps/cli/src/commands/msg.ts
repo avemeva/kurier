@@ -118,10 +118,6 @@ export function register(parent: Command): void {
 
             const flatCount = flattenMessages(slimMessages(matched)).length;
             if (flatCount >= limit) break;
-            if (!since && batch.length < BATCH) {
-              exhaustedSearch = true;
-              break;
-            }
           }
 
           const flat = await enrichMessages(client, matched, enrichOpts(flags));
@@ -143,7 +139,6 @@ export function register(parent: Command): void {
 
         const minId = opts.minId ? Number(opts.minId) : undefined;
         const fromEntity = opts.from ? await resolveEntity(client, opts.from as string) : undefined;
-        const hasClientFilter = !!(minId || fromEntity);
 
         const clientFilter = (m: Td.message): boolean => {
           if (minId && m.id <= minId) return false;
@@ -210,10 +205,6 @@ export function register(parent: Command): void {
 
             const flatCount = flattenMessages(slimMessages(matched)).length;
             if (flatCount >= limit) break;
-            if (!hasClientFilter && batch.length < BATCH) {
-              exhausted = true;
-              break;
-            }
           }
 
           const flatFiltered = await enrichMessages(client, matched, enrichOpts(flags));
@@ -257,10 +248,6 @@ export function register(parent: Command): void {
 
           const flatCount = flattenMessages(slimMessages(matched)).length;
           if (flatCount >= limit) break;
-          if (!hasClientFilter && batch.length < BATCH) {
-            exhaustedHistory = true;
-            break;
-          }
         }
 
         const flatHistory = await enrichMessages(client, matched, enrichOpts(flags));
