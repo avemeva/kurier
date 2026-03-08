@@ -391,7 +391,6 @@ export function register(parent: Command): void {
               if (matched.length >= limit) break;
             }
             cursor = (batch.at(-1) as Td.message).id;
-            if (!since) break;
           }
           const messages = matched;
 

@@ -820,6 +820,24 @@ describe('msg search', () => {
     },
     TIMEOUT,
   );
+
+  it(
+    'cold-cache: --chat search returns results on first fetch',
+    async () => {
+      // Find a group with messages to search in
+      const chats = await tg('chats', 'list', '--type', 'group', '--limit', '3');
+      expect(chats.ok).toBe(true);
+      expect(chats.data.length).toBeGreaterThan(0);
+      const chatId = String(chats.data[0].id);
+
+      // searchChatMessages on cold cache may return fewer than limit.
+      // The loop must continue fetching from server.
+      const r = await tg('msg', 'search', 'a', '--chat', chatId, '--limit', '5');
+      expect(r.ok).toBe(true);
+      expect(r.data.length).toBeGreaterThanOrEqual(1);
+    },
+    TIMEOUT,
+  );
 });
 
 // ─── Send & Edit ───
