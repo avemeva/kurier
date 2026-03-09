@@ -258,6 +258,12 @@ export async function getMe(): Promise<Td.user> {
   return client.invoke({ _: 'getMe' });
 }
 
+// --- User fetch ---
+
+export async function getUser(userId: number): Promise<Td.user> {
+  return client.invoke({ _: 'getUser', user_id: userId });
+}
+
 // --- Media (served from daemon's filesystem cache) ---
 
 /** Remove a cached media download so it can be retried. */

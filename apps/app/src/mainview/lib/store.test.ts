@@ -35,6 +35,7 @@ vi.mock('./telegram', () => ({
   getSenderUserId: vi.fn((sender: Td.MessageSender) =>
     sender._ === 'messageSenderUser' ? sender.user_id : 0,
   ),
+  getUser: vi.fn(() => Promise.resolve({ id: 0, first_name: '', last_name: '' })),
   searchGlobal: vi.fn(),
   searchInChat: vi.fn(),
 }));

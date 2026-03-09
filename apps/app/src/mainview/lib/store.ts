@@ -19,6 +19,7 @@ import {
   getMessageText,
   getProfilePhotoUrl,
   getSenderUserId,
+  getUser,
   markAsRead,
   onUpdate,
   openTdChat,
@@ -125,6 +126,36 @@ const photoRequested = new Set<number>();
 const mediaRequested = new Set<string>();
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const statusTimers = new Map<number, ReturnType<typeof setTimeout>>();
+const userFetchRequested = new Set<number>();
+
+/** Fetch any sender users not yet in the store's users Map. */
+function fetchMissingUsers(
+  messages: Td.message[],
+  get: () => ChatState,
+  set: (partial: Partial<ChatState> | ((s: ChatState) => Partial<ChatState>)) => void,
+): void {
+  const { users } = get();
+  const missing: number[] = [];
+  for (const msg of messages) {
+    if (msg.sender_id._ === 'messageSenderUser') {
+      const uid = msg.sender_id.user_id;
+      if (!users.has(uid) && !userFetchRequested.has(uid)) {
+        userFetchRequested.add(uid);
+        missing.push(uid);
+      }
+    }
+  }
+  if (missing.length === 0) return;
+  Promise.all(missing.map((uid) => getUser(uid).catch(() => null))).then((results) => {
+    set((s) => {
+      const next = new Map(s.users);
+      for (const user of results) {
+        if (user) next.set(user.id, user);
+      }
+      return { users: next };
+    });
+  });
+}
 
 export const useChatStore = create<ChatState>((set, get) => ({
   chats: [],
@@ -211,10 +242,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ loadingMessages: true, error: '' });
     try {
       const { messages: msgs, hasMore } = await getMessages(chat.id);
+      const ordered = msgs.reverse();
       set((s) => ({
-        messagesByChat: { ...s.messagesByChat, [chat.id]: msgs.reverse() },
+        messagesByChat: { ...s.messagesByChat, [chat.id]: ordered },
         hasMoreMessages: { ...s.hasMoreMessages, [chat.id]: hasMore },
       }));
+      fetchMissingUsers(ordered, get, set);
       markAsRead(chat.id);
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) });
@@ -257,6 +290,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           loadingOlderMessages: false,
         };
       });
+      fetchMissingUsers(older, get, set);
     } catch {
       set({ loadingOlderMessages: false });
     }
@@ -286,10 +320,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ loadingMessages: true, error: '' });
     try {
       const { messages: msgs, hasMore } = await getMessages(chatId);
+      const ordered = msgs.reverse();
       set((s) => ({
-        messagesByChat: { ...s.messagesByChat, [chatId]: msgs.reverse() },
+        messagesByChat: { ...s.messagesByChat, [chatId]: ordered },
         hasMoreMessages: { ...s.hasMoreMessages, [chatId]: hasMore },
       }));
+      fetchMissingUsers(ordered, get, set);
       markAsRead(chatId);
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) });
@@ -1176,6 +1212,7 @@ export function _resetForTests() {
   tempIdCounter = 0;
   photoRequested.clear();
   mediaRequested.clear();
+  userFetchRequested.clear();
   for (const t of typingTimers.values()) clearTimeout(t);
   typingTimers.clear();
   for (const t of statusTimers.values()) clearTimeout(t);
