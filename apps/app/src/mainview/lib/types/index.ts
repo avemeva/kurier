@@ -101,6 +101,7 @@ export type TelegramUpdateEvent =
       old_message_id: number;
       message: Td.message;
     }
+  | { type: 'user'; user: Td.user }
   | { type: 'reconnected' }
   | { type: 'auth_state'; authorization_state: Td.AuthorizationState };
 

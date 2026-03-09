@@ -482,6 +482,9 @@ async function translateUpdate(update: Td.Update): Promise<TelegramUpdateEvent |
         action: update.action,
       };
 
+    case 'updateUser':
+      return { type: 'user', user: update.user };
+
     case 'updateUserStatus':
       return {
         type: 'user_status',

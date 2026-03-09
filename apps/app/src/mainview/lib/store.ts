@@ -457,6 +457,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
     }
 
+    if (event.type === 'user') {
+      set((s) => {
+        const next = new Map(s.users);
+        next.set(event.user.id, event.user);
+        return { users: next };
+      });
+    }
+
     if (event.type === 'new_message') {
       const msg = event.message;
       const chatId = event.chat_id;
