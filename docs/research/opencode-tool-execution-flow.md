@@ -2,6 +2,76 @@
 
 How a user's message becomes a tool call and back. Every step shows the actual data moving through the system.
 
+> **Source codebase:** `/Users/andrey/Projects/opencode`
+> All paths below are relative to `packages/opencode/src/` unless noted.
+
+---
+
+## Key Source Files (Read These First)
+
+### Core Pipeline (the "engine")
+
+| File | What It Does | Why It Matters |
+|------|-------------|----------------|
+| `session/prompt.ts` | `prompt()` creates user messages, `loop()` is the while(true) orchestrator, `resolveTools()` builds the tools map | **The main loop.** Everything flows through here. |
+| `session/processor.ts` | Consumes `stream.fullStream` events, writes parts to DB | **The event handler.** Text deltas, tool calls, tool results, errors — all processed here. |
+| `session/llm.ts` | `LLM.stream()` — calls Vercel AI SDK's `streamText()` | **The LLM call.** Assembles system prompt + messages + tools → single HTTP call to Claude/OpenAI/etc. |
+| `session/message-v2.ts` | Message types, `toModelMessages()` conversion, `convertToModelMessages()` | **The data format bridge.** Converts internal DB format ↔ AI SDK format ↔ provider API format. |
+| `session/index.ts` | `Session` namespace — CRUD, `updateMessage()`, `updatePart()`, `updatePartDelta()`, usage/cost calc | **The database layer.** All message/part persistence + event publishing. |
+
+### Tool System
+
+| File | What It Does | Why It Matters |
+|------|-------------|----------------|
+| `tool/tool.ts` | `Tool.define()` — wraps every tool with Zod validation + output truncation | **The tool wrapper.** Validates LLM args, catches errors, truncates output. |
+| `tool/registry.ts` | `ToolRegistry.tools()` — returns all tools, handles conditional enable/disable | **The tool registry.** Controls which tools are available for which models/agents. |
+| `tool/bash.ts` | Bash tool — tree-sitter command parsing, permission extraction, `spawn()` | **Most complex tool.** Shows permission patterns, streaming metadata, process management. |
+| `tool/websearch.ts` | Web search — simple HTTP call to Exa MCP | **Simplest tool.** Good reference for "what does a tool actually do." |
+| `tool/edit.ts` | File editing — find/replace with diff generation, LSP diagnostics | Shows how tools return structured metadata for UI rendering. |
+| `tool/grep.ts` | Ripgrep wrapper — structured output, sorted by mtime | Shows why dedicated tools exist (vs bash): controlled output format. |
+| `tool/read.ts` | File/directory reading with pagination + instruction file loading | Shows how tools can trigger side effects (loading CLAUDE.md etc). |
+
+### System Prompt & Instructions
+
+| File | What It Does | Why It Matters |
+|------|-------------|----------------|
+| `session/system.ts` | `SystemPrompt.environment()` — model name, working dir, platform, date | Builds the "You are powered by..." system message. |
+| `session/instruction.ts` | `InstructionPrompt.system()` — loads CLAUDE.md, AGENTS.md, remote URLs | Builds the user instruction system messages. |
+| `agent/agent.ts` | Agent definitions — name, system prompt, tools, permissions, steps | Defines "personalities" (coder, planner, etc.) with different tool access. |
+
+### Permission System
+
+| File | What It Does | Why It Matters |
+|------|-------------|----------------|
+| `permission/next.ts` | `PermissionNext.ask()` — checks rules, emits permission requests | Central permission logic. Tools call `ctx.ask()` which routes here. |
+| `permission/arity.ts` | `BashArity.prefix()` — extracts command prefix for always-allow patterns | How "git status" becomes "git *" in permission rules. |
+
+### SDK & Server (for embedding/reusing)
+
+| File | What It Does | Why It Matters |
+|------|-------------|----------------|
+| `server/server.ts` | Hono HTTP server setup | The headless server you'd run to use opencode without TUI. |
+| `server/routes/session.ts` | REST API routes — session CRUD, message sending, SSE events | **The HTTP API.** This is what the SDK talks to. |
+| `packages/sdk/js/src/v2/` | `@opencode-ai/sdk` — TypeScript HTTP client | **The SDK.** What you'd import to talk to the server from your own UI. |
+| `packages/sdk/openapi.json` | OpenAPI spec | Full API surface documentation. |
+
+### UI Layer (TUI-specific, NOT needed for embedding)
+
+| File | What It Does |
+|------|-------------|
+| `cli/cmd/run.ts` | CLI entry point — spawns server, creates SDK client, handles I/O |
+| `cli/cmd/tui/component/prompt/` | Ink-based terminal UI components |
+| `cli/cmd/serve.ts` | `opencode serve` command |
+| `packages/app/` | SolidJS web UI (separate package) |
+| `packages/desktop/` | Tauri desktop wrapper (separate package) |
+
+### Plugin System
+
+| File | What It Does |
+|------|-------------|
+| `plugin/index.ts` | Plugin loading, `Plugin.trigger()` hook system |
+| `packages/plugin/src/tool.ts` | Simplified `tool()` API for plugin authors |
+
 ---
 
 ## Giant Diagram: The Complete Flow
