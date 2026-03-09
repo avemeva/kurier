@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "hmr": "portless tg vite",
+    "hmr": "portless $([ -f \"$(git rev-parse --show-toplevel)/.git\" ] && basename \"$(git rev-parse --show-toplevel)\" || echo tg) vite",
     "build": "vite build && electrobun build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

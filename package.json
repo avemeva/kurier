@@ -19,6 +19,9 @@
     "test:e2e": "bun --filter '*' test:e2e",
     "typecheck": "bun --filter '*' typecheck",
     "test:perf": "cd apps/app && bunx playwright test --project perf",
+    "dev:hmr": "bun --filter @tg/app hmr",
+    "worktree:pull": "./scripts/worktree-pull.sh",
+    "worktree:push": "./scripts/worktree-push.sh",
     "postinstall": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
