@@ -88,6 +88,18 @@ function extractMediaLabel(content: Td.MessageContent): string {
   }
 }
 
+// --- Voice note metadata ---
+
+function extractVoiceWaveform(content: Td.MessageContent): string | null {
+  if (content._ === 'messageVoiceNote') return content.voice_note.waveform ?? null;
+  return null;
+}
+
+function extractVoiceDuration(content: Td.MessageContent): number {
+  if (content._ === 'messageVoiceNote') return content.voice_note.duration;
+  return 0;
+}
+
 // --- Web preview ---
 
 function extractWebPreview(content: Td.MessageContent): UIWebPreview | null {
@@ -259,6 +271,8 @@ export function toUIMessage(
     serviceText: extractServiceText(msg.content),
     inlineKeyboard: extractInlineKeyboard(msg),
     replyPreview: null, // Populated by enrichReplyPreviews after batch conversion
+    voiceWaveform: extractVoiceWaveform(msg.content),
+    voiceDuration: extractVoiceDuration(msg.content),
   };
 }
 

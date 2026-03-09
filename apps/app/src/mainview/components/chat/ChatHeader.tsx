@@ -22,7 +22,10 @@ export function ChatHeader() {
         className="size-8 text-xs"
       />
       <div className="flex-1">
-        <h2 className="flex items-center gap-1 text-sm font-medium text-text-primary">
+        <h2
+          data-testid="chat-title"
+          className="flex items-center gap-1 text-sm font-medium text-text-primary"
+        >
           {selectedChat.title}
           {user?.emojiStatusId ? (
             <EmojiStatusBadge documentId={user.emojiStatusId} />

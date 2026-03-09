@@ -33,7 +33,14 @@ function Avatar({
   }
 
   if (src) {
-    return <img src={src} alt={name} className={cn('rounded-full object-cover', className)} />;
+    return (
+      <img
+        src={src}
+        alt={name}
+        data-testid="avatar-img"
+        className={cn('rounded-full object-cover', className)}
+      />
+    );
   }
 
   const initials = (name ?? '')

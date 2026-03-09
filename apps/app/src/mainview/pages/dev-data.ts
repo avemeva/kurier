@@ -93,6 +93,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   // text_outgoing
   {
@@ -117,6 +119,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   // text_with_entities + reactions
   {
@@ -148,6 +152,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   // text_with_link_preview
   {
@@ -179,6 +185,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   // photo_album (two photos, same album ID)
   {
@@ -203,6 +211,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   {
     id: 755107889152,
@@ -226,6 +236,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   // photo_single (from supergroup)
   {
@@ -250,6 +262,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   // video
   {
@@ -274,6 +288,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   // voice_incoming
   {
@@ -298,6 +314,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   // voice_outgoing
   {
@@ -322,6 +340,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   // video_note
   {
@@ -346,6 +366,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   // sticker_incoming
   {
@@ -370,6 +392,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   // animation (GIF)
   {
@@ -394,6 +418,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   // forwarded text
   {
@@ -418,6 +444,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   // reply
   {
@@ -442,6 +470,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
   // spoiler
   {
@@ -466,6 +496,8 @@ export const MESSAGES: UIMessage[] = [
     serviceText: null,
     inlineKeyboard: null,
     replyPreview: null,
+    voiceWaveform: null,
+    voiceDuration: 0,
   },
 ];
 

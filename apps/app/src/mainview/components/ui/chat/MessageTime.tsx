@@ -69,7 +69,7 @@ export function PureMessageTime({
   );
 
   return (
-    <span className={wrapperClasses}>
+    <span data-testid="message-time" className={wrapperClasses}>
       {views !== undefined && (
         <>
           <Eye size={11} className="opacity-80" />

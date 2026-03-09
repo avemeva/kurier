@@ -418,6 +418,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
               value={searchQuery}
               onChange={(e) => handleSearchInputChange(e.target.value)}
               onKeyDown={handleSearchKeyDown}
+              data-testid="search-input"
               placeholder="Search"
               className="h-[35px] w-full rounded-full border border-border bg-bg-secondary pl-9 pr-9 text-sm text-text-primary placeholder:text-text-tertiary focus:border-accent-blue focus:outline-none"
             />
@@ -441,9 +442,12 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
         </div>
       ) : (
         <div className="flex items-center justify-between px-4 py-3">
-          <h1 className="text-sm font-bold text-text-primary">Chats</h1>
+          <h1 data-testid="sidebar-heading" className="text-sm font-bold text-text-primary">
+            Chats
+          </h1>
           <div className="flex items-center gap-1">
             <button
+              data-testid="search-button"
               type="button"
               onClick={openGlobalSearch}
               className="rounded-md p-1.5 text-text-tertiary hover:bg-accent hover:text-text-secondary"
@@ -505,7 +509,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto scrollbar-subtle">
+          <div data-testid="sidebar-scroll" className="flex-1 overflow-y-auto scrollbar-subtle">
             {loadingDialogs && (
               <p className="animate-pulse p-4 text-sm text-text-tertiary">Loading chats...</p>
             )}
@@ -540,7 +544,10 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="flex items-center gap-1 truncate text-sm font-medium text-text-primary">
+                      <span
+                        data-testid="dialog-name"
+                        className="flex items-center gap-1 truncate text-sm font-medium text-text-primary"
+                      >
                         {chat.title}
                         {user?.emojiStatusId ? (
                           <EmojiStatusBadge documentId={user.emojiStatusId} />
@@ -560,7 +567,10 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                       {typingByChat[chat.id] && Object.keys(typingByChat[chat.id]).length > 0 ? (
                         <PureTypingIndicator text="typing" />
                       ) : (
-                        <span className="truncate text-xs text-text-tertiary">
+                        <span
+                          data-testid="dialog-preview"
+                          className="truncate text-xs text-text-tertiary"
+                        >
                           {chat.lastMessagePreview || '\u00A0'}
                         </span>
                       )}

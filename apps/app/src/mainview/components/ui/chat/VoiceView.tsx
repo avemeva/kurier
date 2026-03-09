@@ -1,5 +1,5 @@
 import { Mic, Pause, Play } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** Match tdesktop: kWaveformSamplesCount=100, msgWaveformBar=2, msgWaveformSkip=1, min=3, max=17 */
 const WAVEFORM_SAMPLES = 100;
@@ -29,12 +29,44 @@ function hashString(str: string): number {
   return h;
 }
 
-/** Generate deterministic bar heights from a seed string. */
+/** Generate deterministic bar heights from a seed string (fallback when no waveform data). */
 function generateBars(seed: string): number[] {
   const rng = mulberry32(hashString(seed));
   return Array.from({ length: WAVEFORM_SAMPLES }, () =>
     Math.round(BAR_MIN + rng() * (BAR_MAX - BAR_MIN)),
   );
+}
+
+/**
+ * Decode TDLib 5-bit packed waveform from base64.
+ * Each sample is 5 bits (0-31), packed sequentially into bytes.
+ */
+function decodeWaveform(base64: string): number[] {
+  const raw = atob(base64);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+
+  const totalBits = bytes.length * 8;
+  const sampleCount = Math.floor(totalBits / 5);
+  const samples: number[] = [];
+
+  for (let i = 0; i < sampleCount; i++) {
+    const bitOffset = i * 5;
+    const byteIdx = bitOffset >> 3;
+    const bitIdx = bitOffset & 7;
+    // Read up to 2 bytes to extract 5 bits
+    const val = ((bytes[byteIdx] | ((bytes[byteIdx + 1] ?? 0) << 8)) >> bitIdx) & 0x1f;
+    samples.push(val);
+  }
+
+  return samples;
+}
+
+/** Convert decoded 5-bit waveform samples (0-31) to bar heights (BAR_MIN..BAR_MAX). */
+function waveformToBars(waveform: string): number[] {
+  const samples = decodeWaveform(waveform);
+  if (samples.length === 0) return [];
+  return samples.map((s) => Math.round(BAR_MIN + (s / 31) * (BAR_MAX - BAR_MIN)));
 }
 
 /**
@@ -56,12 +88,16 @@ function sampleBars(allBars: number[], targetCount: number): number[] {
   return result;
 }
 
-/** Hook: measure container width and compute how many bars fit. */
-function useBarCount(ref: React.RefObject<HTMLDivElement | null>): number {
+/** Hook: measure container width and compute how many bars fit via callback ref. */
+function useBarCount(): [React.RefCallback<HTMLDivElement>, number] {
   const [barCount, setBarCount] = useState(0);
+  const roRef = useRef<ResizeObserver | null>(null);
 
-  useLayoutEffect(() => {
-    const el = ref.current;
+  const callbackRef = useCallback((el: HTMLDivElement | null) => {
+    if (roRef.current) {
+      roRef.current.disconnect();
+      roRef.current = null;
+    }
     if (!el) return;
 
     const update = () => {
@@ -72,11 +108,10 @@ function useBarCount(ref: React.RefObject<HTMLDivElement | null>): number {
     const ro = new ResizeObserver(update);
     ro.observe(el);
     update();
+    roRef.current = ro;
+  }, []);
 
-    return () => ro.disconnect();
-  }, [ref]);
-
-  return barCount;
+  return [callbackRef, barCount];
 }
 
 /** Format seconds as m:ss */
@@ -91,20 +126,27 @@ export function PureVoiceView({
   url,
   loading,
   onRetry,
+  waveform,
+  duration: tdDuration,
 }: {
   url: string | null;
   loading?: boolean;
   onRetry?: () => void;
+  waveform?: string | null;
+  duration?: number;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
-  const waveformRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
+  const [duration, setDuration] = useState(tdDuration ?? 0);
   const [currentTime, setCurrentTime] = useState(0);
   const rafRef = useRef<number>(0);
 
-  const barCount = useBarCount(waveformRef);
-  const allBars = url ? generateBars(url) : generateBars('placeholder');
+  const [waveformRef, barCount] = useBarCount();
+  const allBars = waveform
+    ? waveformToBars(waveform)
+    : url
+      ? generateBars(url)
+      : generateBars('placeholder');
   const bars = barCount > 0 ? sampleBars(allBars, barCount) : [];
 
   const tick = useCallback(() => {
@@ -215,7 +257,10 @@ export function PureVoiceView({
   }
 
   return (
-    <div className="flex w-full min-w-[200px] items-center gap-[11px] py-1">
+    <div
+      data-testid="voice-message"
+      className="flex w-full min-w-[200px] items-center gap-[11px] py-1"
+    >
       {/* biome-ignore lint/a11y/useMediaCaption: Telegram voice messages don't have captions */}
       <audio ref={audioRef} src={url} preload="metadata" />
 
@@ -234,7 +279,11 @@ export function PureVoiceView({
       </button>
 
       {/* Waveform bars */}
-      <div ref={waveformRef} className="flex min-w-0 flex-1 items-center gap-[1px]">
+      <div
+        ref={waveformRef}
+        data-testid="voice-waveform"
+        className="flex min-w-0 flex-1 items-center gap-[1px]"
+      >
         {bars.map((height, i) => {
           const barProgress = bars.length > 0 ? (i + 0.5) / bars.length : 0;
           const filled = barProgress <= progress;
@@ -251,7 +300,10 @@ export function PureVoiceView({
       </div>
 
       {/* Duration */}
-      <span className="min-w-[32px] shrink-0 text-right text-[11px] tabular-nums text-text-tertiary">
+      <span
+        data-testid="voice-duration"
+        className="min-w-[32px] shrink-0 text-right text-[11px] tabular-nums text-text-tertiary"
+      >
         {displayTime}
       </span>
     </div>

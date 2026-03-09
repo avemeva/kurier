@@ -129,6 +129,7 @@ export function MessagePanel() {
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
+        data-testid="message-panel"
         className="flex-1 overflow-y-auto px-4 py-3 scrollbar-subtle"
       >
         {loadingOlderMessages && (

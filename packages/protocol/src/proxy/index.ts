@@ -228,15 +228,24 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
   // --- 6. Media file serving ---
 
   function serveMediaFile(relPath: string): Response {
-    const filePath = path.resolve(path.join(filesDir, relPath));
+    // Try filesDir (media_cache) first, then dbDir (tdlib_db) for profile photos
+    let filePath = path.resolve(path.join(filesDir, relPath));
 
     if (!filePath.startsWith(filesDir)) {
       return new Response('Forbidden', { status: 403, headers: CORS });
     }
 
-    const file = Bun.file(filePath);
+    let file = Bun.file(filePath);
     if (!file.size) {
-      return new Response('Not found', { status: 404, headers: CORS });
+      // Fall back to dbDir (profile photos are stored under tdlib_db/)
+      filePath = path.resolve(path.join(dbDir, relPath));
+      if (!filePath.startsWith(dbDir)) {
+        return new Response('Forbidden', { status: 403, headers: CORS });
+      }
+      file = Bun.file(filePath);
+      if (!file.size) {
+        return new Response('Not found', { status: 404, headers: CORS });
+      }
     }
 
     const ext = path.extname(filePath).slice(1);

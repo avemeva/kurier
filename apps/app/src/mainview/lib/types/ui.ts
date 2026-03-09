@@ -69,6 +69,8 @@ export type UIMessage = {
   serviceText: string | null;
   inlineKeyboard: UIKeyboardRow[] | null;
   replyPreview: UIReplyPreview | null;
+  voiceWaveform: string | null;
+  voiceDuration: number;
 };
 
 export type UIPendingMessage = {

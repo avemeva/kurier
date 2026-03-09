@@ -31,6 +31,7 @@ export function PureMessageInput({ onSend }: { onSend: (text: string) => Promise
     <div className="border-t border-border px-4 py-2">
       <div className="flex items-end gap-2 rounded-2xl border border-input bg-background transition-shadow has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-2 has-[textarea:focus-visible]:ring-ring/20">
         <textarea
+          data-testid="message-input"
           ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -40,6 +41,7 @@ export function PureMessageInput({ onSend }: { onSend: (text: string) => Promise
           className="max-h-32 min-h-[36px] flex-1 resize-none bg-transparent px-4 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground"
         />
         <Button
+          data-testid="send-button"
           size="icon-sm"
           onClick={handleSend}
           disabled={!text.trim() || sending}

@@ -299,7 +299,8 @@ export function getProfilePhotoUrl(chatId: number): Promise<string | null> {
 
       if (file.local.is_downloading_completed && file.local.path) {
         // Convert absolute path to /api/media/ URL
-        const match = file.local.path.match(/media_cache\/(.+)$/);
+        // Profile photos live under tdlib_db/, message media under media_cache/
+        const match = file.local.path.match(/(?:media_cache|tdlib_db)\/(.+)$/);
         if (match) return `/api/media/${match[1]}`;
       }
       return null;
@@ -339,7 +340,7 @@ export function downloadMedia(chatId: number, messageId: number): Promise<string
       });
 
       if (downloaded.local.is_downloading_completed && downloaded.local.path) {
-        const match = downloaded.local.path.match(/media_cache\/(.+)$/);
+        const match = downloaded.local.path.match(/(?:media_cache|tdlib_db)\/(.+)$/);
         if (match) return `/api/media/${match[1]}`;
       }
       return null;

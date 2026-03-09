@@ -71,6 +71,7 @@ function PendingLayout({ state }: { state: PendingRenderState }) {
     >
       <div
         data-testid="message-bubble"
+        data-is-outgoing="true"
         className="group/bubble relative max-w-[55%] rounded-2xl bg-message-own px-4 py-2.5"
       >
         <p className="whitespace-pre-wrap break-words text-[13px] leading-[18px] text-text-primary">
@@ -159,6 +160,7 @@ function BubbleLayout({
   const bubble = (
     <div
       data-testid="message-bubble"
+      data-is-outgoing={msg.isOutgoing ? 'true' : 'false'}
       className={cn(
         'group/bubble relative rounded-2xl px-4 py-2.5',
         msg.isOutgoing ? 'bg-message-own' : 'bg-message-peer',
@@ -201,7 +203,13 @@ function BubbleLayout({
         />
       )}
       {isVoice && media && (
-        <PureVoiceView url={media.url} loading={media.loading} onRetry={media.retry} />
+        <PureVoiceView
+          url={media.url}
+          loading={media.loading}
+          onRetry={media.retry}
+          waveform={msg.voiceWaveform}
+          duration={msg.voiceDuration}
+        />
       )}
       {!isPhoto && !isVideo && !isVoice && msg.mediaLabel && (
         <p className="text-xs italic text-text-tertiary">{msg.mediaLabel}</p>
@@ -292,6 +300,7 @@ function AlbumLayout({
   const albumBubble = (
     <div
       data-testid="message-bubble"
+      data-is-outgoing={first.isOutgoing ? 'true' : 'false'}
       className={cn(
         'group/bubble relative rounded-2xl px-4 py-2.5',
         first.isOutgoing ? 'bg-message-own' : 'bg-message-peer',
