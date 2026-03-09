@@ -1,71 +1,8 @@
 # Kurier
 
-Bun monorepo. Workspaces: `packages/*`, `apps/*`.
+## Product
 
-## Architecture
-
-```
-TDLib (C++) → daemon (HTTP+SSE) → cli | app
-```
-
-Daemon is the **only** process that talks to TDLib. Everything else is an HTTP client.
-
-Daemon does NOT: cache TDLib data, make policy decisions, transform data for UI, handle auth UI, contain business logic. If it could live in the client, it belongs in the client.
-
-## Packages
-
-| Package | Purpose |
-|---------|---------|
-| `@tg/protocol` | HTTP/SSE client for daemon communication |
-
-## Apps
-
-| App | Purpose |
-|-----|---------|
-| `daemon` | TDLib ↔ HTTP bridge |
-| `cli` | Terminal client (no auth — that's the UI's job) |
-| `app` | Electrobun desktop app (React, Vite, Zustand) |
-
-## TDLib Types
-
-Source of truth: `node_modules/@prebuilt-tdlib/types/tdlib-types.d.ts`
-Always grep that file — do not search across `node_modules`.
-
-## Dev
-
-```sh
-bun run dev:daemon   # daemon with --watch
-bun run dev:app      # vite dev server
-bun run cli          # run CLI (pass args after --)
-```
-
-## Linting
-
-Biome, not ESLint. Auto-fix first, then check:
-
-```sh
-bun run lint:fix
-bun run lint
-```
-
-## Testing
-
-```sh
-bun run test         # all workspace tests
-bun run test:e2e     # cli e2e tests
-bun run test:perf    # app perf tests (Playwright)
-bun run typecheck    # all workspace type checks
-```
-
-## Conventions
-
-- **Runtime:** Bun
-- **Linter/formatter:** Biome
-- **Types:** strict TypeScript, no `any`
-- **Styling:** Tailwind v4, OKLCH color space
-- **State:** Zustand
-- **Components:** pure where possible (props → JSX, no hooks)
-- **Tests:** `bun test` (daemon, cli), Vitest (app)
+Open-source Telegram desktop client with native AI integration. Built for productivity-focused power users.
 
 ## Git Commits
 
