@@ -573,6 +573,7 @@ export const CHATS: UIChat[] = [
     draftText: null,
     isBot: false,
     isOnline: false,
+    isSavedMessages: false,
     user: null,
   },
   {
@@ -596,6 +597,7 @@ export const CHATS: UIChat[] = [
       '\u042F \u0445\u043E\u0442\u0435\u043B \u0441\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u043D\u0430\u0441\u0447\u0451\u0442...',
     isBot: false,
     isOnline: false,
+    isSavedMessages: false,
     user: null,
   },
   {
@@ -618,6 +620,7 @@ export const CHATS: UIChat[] = [
     lastMessageStatus: 'none',
     isBot: false,
     isOnline: false,
+    isSavedMessages: false,
     user: null,
   },
   {
@@ -639,6 +642,7 @@ export const CHATS: UIChat[] = [
     lastMessageStatus: 'none',
     isBot: false,
     isOnline: false,
+    isSavedMessages: false,
     user: null,
   },
   {
@@ -660,6 +664,7 @@ export const CHATS: UIChat[] = [
     lastMessageStatus: 'none',
     isBot: false,
     isOnline: false,
+    isSavedMessages: false,
     user: null,
   },
   {
@@ -681,6 +686,7 @@ export const CHATS: UIChat[] = [
     lastMessageStatus: 'none',
     isBot: false,
     isOnline: false,
+    isSavedMessages: false,
     user: null,
   },
   {
@@ -702,6 +708,7 @@ export const CHATS: UIChat[] = [
     lastMessageStatus: 'none',
     isBot: false,
     isOnline: false,
+    isSavedMessages: false,
     user: null,
   },
 ];

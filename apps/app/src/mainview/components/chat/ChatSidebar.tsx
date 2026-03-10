@@ -1,4 +1,5 @@
 import {
+  Bookmark,
   Bot,
   Camera,
   Check,
@@ -27,6 +28,19 @@ import { selectUIArchivedChats, selectUIChats, useChatStore } from '@/lib/store'
 import type { PeerInfo, UIChat, UISearchResult } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { EmojiStatusBadge } from './EmojiStatusBadge';
+
+function SavedMessagesAvatar({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'flex items-center justify-center rounded-full bg-accent-blue text-white',
+        className,
+      )}
+    >
+      <Bookmark size={20} className="fill-current" />
+    </div>
+  );
+}
 
 type Tab = 'all' | 'archive';
 
@@ -115,7 +129,7 @@ function SearchMessageRow({
         <UserAvatar
           name={result.chatTitle || '?'}
           src={result.photoUrl ?? undefined}
-          className="size-10 text-xs"
+          className="size-10 text-sm"
         />
       </div>
       <div className="min-w-0 flex-1">
@@ -153,7 +167,7 @@ function PeerResultRow({
       className="mx-2 flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-colors hover:bg-accent"
     >
       <div className="relative shrink-0">
-        <UserAvatar name={peer.name} src={profilePhoto} className="size-10 text-xs" />
+        <UserAvatar name={peer.name} src={profilePhoto} className="size-10 text-sm" />
       </div>
       <div className="min-w-0 flex-1">
         <span className="truncate text-sm font-medium text-text-primary">{peer.name}</span>
@@ -234,7 +248,7 @@ function SearchResults({
                 <UserAvatar
                   name={chat.title}
                   src={chat.photoUrl ?? undefined}
-                  className="size-10 text-xs"
+                  className="size-10 text-sm"
                 />
               </div>
               <div className="min-w-0 flex-1">
@@ -586,12 +600,16 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                   )}
                 >
                   <div className="relative mt-0.5 shrink-0">
-                    <UserAvatar
-                      name={chat.title}
-                      src={chat.photoUrl ?? undefined}
-                      className="size-10 text-xs"
-                    />
-                    {chat.isOnline && <PureOnlineDot />}
+                    {chat.isSavedMessages ? (
+                      <SavedMessagesAvatar className="size-10" />
+                    ) : (
+                      <UserAvatar
+                        name={chat.title}
+                        src={chat.photoUrl ?? undefined}
+                        className="size-10 text-sm"
+                      />
+                    )}
+                    {chat.isOnline && !chat.isSavedMessages && <PureOnlineDot />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
@@ -606,7 +624,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                           <Users size={14} className="shrink-0 text-text-tertiary" />
                         )}
                         {chat.isBot && <Bot size={14} className="shrink-0 text-text-tertiary" />}
-                        {chat.title}
+                        {chat.isSavedMessages ? 'Saved Messages' : chat.title}
                         {chat.user?.emojiStatusId ? (
                           <EmojiStatusBadge documentId={chat.user.emojiStatusId} />
                         ) : (

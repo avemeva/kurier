@@ -38,6 +38,7 @@ vi.mock('./telegram', () => ({
   getUser: vi.fn(() => Promise.resolve({ id: 0, first_name: '', last_name: '' })),
   searchGlobal: vi.fn(),
   searchInChat: vi.fn(),
+  getMe: vi.fn(() => Promise.resolve({ id: 42, first_name: 'Test' })),
 }));
 
 import {

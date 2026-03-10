@@ -1,4 +1,4 @@
-import { Search, Star } from 'lucide-react';
+import { Bookmark, Search, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PureStatusText } from '@/components/ui/chat/StatusText';
 import { UserAvatar } from '@/components/ui/user-avatar';
@@ -17,13 +17,19 @@ export function ChatHeader() {
 
   return (
     <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/80 px-4 py-3 backdrop-blur-sm">
-      <UserAvatar name={selectedChat.title} src={avatarSrc} className="size-8 text-xs" />
+      {selectedChat.isSavedMessages ? (
+        <div className="flex size-8 items-center justify-center rounded-full bg-accent-blue text-white">
+          <Bookmark size={16} className="fill-current" />
+        </div>
+      ) : (
+        <UserAvatar name={selectedChat.title} src={avatarSrc} className="size-8 text-sm" />
+      )}
       <div className="flex-1">
         <h2
           data-testid="chat-title"
           className="flex items-center gap-1 text-sm font-medium text-text-primary"
         >
-          {selectedChat.title}
+          {selectedChat.isSavedMessages ? 'Saved Messages' : selectedChat.title}
           {user?.emojiStatusId ? (
             <EmojiStatusBadge documentId={user.emojiStatusId} />
           ) : (

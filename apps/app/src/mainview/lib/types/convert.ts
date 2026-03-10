@@ -382,6 +382,7 @@ export type UIChatContext = {
   photoUrl: string | null;
   user: Td.user | undefined;
   isOnline: boolean;
+  myUserId?: number;
 };
 
 export function toUIChat(chat: Td.chat, ctx: UIChatContext): UIChat {
@@ -415,6 +416,11 @@ export function toUIChat(chat: Td.chat, ctx: UIChatContext): UIChat {
     draftText,
     isBot: isPrivate && ctx.user?.type?._ === 'userTypeBot',
     isOnline: isPrivate && ctx.isOnline,
+    isSavedMessages:
+      isPrivate &&
+      !!ctx.myUserId &&
+      chat.type._ === 'chatTypePrivate' &&
+      chat.type.user_id === ctx.myUserId,
     user: ctx.user ? toUIUser(ctx.user) : null,
   };
 }

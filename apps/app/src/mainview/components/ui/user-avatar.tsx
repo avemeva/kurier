@@ -5,10 +5,16 @@ export function UserAvatar({
   name,
   src,
   className,
+  children,
 }: {
   name: string;
   src?: string;
   className?: string;
+  children?: React.ReactNode;
 }) {
-  return <Avatar name={name} src={src} className={className} />;
+  return (
+    <Avatar name={name} src={src} className={className}>
+      {children}
+    </Avatar>
+  );
 }

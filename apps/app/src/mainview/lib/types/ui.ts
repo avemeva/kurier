@@ -138,6 +138,7 @@ export type UIChat = {
   draftText: string | null;
   isBot: boolean;
   isOnline: boolean;
+  isSavedMessages: boolean;
   user: UIUser | null;
 };
 

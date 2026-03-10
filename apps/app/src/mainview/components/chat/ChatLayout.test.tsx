@@ -44,6 +44,7 @@ vi.mock('@/lib/telegram', () => ({
   getCustomEmojiUrl: vi.fn(() => Promise.resolve(null)),
   downloadMedia: vi.fn(() => Promise.resolve(null)),
   clearMediaCache: vi.fn(),
+  getMe: vi.fn(() => Promise.resolve({ id: 42, first_name: 'Test' })),
 }));
 
 vi.mock('@/lib/types', async () => {
