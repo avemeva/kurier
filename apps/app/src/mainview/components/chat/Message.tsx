@@ -1,5 +1,7 @@
 import { useCallback } from 'react';
 import { PureBotKeyboard } from '@/components/ui/chat/BotKeyboard';
+import type { GroupPosition } from '@/components/ui/chat/Bubble';
+import { PureBubble } from '@/components/ui/chat/Bubble';
 import { PureForwardHeader } from '@/components/ui/chat/ForwardHeader';
 import { PureLinkPreviewCard } from '@/components/ui/chat/LinkPreviewCard';
 import { PureMessageTime } from '@/components/ui/chat/MessageTime';
@@ -25,6 +27,8 @@ import { cn } from '@/lib/utils';
 import { AlbumGrid } from './AlbumGrid';
 import { FormattedText } from './FormattedText';
 
+export type { GroupPosition } from '@/components/ui/chat/Bubble';
+
 // --- Helpers ---
 
 function toReactionInfos(reactions: UIReaction[]) {
@@ -37,12 +41,19 @@ export type MessageProps = {
   input: MessageInput;
   showSender: boolean;
   senderPhotoUrl?: string;
+  groupPosition?: GroupPosition;
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
 };
 
 // --- Main component ---
 
-export function Message({ input, showSender, senderPhotoUrl, onReact }: MessageProps) {
+export function Message({
+  input,
+  showSender,
+  senderPhotoUrl,
+  groupPosition = 'single',
+  onReact,
+}: MessageProps) {
   const ctx: MessageContext = { showSender, senderPhotoUrl };
   const state = useMessage(input, ctx);
 
@@ -50,19 +61,25 @@ export function Message({ input, showSender, senderPhotoUrl, onReact }: MessageP
     case 'service':
       return <PureServiceMessage text={state.text} />;
     case 'pending':
-      return <PendingLayout state={state} />;
+      return <PendingLayout state={state} groupPosition={groupPosition} />;
     case 'sticker':
       return <StickerLayout state={state} onReact={onReact} />;
     case 'bubble':
-      return <BubbleLayout state={state} onReact={onReact} />;
+      return <BubbleLayout state={state} groupPosition={groupPosition} onReact={onReact} />;
     case 'album':
-      return <AlbumLayout state={state} onReact={onReact} />;
+      return <AlbumLayout state={state} groupPosition={groupPosition} onReact={onReact} />;
   }
 }
 
 // --- Pending layout ---
 
-function PendingLayout({ state }: { state: PendingRenderState }) {
+function PendingLayout({
+  state,
+  groupPosition,
+}: {
+  state: PendingRenderState;
+  groupPosition: GroupPosition;
+}) {
   return (
     <div
       className={cn(
@@ -71,11 +88,7 @@ function PendingLayout({ state }: { state: PendingRenderState }) {
         state.status === 'failed' && 'opacity-40',
       )}
     >
-      <div
-        data-testid="message-bubble"
-        data-is-outgoing="true"
-        className="group/bubble relative max-w-[55%] rounded-xl bg-message-own px-3 py-1.5"
-      >
+      <PureBubble isOutgoing={true} groupPosition={groupPosition} showAvatar={false}>
         <p className="whitespace-pre-wrap break-words text-[13px] leading-[18px] text-text-primary">
           {state.text}
           <span className="float-right h-[18px] w-12" aria-hidden="true" />
@@ -89,7 +102,7 @@ function PendingLayout({ state }: { state: PendingRenderState }) {
             displayType="default"
           />
         </span>
-      </div>
+      </PureBubble>
     </div>
   );
 }
@@ -146,9 +159,11 @@ function StickerLayout({
 
 function BubbleLayout({
   state,
+  groupPosition,
   onReact,
 }: {
   state: BubbleRenderState;
+  groupPosition: GroupPosition;
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
 }) {
   const { msg, media, displayType, isMediaOnly } = state;
@@ -164,16 +179,14 @@ function BubbleLayout({
     storeRecognizeSpeech(msg.chatId, msg.id);
   }, [msg.chatId, msg.id, storeRecognizeSpeech]);
 
-  const bubble = (
-    <div
-      data-testid="message-bubble"
-      data-is-outgoing={msg.isOutgoing ? 'true' : 'false'}
-      className={cn(
-        'group/bubble relative rounded-xl px-3 py-1.5',
-        msg.isOutgoing ? 'bg-message-own' : 'bg-message-peer',
-        hasReactions && 'pb-5',
-        state.showAvatar ? 'max-w-[calc(100%-36px)]' : 'max-w-[55%]',
-      )}
+  return (
+    <PureBubble
+      isOutgoing={msg.isOutgoing}
+      groupPosition={groupPosition}
+      showAvatar={state.showAvatar}
+      senderName={msg.senderName}
+      senderPhotoUrl={state.senderPhotoUrl}
+      hasReactions={hasReactions}
     >
       <PureReactionPicker onReact={(e, c) => onReact(msg.id, e, c)} />
       {state.showSenderName && (
@@ -289,20 +302,7 @@ function BubbleLayout({
           />
         </span>
       )}
-    </div>
-  );
-
-  if (!state.showAvatar) return bubble;
-
-  return (
-    <div className="flex max-w-[55%] items-end gap-2">
-      <UserAvatar
-        name={msg.senderName}
-        src={state.senderPhotoUrl}
-        className="size-7 shrink-0 text-[11px]"
-      />
-      {bubble}
-    </div>
+    </PureBubble>
   );
 }
 
@@ -310,24 +310,24 @@ function BubbleLayout({
 
 function AlbumLayout({
   state,
+  groupPosition,
   onReact,
 }: {
   state: AlbumRenderState;
+  groupPosition: GroupPosition;
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
 }) {
   const { first, messages } = state;
   const hasReactions = first.reactions.length > 0;
 
-  const albumBubble = (
-    <div
-      data-testid="message-bubble"
-      data-is-outgoing={first.isOutgoing ? 'true' : 'false'}
-      className={cn(
-        'group/bubble relative rounded-xl px-3 py-1.5',
-        first.isOutgoing ? 'bg-message-own' : 'bg-message-peer',
-        hasReactions && 'pb-5',
-        state.showAvatar ? 'max-w-[calc(100%-36px)]' : 'max-w-[55%]',
-      )}
+  return (
+    <PureBubble
+      isOutgoing={first.isOutgoing}
+      groupPosition={groupPosition}
+      showAvatar={state.showAvatar}
+      senderName={first.senderName}
+      senderPhotoUrl={state.senderPhotoUrl}
+      hasReactions={hasReactions}
     >
       <PureReactionPicker onReact={(e, c) => onReact(first.id, e, c)} />
       {state.showSenderName && (
@@ -357,19 +357,6 @@ function AlbumLayout({
           displayType={first.text ? 'default' : 'image'}
         />
       </span>
-    </div>
-  );
-
-  if (!state.showAvatar) return albumBubble;
-
-  return (
-    <div className="flex max-w-[55%] items-end gap-2">
-      <UserAvatar
-        name={first.senderName}
-        src={state.senderPhotoUrl}
-        className="size-7 shrink-0 text-[11px]"
-      />
-      {albumBubble}
-    </div>
+    </PureBubble>
   );
 }

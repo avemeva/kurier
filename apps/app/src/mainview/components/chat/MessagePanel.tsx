@@ -5,6 +5,7 @@ import type { UIMessage, UIPendingMessage } from '@/lib/types';
 import { groupUIMessages } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ComposeSearchBottomBar } from './ComposeSearch';
+import type { GroupPosition } from './Message';
 import { Message } from './Message';
 
 export function MessagePanel() {
@@ -124,6 +125,28 @@ export function MessagePanel() {
     return (msg as UIMessage).isOutgoing;
   }
 
+  function getSenderId(group: (typeof grouped)[number]): number | string {
+    if (group.type === 'album') return group.messages[0].senderUserId;
+    const msg = group.message;
+    if ('isPending' in msg) return `pending-${(msg as UIPendingMessage).localId}`;
+    return (msg as UIMessage).senderUserId;
+  }
+
+  function getGroupPosition(index: number): GroupPosition {
+    const cur = getSenderId(grouped[index]);
+    const curOut = getIsOutgoing(grouped[index]);
+    const prev = index > 0 ? getSenderId(grouped[index - 1]) : null;
+    const prevOut = index > 0 ? getIsOutgoing(grouped[index - 1]) : null;
+    const next = index < grouped.length - 1 ? getSenderId(grouped[index + 1]) : null;
+    const nextOut = index < grouped.length - 1 ? getIsOutgoing(grouped[index + 1]) : null;
+    const samePrev = prev === cur && prevOut === curOut;
+    const sameNext = next === cur && nextOut === curOut;
+    if (samePrev && sameNext) return 'middle';
+    if (samePrev) return 'last';
+    if (sameNext) return 'first';
+    return 'single';
+  }
+
   return (
     <>
       <div
@@ -144,7 +167,7 @@ export function MessagePanel() {
           <p className="py-8 text-center text-sm text-text-tertiary">No messages</p>
         )}
         <div className="max-w-[720px] space-y-1">
-          {grouped.map((group) => {
+          {grouped.map((group, index) => {
             const input =
               group.type === 'album'
                 ? ({ kind: 'album', messages: group.messages } as const)
@@ -160,6 +183,7 @@ export function MessagePanel() {
                   input={input}
                   showSender={showSender}
                   senderPhotoUrl={getSenderPhotoUrl(group)}
+                  groupPosition={getGroupPosition(index)}
                   onReact={handleReact}
                 />
               </div>
