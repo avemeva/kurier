@@ -21,6 +21,37 @@ const client = new TelegramClient('');
 
 export type AuthStep = 'phone' | 'code' | 'password';
 
+export type AuthEvent =
+  | { step: 'phone' }
+  | { step: 'code'; codeViaApp: boolean }
+  | { step: 'password'; hint: string }
+  | { step: 'ready' };
+
+/** Subscribe to auth state updates, delivering pre-parsed AuthEvent. */
+export function onAuthUpdate(cb: (event: AuthEvent) => void): () => void {
+  return onUpdate((event) => {
+    if (event.type !== 'auth_state') return;
+    const state = event.authorization_state;
+    switch (state._) {
+      case 'authorizationStateWaitPhoneNumber':
+        cb({ step: 'phone' });
+        break;
+      case 'authorizationStateWaitCode':
+        cb({
+          step: 'code',
+          codeViaApp: state.code_info.type._ === 'authenticationCodeTypeTelegramMessage',
+        });
+        break;
+      case 'authorizationStateWaitPassword':
+        cb({ step: 'password', hint: state.password_hint ?? '' });
+        break;
+      case 'authorizationStateReady':
+        cb({ step: 'ready' });
+        break;
+    }
+  });
+}
+
 function formatFloodWait(secs: number): string {
   if (secs >= 3600) {
     const h = Math.floor(secs / 3600);

@@ -10,6 +10,7 @@ import type {
   UIMessageItem,
   UIPendingMessage,
   UIReaction,
+  UISearchResult,
   UITextEntity,
   UIUser,
   UIWebPreview,
@@ -322,24 +323,77 @@ export function toChatKind(type: Td.ChatType): ChatKind {
   }
 }
 
-export function toUIChat(chat: Td.chat, photoUrl: string | null): UIChat {
+export type UIChatContext = {
+  photoUrl: string | null;
+  user: Td.user | undefined;
+  isOnline: boolean;
+};
+
+export function toUIChat(chat: Td.chat, ctx: UIChatContext): UIChat {
   const draftInput = chat.draft_message?.input_message_text;
   const draftText = draftInput?._ === 'inputMessageText' ? draftInput.text.text || null : null;
+  const kind = toChatKind(chat.type);
+  const isPrivate = kind === 'private';
   return {
     id: chat.id,
     title: chat.title,
-    kind: toChatKind(chat.type),
+    kind,
     userId: chat.type._ === 'chatTypePrivate' ? chat.type.user_id : 0,
     unreadCount: chat.unread_count,
-    lastReadOutboxMessageId: chat.last_read_outbox_message_id,
     isPinned: chat.positions.some((p) => p.is_pinned),
     lastMessagePreview: extractMessagePreview(chat.last_message),
     lastMessageDate: chat.last_message?.date ?? 0,
-    photoUrl,
+    lastMessageStatus: !chat.last_message?.is_outgoing
+      ? 'none'
+      : chat.last_message.id <= chat.last_read_outbox_message_id
+        ? 'read'
+        : 'sent',
+    photoUrl: ctx.photoUrl,
     isMuted: chat.notification_settings.mute_for > 0,
     unreadMentionCount: chat.unread_mention_count,
     draftText,
+    isBot: isPrivate && ctx.user?.type?._ === 'userTypeBot',
+    isOnline: isPrivate && ctx.isOnline,
+    user: ctx.user ? toUIUser(ctx.user) : null,
   };
+}
+
+export function toUISearchResult(
+  msg: Td.message & { chat_title?: string },
+  photoUrl: string | null,
+): UISearchResult {
+  return {
+    chatId: msg.chat_id,
+    messageId: msg.id,
+    chatTitle: msg.chat_title ?? '',
+    text: extractSearchResultText(msg),
+    date: msg.date,
+    photoUrl,
+  };
+}
+
+function extractSearchResultText(msg: Td.message): string {
+  if (msg.content._ === 'messageText') return msg.content.text.text;
+  return getMediaTypeLabel(msg.content._);
+}
+
+function getMediaTypeLabel(contentType: string): string {
+  const labels: Record<string, string> = {
+    messagePhoto: 'Photo',
+    messageVideo: 'Video',
+    messageVoiceNote: 'Voice message',
+    messageVideoNote: 'Video message',
+    messageDocument: 'Document',
+    messageAnimation: 'GIF',
+    messageAudio: 'Audio',
+    messageSticker: 'Sticker',
+    messagePoll: 'Poll',
+    messageContact: 'Contact',
+    messageLocation: 'Location',
+    messageVenue: 'Venue',
+    messageDice: 'Dice',
+  };
+  return labels[contentType] ?? 'Message';
 }
 
 export function toUIUser(user: Td.user): UIUser {

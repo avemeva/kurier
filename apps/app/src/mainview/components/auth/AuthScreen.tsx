@@ -9,7 +9,7 @@ import {
   formatTelegramError,
   initialize,
   isAuthorized,
-  onUpdate,
+  onAuthUpdate,
   resendCode,
   submitCode,
   submitPassword,
@@ -48,27 +48,25 @@ export function AuthScreen({ onSuccess }: { onSuccess: () => void }) {
 
   // Subscribe to auth state updates via SSE
   useEffect(() => {
-    const unsub = onUpdate((event) => {
-      if (event.type !== 'auth_state') return;
-      const state = event.authorization_state;
-      telegramLog.info(`Auth SSE: ${state._}`);
+    const unsub = onAuthUpdate((event) => {
+      telegramLog.info(`Auth SSE: ${event.step}`);
       setLoading(false);
       setError('');
 
-      switch (state._) {
-        case 'authorizationStateWaitPhoneNumber':
+      switch (event.step) {
+        case 'phone':
           setStep('phone');
           break;
-        case 'authorizationStateWaitCode':
+        case 'code':
           setStep('code');
-          setCodeViaApp(state.code_info.type._ === 'authenticationCodeTypeTelegramMessage');
+          setCodeViaApp(event.codeViaApp);
           setResendCountdown(60);
           break;
-        case 'authorizationStateWaitPassword':
+        case 'password':
           setStep('password');
-          setPasswordHint(state.password_hint ?? '');
+          setPasswordHint(event.hint);
           break;
-        case 'authorizationStateReady':
+        case 'ready':
           onSuccessRef.current();
           break;
       }

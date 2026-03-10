@@ -96,14 +96,26 @@ export type UIChat = {
   kind: ChatKind;
   userId: number;
   unreadCount: number;
-  lastReadOutboxMessageId: number;
   isPinned: boolean;
   lastMessagePreview: string;
   lastMessageDate: number;
+  lastMessageStatus: 'none' | 'sent' | 'read';
   photoUrl: string | null;
   isMuted: boolean;
   unreadMentionCount: number;
   draftText: string | null;
+  isBot: boolean;
+  isOnline: boolean;
+  user: UIUser | null;
+};
+
+export type UISearchResult = {
+  chatId: number;
+  messageId: number;
+  chatTitle: string;
+  text: string;
+  date: number;
+  photoUrl: string | null;
 };
 
 export type UIUser = {

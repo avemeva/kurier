@@ -2,6 +2,7 @@ export type * as Td from 'tdlib-types';
 
 import type * as Td from 'tdlib-types';
 
+export type { UIChatContext } from './convert';
 export {
   enrichReplyPreviews,
   extractForwardName,
@@ -14,6 +15,7 @@ export {
   toUIMessage,
   toUIPendingMessage,
   toUIReactions,
+  toUISearchResult,
   toUITextEntities,
   toUIUser,
 } from './convert';
@@ -29,6 +31,7 @@ export type {
   UIPendingMessage,
   UIReaction,
   UIReplyPreview,
+  UISearchResult,
   UITextEntity,
   UIUser,
   UIWebPreview,

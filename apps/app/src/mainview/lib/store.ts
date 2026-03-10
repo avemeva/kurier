@@ -5,9 +5,10 @@ import type {
   TelegramUpdateEvent,
   UIChat,
   UIMessageItem,
+  UISearchResult,
   UIUser,
 } from '@/lib/types';
-import { toUIChat, toUIMessage, toUIPendingMessage, toUIUser } from '@/lib/types';
+import { toUIChat, toUIMessage, toUIPendingMessage, toUISearchResult, toUIUser } from '@/lib/types';
 import { log } from './log';
 import {
   clearMediaCache,
@@ -24,7 +25,6 @@ import {
   onUpdate,
   openTdChat,
   type PeerInfo,
-  type SearchResultMessage,
   searchContacts,
   searchGlobal,
   searchInChat,
@@ -64,7 +64,7 @@ interface ChatState {
   // Global search state
   searchQuery: string;
   searchMode: 'none' | 'global' | 'chat';
-  searchResults: SearchResultMessage[];
+  searchResults: UISearchResult[];
   searchTotalCount: number | undefined;
   searchLoading: boolean;
   searchHasMore: boolean;
@@ -835,8 +835,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const result = await searchGlobal(query);
       // Guard: if query changed while we were loading, discard
       if (get().searchQuery !== query) return;
+      const { profilePhotos } = get();
       set({
-        searchResults: result.messages,
+        searchResults: result.messages.map((m) =>
+          toUISearchResult(m, profilePhotos[m.chat_id] ?? null),
+        ),
         searchTotalCount: result.totalCount,
         searchHasMore: result.hasMore,
         searchNextCursor: result.nextCursor,
@@ -885,8 +888,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const result = await searchGlobal(searchQuery, { offsetCursor: searchNextCursor });
       if (get().searchQuery !== searchQuery) return;
+      const { profilePhotos } = get();
       set((s) => ({
-        searchResults: [...s.searchResults, ...result.messages],
+        searchResults: [
+          ...s.searchResults,
+          ...result.messages.map((m) => toUISearchResult(m, profilePhotos[m.chat_id] ?? null)),
+        ],
         searchTotalCount: result.totalCount ?? s.searchTotalCount,
         searchHasMore: result.hasMore,
         searchNextCursor: result.nextCursor,
@@ -1065,10 +1072,12 @@ export function selectChatMessages(state: ChatState): UIMessageItem[] {
 
 let _prevSelRawChat: Td.chat | null = null;
 let _prevSelPhoto: string | undefined;
+let _prevSelUser: Td.user | undefined;
+let _prevSelStatus: Td.UserStatus | undefined;
 let _prevSelUIChat: UIChat | null = null;
 
 export function selectSelectedChat(state: ChatState): UIChat | null {
-  const { selectedChatId, chats, archivedChats, profilePhotos } = state;
+  const { selectedChatId, chats, archivedChats, profilePhotos, users, userStatuses } = state;
   if (!selectedChatId) return null;
   const rawChat =
     chats.find((c) => c.id === selectedChatId) ??
@@ -1076,12 +1085,26 @@ export function selectSelectedChat(state: ChatState): UIChat | null {
     null;
   if (!rawChat) return null;
   const photo = profilePhotos[rawChat.id];
-  if (rawChat === _prevSelRawChat && photo === _prevSelPhoto) {
+  const userId = rawChat.type._ === 'chatTypePrivate' ? rawChat.type.user_id : 0;
+  const user = userId ? users.get(userId) : undefined;
+  const status = userId ? userStatuses[userId] : undefined;
+  if (
+    rawChat === _prevSelRawChat &&
+    photo === _prevSelPhoto &&
+    user === _prevSelUser &&
+    status === _prevSelStatus
+  ) {
     return _prevSelUIChat;
   }
   _prevSelRawChat = rawChat;
   _prevSelPhoto = photo;
-  _prevSelUIChat = toUIChat(rawChat, photo ?? null);
+  _prevSelUser = user;
+  _prevSelStatus = status;
+  _prevSelUIChat = toUIChat(rawChat, {
+    photoUrl: photo ?? null,
+    user,
+    isOnline: status?._ === 'userStatusOnline',
+  });
   return _prevSelUIChat;
 }
 
@@ -1172,31 +1195,61 @@ export function selectHeaderStatus(state: ChatState): HeaderStatus {
 
 let _prevUIChatsRaw: Td.chat[] = [];
 let _prevUIChatsPhotos: Record<number, string> = {};
+let _prevUIChatsUsers: Map<number, Td.user> = new Map();
+let _prevUIChatsStatuses: Record<number, Td.UserStatus> = {};
 let _prevUIChatsResult: UIChat[] = [];
 
+function chatContext(
+  c: Td.chat,
+  state: ChatState,
+): { photoUrl: string | null; user: Td.user | undefined; isOnline: boolean } {
+  const userId = c.type._ === 'chatTypePrivate' ? c.type.user_id : 0;
+  return {
+    photoUrl: state.profilePhotos[c.id] ?? null,
+    user: userId ? state.users.get(userId) : undefined,
+    isOnline: userId ? state.userStatuses[userId]?._ === 'userStatusOnline' : false,
+  };
+}
+
 export function selectUIChats(state: ChatState): UIChat[] {
-  const { chats, profilePhotos } = state;
-  if (chats === _prevUIChatsRaw && profilePhotos === _prevUIChatsPhotos) {
+  const { chats, profilePhotos, users, userStatuses } = state;
+  if (
+    chats === _prevUIChatsRaw &&
+    profilePhotos === _prevUIChatsPhotos &&
+    users === _prevUIChatsUsers &&
+    userStatuses === _prevUIChatsStatuses
+  ) {
     return _prevUIChatsResult;
   }
   _prevUIChatsRaw = chats;
   _prevUIChatsPhotos = profilePhotos;
-  _prevUIChatsResult = chats.map((c) => toUIChat(c, profilePhotos[c.id] ?? null));
+  _prevUIChatsUsers = users;
+  _prevUIChatsStatuses = userStatuses;
+  _prevUIChatsResult = chats.map((c) => toUIChat(c, chatContext(c, state)));
   return _prevUIChatsResult;
 }
 
 let _prevUIArchivedRaw: Td.chat[] = [];
 let _prevUIArchivedPhotos: Record<number, string> = {};
+let _prevUIArchivedUsers: Map<number, Td.user> = new Map();
+let _prevUIArchivedStatuses: Record<number, Td.UserStatus> = {};
 let _prevUIArchivedResult: UIChat[] = [];
 
 export function selectUIArchivedChats(state: ChatState): UIChat[] {
-  const { archivedChats, profilePhotos } = state;
-  if (archivedChats === _prevUIArchivedRaw && profilePhotos === _prevUIArchivedPhotos) {
+  const { archivedChats, profilePhotos, users, userStatuses } = state;
+  if (
+    archivedChats === _prevUIArchivedRaw &&
+    profilePhotos === _prevUIArchivedPhotos &&
+    users === _prevUIArchivedUsers &&
+    userStatuses === _prevUIArchivedStatuses
+  ) {
     return _prevUIArchivedResult;
   }
   _prevUIArchivedRaw = archivedChats;
   _prevUIArchivedPhotos = profilePhotos;
-  _prevUIArchivedResult = archivedChats.map((c) => toUIChat(c, profilePhotos[c.id] ?? null));
+  _prevUIArchivedUsers = users;
+  _prevUIArchivedStatuses = userStatuses;
+  _prevUIArchivedResult = archivedChats.map((c) => toUIChat(c, chatContext(c, state)));
   return _prevUIArchivedResult;
 }
 

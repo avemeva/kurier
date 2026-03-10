@@ -1,4 +1,15 @@
-import { Loader2, Pin, Search, Star, X } from 'lucide-react';
+import {
+  Bot,
+  Check,
+  CheckCheck,
+  Loader2,
+  Megaphone,
+  Pin,
+  Search,
+  Star,
+  Users,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PureOnlineDot } from '@/components/ui/chat/OnlineDot';
@@ -8,10 +19,8 @@ import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { log } from '@/lib/log';
 import { selectUIArchivedChats, selectUIChats, useChatStore } from '@/lib/store';
-import type { SearchResultMessage } from '@/lib/telegram';
-import { formatTime, getMediaTypeLabel, getMessageText, type PeerInfo } from '@/lib/telegram';
-import type { UIChat } from '@/lib/types';
-import { toUIUser } from '@/lib/types';
+import { formatTime, type PeerInfo } from '@/lib/telegram';
+import type { UIChat, UISearchResult } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { EmojiStatusBadge } from './EmojiStatusBadge';
 
@@ -58,16 +67,12 @@ function SectionBar({ label }: { label: string }) {
 function SearchMessageRow({
   result,
   query,
-  profilePhoto,
   onClick,
 }: {
-  result: SearchResultMessage;
+  result: UISearchResult;
   query: string;
-  profilePhoto?: string;
   onClick: () => void;
 }) {
-  const chatTitle = result.chat_title ?? '';
-  const text = getMessageText(result) || getMediaTypeLabel(result);
   return (
     <button
       type="button"
@@ -75,11 +80,15 @@ function SearchMessageRow({
       className="mx-2 flex w-full items-start gap-3 rounded-lg px-4 py-3 text-left transition-colors hover:bg-accent"
     >
       <div className="relative mt-0.5 shrink-0">
-        <UserAvatar name={chatTitle || '?'} src={profilePhoto} className="size-10 text-xs" />
+        <UserAvatar
+          name={result.chatTitle || '?'}
+          src={result.photoUrl ?? undefined}
+          className="size-10 text-xs"
+        />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="truncate text-sm font-medium text-text-primary">{chatTitle}</span>
+          <span className="truncate text-sm font-medium text-text-primary">{result.chatTitle}</span>
           {result.date > 0 && (
             <span className="shrink-0 text-[10px] text-text-quaternary">
               {formatTime(result.date)}
@@ -87,7 +96,7 @@ function SearchMessageRow({
           )}
         </div>
         <div className="truncate text-xs text-text-tertiary">
-          <HighlightedText text={text || '\u00A0'} query={query} />
+          <HighlightedText text={result.text || '\u00A0'} query={query} />
         </div>
       </div>
     </button>
@@ -139,13 +148,13 @@ function SearchResults({
   query: string;
   localMatches: UIChat[];
   contactResults: PeerInfo[];
-  messageResults: SearchResultMessage[];
+  messageResults: UISearchResult[];
   searchLoading: boolean;
   contactsLoading: boolean;
   profilePhotos: Record<number, string>;
   onSelectChat: (chatId: number) => void;
   onSelectPeer: (peer: PeerInfo) => void;
-  onSelectMessage: (msg: SearchResultMessage) => void;
+  onSelectMessage: (msg: UISearchResult) => void;
 }) {
   const hasQuery = query.trim().length > 0;
   const hasAnyResults =
@@ -228,10 +237,9 @@ function SearchResults({
           <SectionBar label={`Messages${searchLoading ? ' (searching...)' : ''}`} />
           {messageResults.map((msg) => (
             <SearchMessageRow
-              key={`${msg.chat_id}-${msg.id}`}
+              key={`${msg.chatId}-${msg.messageId}`}
               result={msg}
               query={query}
-              profilePhoto={profilePhotos[msg.chat_id]}
               onClick={() => onSelectMessage(msg)}
             />
           ))}
@@ -260,9 +268,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
   const selectedChatId = useChatStore((s) => s.selectedChatId);
   const profilePhotos = useChatStore((s) => s.profilePhotos);
   const typingByChat = useChatStore((s) => s.typingByChat);
-  const userStatuses = useChatStore((s) => s.userStatuses);
   const loadingDialogs = useChatStore((s) => s.loadingDialogs);
-  const users = useChatStore((s) => s.users);
 
   const searchMode = useChatStore((s) => s.searchMode);
   const searchQuery = useChatStore((s) => s.searchQuery);
@@ -395,14 +401,14 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
     openChatById(peer.id);
   }
 
-  function handleSelectMessage(msg: SearchResultMessage) {
-    const existing = [...chats, ...archivedChats].find((c) => c.id === msg.chat_id);
+  function handleSelectMessage(msg: UISearchResult) {
+    const existing = [...chats, ...archivedChats].find((c) => c.id === msg.chatId);
     if (existing) {
       handleSelectChat(existing.id);
       return;
     }
     handleCloseSearch();
-    openChatById(msg.chat_id);
+    openChatById(msg.chatId);
   }
 
   return (
@@ -517,10 +523,6 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
               <p className="p-4 text-sm text-text-tertiary">No chats found</p>
             )}
             {displayedChats.map((chat) => {
-              const isPrivate = chat.kind === 'private';
-              const rawUser = chat.userId ? users.get(chat.userId) : undefined;
-              const user = rawUser ? toUIUser(rawUser) : undefined;
-
               return (
                 <button
                   key={chat.id}
@@ -528,7 +530,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                   type="button"
                   onClick={() => handleSelectChat(chat.id)}
                   className={cn(
-                    'mx-2 flex w-full items-start gap-3 rounded-lg px-4 py-3 text-left transition-colors hover:bg-accent',
+                    'mx-2 flex w-full items-start gap-3 rounded-lg px-4 py-2 text-left transition-colors hover:bg-accent',
                     selectedChatId === chat.id && 'bg-message-own hover:bg-message-own-hover',
                   )}
                 >
@@ -538,9 +540,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                       src={chat.photoUrl ?? undefined}
                       className="size-10 text-xs"
                     />
-                    {isPrivate && userStatuses[chat.id]?._ === 'userStatusOnline' && (
-                      <PureOnlineDot />
-                    )}
+                    {chat.isOnline && <PureOnlineDot />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
@@ -548,17 +548,28 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                         data-testid="dialog-name"
                         className="flex items-center gap-1 truncate text-sm font-medium text-text-primary"
                       >
+                        {chat.kind === 'channel' && (
+                          <Megaphone size={14} className="shrink-0 text-text-tertiary" />
+                        )}
+                        {(chat.kind === 'basicGroup' || chat.kind === 'supergroup') && (
+                          <Users size={14} className="shrink-0 text-text-tertiary" />
+                        )}
+                        {chat.isBot && <Bot size={14} className="shrink-0 text-text-tertiary" />}
                         {chat.title}
-                        {user?.emojiStatusId ? (
-                          <EmojiStatusBadge documentId={user.emojiStatusId} />
+                        {chat.user?.emojiStatusId ? (
+                          <EmojiStatusBadge documentId={chat.user.emojiStatusId} />
                         ) : (
-                          user?.isPremium && (
+                          chat.user?.isPremium && (
                             <Star size={12} className="shrink-0 fill-unread text-unread" />
                           )
                         )}
                       </span>
                       {chat.lastMessageDate > 0 && (
-                        <span className="shrink-0 text-[10px] text-text-quaternary">
+                        <span className="flex shrink-0 items-center gap-0.5 text-[11px] text-text-quaternary">
+                          {chat.lastMessageStatus === 'read' && (
+                            <CheckCheck size={14} className="text-unread" />
+                          )}
+                          {chat.lastMessageStatus === 'sent' && <Check size={14} />}
                           {formatTime(chat.lastMessageDate)}
                         </span>
                       )}
@@ -569,7 +580,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                       ) : (
                         <span
                           data-testid="dialog-preview"
-                          className="truncate text-xs text-text-tertiary"
+                          className="truncate text-[13px] text-text-tertiary"
                         >
                           {chat.lastMessagePreview || '\u00A0'}
                         </span>

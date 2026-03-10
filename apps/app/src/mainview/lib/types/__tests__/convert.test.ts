@@ -194,7 +194,7 @@ describe('toUIMessage', () => {
 
 describe('toUIChat', () => {
   it('converts private chat (Hy Rid)', () => {
-    const ui = toUIChat(CHAT_HY_RID, null);
+    const ui = toUIChat(CHAT_HY_RID, { photoUrl: null, user: undefined, isOnline: false });
     expect(ui.id).toBe(6098406782);
     expect(ui.title).toBe('Hy Rid');
     expect(ui.kind).toBe('private');
@@ -205,10 +205,17 @@ describe('toUIChat', () => {
     expect(ui.isPinned).toBe(true);
     expect(ui.draftText).toBeNull();
     expect(ui.photoUrl).toBeNull();
+    expect(ui.isBot).toBe(false);
+    expect(ui.isOnline).toBe(false);
+    expect(ui.user).toBeNull();
   });
 
   it('converts private chat (Маруся)', () => {
-    const ui = toUIChat(CHAT_MARUSIA, 'https://photo.url/marusia.jpg');
+    const ui = toUIChat(CHAT_MARUSIA, {
+      photoUrl: 'https://photo.url/marusia.jpg',
+      user: USER_MARUSIA,
+      isOnline: true,
+    });
     expect(ui.id).toBe(346928206);
     expect(ui.kind).toBe('private');
     expect(ui.userId).toBe(346928206);
@@ -216,26 +223,36 @@ describe('toUIChat', () => {
     expect(ui.isMuted).toBe(false);
     expect(ui.photoUrl).toBe('https://photo.url/marusia.jpg');
     expect(ui.lastMessagePreview).toBe('прошла неделя, а цвет уже изменился\nтак круто');
+    expect(ui.isBot).toBe(false);
+    expect(ui.isOnline).toBe(true);
+    expect(ui.user).not.toBeNull();
+    expect(ui.user?.fullName).toBe('Маруся');
   });
 
   it('converts supergroup (muted)', () => {
-    const ui = toUIChat(CHAT_SUPERGROUP, null);
+    const ui = toUIChat(CHAT_SUPERGROUP, { photoUrl: null, user: undefined, isOnline: false });
     expect(ui.id).toBe(-1001731417779);
     expect(ui.kind).toBe('supergroup');
     expect(ui.userId).toBe(0);
     expect(ui.isMuted).toBe(true);
     expect(ui.isPinned).toBe(false);
+    expect(ui.isBot).toBe(false);
+    expect(ui.isOnline).toBe(false);
+    expect(ui.user).toBeNull();
   });
 
   it('converts channel', () => {
-    const ui = toUIChat(CHAT_CHANNEL, null);
+    const ui = toUIChat(CHAT_CHANNEL, { photoUrl: null, user: undefined, isOnline: false });
     expect(ui.kind).toBe('channel');
+    expect(ui.isBot).toBe(false);
+    expect(ui.isOnline).toBe(false);
+    expect(ui.user).toBeNull();
   });
 
   it('handles chat with no last message', () => {
     // Supergroup chat has no last_message set (we'll test with a constructed chat)
     const chatNoMsg = { ...CHAT_SUPERGROUP, last_message: undefined } as Td.chat;
-    const ui = toUIChat(chatNoMsg, null);
+    const ui = toUIChat(chatNoMsg, { photoUrl: null, user: undefined, isOnline: false });
     expect(ui.lastMessagePreview).toBe('');
     expect(ui.lastMessageDate).toBe(0);
   });
