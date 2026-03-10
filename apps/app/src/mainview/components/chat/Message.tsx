@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { PureBotKeyboard } from '@/components/ui/chat/BotKeyboard';
 import { PureForwardHeader } from '@/components/ui/chat/ForwardHeader';
 import { PureLinkPreviewCard } from '@/components/ui/chat/LinkPreviewCard';
@@ -18,6 +19,7 @@ import type {
   StickerRenderState,
 } from '@/hooks/useMessage';
 import { useMessage } from '@/hooks/useMessage';
+import { recognizeSpeech } from '@/lib/telegram';
 import type { UIReaction } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { AlbumGrid } from './AlbumGrid';
@@ -157,6 +159,10 @@ function BubbleLayout({
   const hasMedia = isPhoto || isVideo || isVoice;
   const hasReactions = msg.reactions.length > 0;
 
+  const handleTranscribe = useCallback(() => {
+    recognizeSpeech(msg.chatId, msg.id).catch(() => {});
+  }, [msg.chatId, msg.id]);
+
   const bubble = (
     <div
       data-testid="message-bubble"
@@ -209,6 +215,10 @@ function BubbleLayout({
           onRetry={media.retry}
           waveform={msg.voiceWaveform}
           duration={msg.voiceDuration}
+          fileSize={msg.voiceFileSize}
+          speechStatus={msg.voiceSpeechStatus}
+          speechText={msg.voiceSpeechText}
+          onTranscribe={handleTranscribe}
         />
       )}
       {!isPhoto && !isVideo && !isVoice && msg.mediaLabel && (

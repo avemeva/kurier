@@ -101,6 +101,37 @@ function extractVoiceDuration(content: Td.MessageContent): number {
   return 0;
 }
 
+function extractVoiceFileSize(content: Td.MessageContent): number {
+  if (content._ === 'messageVoiceNote')
+    return content.voice_note.voice.size || content.voice_note.voice.expected_size;
+  return 0;
+}
+
+function extractVoiceSpeechStatus(
+  content: Td.MessageContent,
+): 'none' | 'pending' | 'done' | 'error' {
+  if (content._ !== 'messageVoiceNote') return 'none';
+  const r = content.voice_note.speech_recognition_result;
+  if (!r) return 'none';
+  switch (r._) {
+    case 'speechRecognitionResultPending':
+      return 'pending';
+    case 'speechRecognitionResultText':
+      return 'done';
+    case 'speechRecognitionResultError':
+      return 'error';
+    default:
+      return 'none';
+  }
+}
+
+function extractVoiceSpeechText(content: Td.MessageContent): string {
+  if (content._ !== 'messageVoiceNote') return '';
+  const r = content.voice_note.speech_recognition_result;
+  if (r?._ === 'speechRecognitionResultText') return r.text;
+  return '';
+}
+
 // --- Web preview ---
 
 function extractWebPreview(content: Td.MessageContent): UIWebPreview | null {
@@ -274,6 +305,9 @@ export function toUIMessage(
     replyPreview: null, // Populated by enrichReplyPreviews after batch conversion
     voiceWaveform: extractVoiceWaveform(msg.content),
     voiceDuration: extractVoiceDuration(msg.content),
+    voiceFileSize: extractVoiceFileSize(msg.content),
+    voiceSpeechStatus: extractVoiceSpeechStatus(msg.content),
+    voiceSpeechText: extractVoiceSpeechText(msg.content),
   };
 }
 

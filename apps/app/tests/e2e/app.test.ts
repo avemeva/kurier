@@ -354,9 +354,9 @@ base('voice messages show pre-loaded duration', async () => {
 
   const duration = voiceMessages.first().locator('[data-testid="voice-duration"]');
   const text = await duration.textContent();
-  // Duration should not be 0:00 (TDLib provides it before audio loads)
-  expect(text).not.toBe('0:00');
-  expect(text).toMatch(/\d+:\d{2}/);
+  // Duration should not be 00:00 (TDLib provides it before audio loads)
+  expect(text).not.toContain('00:00');
+  expect(text).toMatch(/\d{2}:\d{2}/);
 });
 
 // ---------------------------------------------------------------------------

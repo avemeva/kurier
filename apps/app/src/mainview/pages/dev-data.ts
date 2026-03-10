@@ -95,6 +95,9 @@ export const MESSAGES: UIMessage[] = [
     replyPreview: null,
     voiceWaveform: null,
     voiceDuration: 0,
+    voiceFileSize: 0,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   // text_outgoing
   {
@@ -121,6 +124,9 @@ export const MESSAGES: UIMessage[] = [
     replyPreview: null,
     voiceWaveform: null,
     voiceDuration: 0,
+    voiceFileSize: 0,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   // text_with_entities + reactions
   {
@@ -154,6 +160,9 @@ export const MESSAGES: UIMessage[] = [
     replyPreview: null,
     voiceWaveform: null,
     voiceDuration: 0,
+    voiceFileSize: 0,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   // text_with_link_preview
   {
@@ -187,6 +196,9 @@ export const MESSAGES: UIMessage[] = [
     replyPreview: null,
     voiceWaveform: null,
     voiceDuration: 0,
+    voiceFileSize: 0,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   // photo_album (two photos, same album ID)
   {
@@ -213,6 +225,9 @@ export const MESSAGES: UIMessage[] = [
     replyPreview: null,
     voiceWaveform: null,
     voiceDuration: 0,
+    voiceFileSize: 0,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   {
     id: 755107889152,
@@ -238,6 +253,9 @@ export const MESSAGES: UIMessage[] = [
     replyPreview: null,
     voiceWaveform: null,
     voiceDuration: 0,
+    voiceFileSize: 0,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   // photo_single (from supergroup)
   {
@@ -264,6 +282,9 @@ export const MESSAGES: UIMessage[] = [
     replyPreview: null,
     voiceWaveform: null,
     voiceDuration: 0,
+    voiceFileSize: 0,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   // video
   {
@@ -290,6 +311,9 @@ export const MESSAGES: UIMessage[] = [
     replyPreview: null,
     voiceWaveform: null,
     voiceDuration: 0,
+    voiceFileSize: 0,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   // voice_incoming
   {
@@ -315,7 +339,10 @@ export const MESSAGES: UIMessage[] = [
     inlineKeyboard: null,
     replyPreview: null,
     voiceWaveform: null,
-    voiceDuration: 0,
+    voiceDuration: 31,
+    voiceFileSize: 119194,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   // voice_outgoing
   {
@@ -341,7 +368,10 @@ export const MESSAGES: UIMessage[] = [
     inlineKeyboard: null,
     replyPreview: null,
     voiceWaveform: null,
-    voiceDuration: 0,
+    voiceDuration: 12,
+    voiceFileSize: 45200,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   // video_note
   {
@@ -368,6 +398,9 @@ export const MESSAGES: UIMessage[] = [
     replyPreview: null,
     voiceWaveform: null,
     voiceDuration: 0,
+    voiceFileSize: 0,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   // sticker_incoming
   {
@@ -394,6 +427,9 @@ export const MESSAGES: UIMessage[] = [
     replyPreview: null,
     voiceWaveform: null,
     voiceDuration: 0,
+    voiceFileSize: 0,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   // animation (GIF)
   {
@@ -420,6 +456,9 @@ export const MESSAGES: UIMessage[] = [
     replyPreview: null,
     voiceWaveform: null,
     voiceDuration: 0,
+    voiceFileSize: 0,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   // forwarded text
   {
@@ -446,6 +485,9 @@ export const MESSAGES: UIMessage[] = [
     replyPreview: null,
     voiceWaveform: null,
     voiceDuration: 0,
+    voiceFileSize: 0,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   // reply
   {
@@ -472,6 +514,9 @@ export const MESSAGES: UIMessage[] = [
     replyPreview: null,
     voiceWaveform: null,
     voiceDuration: 0,
+    voiceFileSize: 0,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
   // spoiler
   {
@@ -498,6 +543,9 @@ export const MESSAGES: UIMessage[] = [
     replyPreview: null,
     voiceWaveform: null,
     voiceDuration: 0,
+    voiceFileSize: 0,
+    voiceSpeechStatus: 'none' as const,
+    voiceSpeechText: '',
   },
 ];
 

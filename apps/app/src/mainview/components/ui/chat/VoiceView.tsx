@@ -1,4 +1,4 @@
-import { Mic, Pause, Play } from 'lucide-react';
+import { ChevronUp, Loader2, Mic, Pause, Play } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 /** Match tdesktop: kWaveformSamplesCount=100, msgWaveformBar=2, msgWaveformSkip=1, min=3, max=17 */
@@ -7,7 +7,7 @@ const BAR_WIDTH = 2;
 const BAR_GAP = 1;
 const BAR_STEP = BAR_WIDTH + BAR_GAP; // 3px per bar
 const BAR_MIN = 3;
-const BAR_MAX = 17;
+const BAR_MAX = 23;
 
 /** Simple seedable PRNG (mulberry32) for deterministic waveform shapes. */
 function mulberry32(seed: number) {
@@ -114,12 +114,20 @@ function useBarCount(): [React.RefCallback<HTMLDivElement>, number] {
   return [callbackRef, barCount];
 }
 
-/** Format seconds as m:ss */
+/** Format seconds as mm:ss */
 function formatTime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+  if (!Number.isFinite(seconds) || seconds < 0) return '00:00';
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+/** Format file size in human-readable form */
+function formatFileSize(bytes: number): string {
+  if (bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function PureVoiceView({
@@ -128,18 +136,40 @@ export function PureVoiceView({
   onRetry,
   waveform,
   duration: tdDuration,
+  fileSize,
+  speechStatus = 'none',
+  speechText = '',
+  onTranscribe,
 }: {
   url: string | null;
   loading?: boolean;
   onRetry?: () => void;
   waveform?: string | null;
   duration?: number;
+  fileSize?: number;
+  speechStatus?: 'none' | 'pending' | 'done' | 'error';
+  speechText?: string;
+  onTranscribe?: () => void;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [duration, setDuration] = useState(tdDuration ?? 0);
   const [currentTime, setCurrentTime] = useState(0);
   const rafRef = useRef<number>(0);
+  const [expanded, setExpanded] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+
+  // Auto-expand when transcription completes
+  useEffect(() => {
+    if (speechStatus === 'done') {
+      setExpanded(true);
+      setRequesting(false);
+    } else if (speechStatus === 'pending') {
+      setRequesting(false);
+    } else if (speechStatus === 'error') {
+      setRequesting(false);
+    }
+  }, [speechStatus]);
 
   const [waveformRef, barCount] = useBarCount();
   const allBars = waveform
@@ -166,6 +196,17 @@ export function PureVoiceView({
       audio.pause();
     }
   }, []);
+
+  const handleTranscribe = useCallback(() => {
+    if (speechStatus === 'done') {
+      setExpanded((v) => !v);
+      return;
+    }
+    if (onTranscribe && speechStatus !== 'pending' && !requesting) {
+      setRequesting(true);
+      onTranscribe();
+    }
+  }, [speechStatus, onTranscribe, requesting]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -206,6 +247,14 @@ export function PureVoiceView({
   const progress = duration > 0 ? currentTime / duration : 0;
   const displayTime =
     playing || currentTime > 0 ? formatTime(duration - currentTime) : formatTime(duration);
+  const fileSizeStr = fileSize ? formatFileSize(fileSize) : '';
+  const metaText = fileSizeStr ? `${displayTime}, ${fileSizeStr}` : displayTime;
+
+  const isTranscribing = speechStatus === 'pending' || requesting;
+  const hasTranscription = speechStatus === 'done' && speechText;
+  const canTranscribe =
+    onTranscribe &&
+    (speechStatus === 'none' || speechStatus === 'error' || speechStatus === 'done');
 
   if (loading) {
     return (
@@ -220,19 +269,19 @@ export function PureVoiceView({
     const allPlaceholderBars = generateBars('unavailable');
     const placeholderBars = barCount > 0 ? sampleBars(allPlaceholderBars, barCount) : [];
     return (
-      <div className="flex w-full min-w-[200px] items-center gap-[11px] py-1">
+      <div className="flex w-full min-w-[200px] items-center gap-2 py-1">
         {/* Play button — clickable for retry, otherwise just a muted circle */}
         {onRetry ? (
           <button
             type="button"
             onClick={onRetry}
-            className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full bg-text-quaternary/30 text-text-quaternary transition-opacity hover:opacity-80"
+            className="flex size-[42px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-text-quaternary/30 text-text-quaternary transition-opacity hover:opacity-80"
             aria-label="Retry"
           >
             <Play size={18} fill="currentColor" className="ml-0.5" />
           </button>
         ) : (
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-text-quaternary/30 text-text-quaternary">
+          <div className="flex size-[42px] shrink-0 items-center justify-center rounded-full bg-text-quaternary/30 text-text-quaternary">
             <Play size={18} fill="currentColor" className="ml-0.5" />
           </div>
         )}
@@ -257,55 +306,97 @@ export function PureVoiceView({
   }
 
   return (
-    <div
-      data-testid="voice-message"
-      className="flex w-full min-w-[200px] items-center gap-[11px] py-1"
-    >
+    <div data-testid="voice-message" className="w-[280px] py-1">
       {/* biome-ignore lint/a11y/useMediaCaption: Telegram voice messages don't have captions */}
       <audio ref={audioRef} src={url} preload="metadata" />
 
-      {/* Play/pause button */}
-      <button
-        type="button"
-        onClick={togglePlay}
-        className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent-blue text-white transition-opacity hover:opacity-90"
-        aria-label={playing ? 'Pause' : 'Play'}
-      >
-        {playing ? (
-          <Pause size={18} fill="currentColor" />
-        ) : (
-          <Play size={18} fill="currentColor" className="ml-0.5" />
-        )}
-      </button>
+      {/* Play button | right column */}
+      <div className="flex gap-2">
+        {/* Play/pause button — aligned to waveform row */}
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="mt-0.5 flex size-[42px] shrink-0 items-center justify-center rounded-full bg-accent-blue text-white transition-opacity hover:opacity-90"
+          aria-label={playing ? 'Pause' : 'Play'}
+        >
+          {playing ? (
+            <Pause size={18} fill="currentColor" />
+          ) : (
+            <Play size={18} fill="currentColor" className="ml-0.5" />
+          )}
+        </button>
 
-      {/* Waveform bars */}
-      <div
-        ref={waveformRef}
-        data-testid="voice-waveform"
-        className="flex min-w-0 flex-1 items-center gap-[1px]"
-      >
-        {bars.map((height, i) => {
-          const barProgress = bars.length > 0 ? (i + 0.5) / bars.length : 0;
-          const filled = barProgress <= progress;
-          return (
+        {/* Right column: waveform row + duration row */}
+        <div className="min-w-0 flex-1">
+          {/* Waveform + transcribe button */}
+          <div className="flex items-center gap-1.5">
             <div
-              key={`bar-${i}-${height}`}
-              className={`w-[2px] rounded-full transition-colors duration-75 ${
-                filled ? 'bg-accent-blue' : 'bg-muted-foreground/40'
-              }`}
-              style={{ height: `${height}px` }}
-            />
-          );
-        })}
+              ref={waveformRef}
+              data-testid="voice-waveform"
+              className="flex min-w-0 flex-1 items-center gap-[1px]"
+            >
+              {bars.map((height, i) => {
+                const barProgress = bars.length > 0 ? (i + 0.5) / bars.length : 0;
+                const filled = barProgress <= progress;
+                return (
+                  <div
+                    key={`bar-${i}-${height}`}
+                    className={`w-[2px] rounded-full transition-colors duration-75 ${
+                      filled ? 'bg-accent-blue' : 'bg-muted-foreground/40'
+                    }`}
+                    style={{ height: `${height}px` }}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Transcribe / loading / collapse button */}
+            {(canTranscribe || isTranscribing) && (
+              <button
+                type="button"
+                onClick={handleTranscribe}
+                disabled={isTranscribing}
+                className={`flex shrink-0 items-center justify-center rounded transition-opacity hover:opacity-80 ${
+                  hasTranscription
+                    ? 'size-6 bg-accent-blue text-white'
+                    : 'bg-accent-blue/10 px-1 py-0.5 text-accent-blue'
+                } ${isTranscribing ? 'cursor-default opacity-70' : ''}`}
+                aria-label={
+                  isTranscribing
+                    ? 'Transcribing...'
+                    : hasTranscription && expanded
+                      ? 'Collapse transcript'
+                      : 'Transcribe'
+                }
+              >
+                {isTranscribing ? (
+                  <Loader2 size={12} className="animate-spin" />
+                ) : hasTranscription ? (
+                  <ChevronUp
+                    size={14}
+                    className={`transition-transform ${expanded ? '' : 'rotate-180'}`}
+                  />
+                ) : (
+                  <span className="text-[11px] font-medium leading-none">→A</span>
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Duration + file size */}
+          <span
+            data-testid="voice-duration"
+            className="mt-0.5 block text-[11px] tabular-nums text-text-tertiary"
+          >
+            {metaText}
+          </span>
+        </div>
       </div>
 
-      {/* Duration */}
-      <span
-        data-testid="voice-duration"
-        className="min-w-[32px] shrink-0 text-right text-[11px] tabular-nums text-text-tertiary"
-      >
-        {displayTime}
-      </span>
+      {/* Transcription text (when expanded) */}
+      {hasTranscription && expanded && (
+        <p className="mt-1.5 text-[13px] leading-[18px] text-text-primary">{speechText}</p>
+      )}
     </div>
   );
 }

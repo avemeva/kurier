@@ -71,6 +71,9 @@ export type UIMessage = {
   replyPreview: UIReplyPreview | null;
   voiceWaveform: string | null;
   voiceDuration: number;
+  voiceFileSize: number;
+  voiceSpeechStatus: 'none' | 'pending' | 'done' | 'error';
+  voiceSpeechText: string;
 };
 
 export type UIPendingMessage = {

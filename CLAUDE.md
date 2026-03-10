@@ -39,6 +39,10 @@ Auto-detects worktree name for portless URL:
 - Main repo: `tg.localhost:1355`
 - Worktree: `<worktree-name>.localhost:1355`
 
+## Output
+
+Always output clickable links: `http://`, `https://`, file paths as absolute paths.
+
 ## Certainty Labels
 
 ALWAYS label statements with certainty level when explaining, reporting findings, diagnosing issues, or making architectural assessments:

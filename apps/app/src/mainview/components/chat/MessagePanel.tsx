@@ -143,7 +143,7 @@ export function MessagePanel() {
         {!loadingMessages && messages.length === 0 && (
           <p className="py-8 text-center text-sm text-text-tertiary">No messages</p>
         )}
-        <div className="space-y-1">
+        <div className="max-w-[720px] space-y-1">
           {grouped.map((group) => {
             const input =
               group.type === 'album'

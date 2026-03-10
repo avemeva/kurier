@@ -257,6 +257,12 @@ export async function sendReaction(
   }
 }
 
+// --- Speech recognition ---
+
+export async function recognizeSpeech(chatId: number, messageId: number): Promise<void> {
+  await client.invoke({ _: 'recognizeSpeech', chat_id: chatId, message_id: messageId });
+}
+
 // --- Mark as read ---
 
 export async function markAsRead(chatId: number): Promise<void> {
@@ -469,6 +475,25 @@ async function translateUpdate(update: Td.Update): Promise<TelegramUpdateEvent |
           message_id: update.message_id,
         });
         return { type: 'edit_message', chat_id: update.chat_id, message: msg };
+      } catch {
+        return null;
+      }
+    }
+
+    // Speech recognition updates — re-fetch message to get updated voiceNote content
+    case 'updateSpeechRecognitionTrial':
+      return null;
+
+    // @ts-expect-error TDLib update type not in type definitions yet
+    case 'updateSpeechRecognitionCompleted': {
+      const u = update as unknown as { chat_id: number; message_id: number };
+      try {
+        const msg = await client.invoke({
+          _: 'getMessage',
+          chat_id: u.chat_id,
+          message_id: u.message_id,
+        });
+        return { type: 'edit_message', chat_id: u.chat_id, message: msg };
       } catch {
         return null;
       }
