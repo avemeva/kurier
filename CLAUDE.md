@@ -51,3 +51,7 @@ ALWAYS label statements with certainty level when explaining, reporting findings
 - `[inference]` — logical conclusion derived from facts
 
 No exceptions. Every claim gets a label.
+
+## Local CLAUDE.md
+
+Before editing files in a directory, check for a `CLAUDE.md` in that directory and read it first.
