@@ -6,7 +6,7 @@ import { FormattedText } from './FormattedText';
 function entity(
   offset: number,
   length: number,
-  type: string,
+  type: UITextEntity['type'],
   extra?: Partial<UITextEntity>,
 ): UITextEntity {
   return { offset, length, type, ...extra };
@@ -27,7 +27,7 @@ describe('FormattedText', () => {
 
   it('renders entity-based bold', () => {
     const { container } = render(
-      <FormattedText text="Screenshot Made" entities={[entity(0, 15, 'textEntityTypeBold')]} />,
+      <FormattedText text="Screenshot Made" entities={[entity(0, 15, 'bold')]} />,
     );
     const strong = container.querySelector('strong');
     expect(strong?.textContent).toBe('Screenshot Made');
@@ -35,7 +35,7 @@ describe('FormattedText', () => {
 
   it('renders gap text as plain text between entities', () => {
     const text = 'Hello world\nhttps://example.com';
-    const entities = [entity(12, 19, 'textEntityTypeUrl')];
+    const entities = [entity(12, 19, 'url')];
     const { container } = render(<FormattedText text={text} entities={entities} />);
 
     // Gap text is plain
@@ -48,7 +48,7 @@ describe('FormattedText', () => {
 
   it('renders trailing text as plain text after entities', () => {
     const text = 'https://example.com\nFooter text';
-    const entities = [entity(0, 19, 'textEntityTypeUrl')];
+    const entities = [entity(0, 19, 'url')];
     const { container } = render(<FormattedText text={text} entities={entities} />);
 
     // Trailing text should be plain
@@ -58,8 +58,8 @@ describe('FormattedText', () => {
   it('does not duplicate text when entities overlap', () => {
     const text = 'Visit my.telegram.org for info';
     const entities = [
-      entity(6, 15, 'textEntityTypeTextUrl', { url: 'https://my.telegram.org' }),
-      entity(6, 15, 'textEntityTypeBold'),
+      entity(6, 15, 'textUrl', { url: 'https://my.telegram.org' }),
+      entity(6, 15, 'bold'),
     ];
     const { container } = render(<FormattedText text={text} entities={entities} />);
 
@@ -77,11 +77,7 @@ describe('FormattedText', () => {
 
   it('renders the full bot message with entities correctly', () => {
     const text = 'Screenshot Made\n=====\nAccount ID\n 69834249152f0e8e0be38f7a\nVersion 2.1';
-    const entities = [
-      entity(0, 15, 'textEntityTypeBold'),
-      entity(22, 10, 'textEntityTypeBold'),
-      entity(59, 7, 'textEntityTypeBold'),
-    ];
+    const entities = [entity(0, 15, 'bold'), entity(22, 10, 'bold'), entity(59, 7, 'bold')];
     const { container } = render(<FormattedText text={text} entities={entities} />);
 
     const bolds = container.querySelectorAll('strong');

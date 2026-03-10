@@ -1,9 +1,36 @@
 // UI-facing types. Components never import Td — they consume these.
 
+export interface PeerInfo {
+  id: number;
+  name: string;
+  username: string | null;
+  isUser: boolean;
+  isGroup: boolean;
+  isChannel: boolean;
+}
+
+export type TextEntityKind =
+  | 'bold'
+  | 'italic'
+  | 'code'
+  | 'pre'
+  | 'preCode'
+  | 'url'
+  | 'email'
+  | 'textUrl'
+  | 'strikethrough'
+  | 'underline'
+  | 'mention'
+  | 'hashtag'
+  | 'botCommand'
+  | 'spoiler'
+  | 'customEmoji'
+  | 'unknown';
+
 export type UITextEntity = {
   offset: number;
   length: number;
-  type: string;
+  type: TextEntityKind;
   url?: string;
   customEmojiId?: string;
 };

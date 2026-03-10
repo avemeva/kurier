@@ -21,10 +21,10 @@ import { PureTypingIndicator } from '@/components/ui/chat/TypingIndicator';
 import { Separator } from '@/components/ui/separator';
 import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import { UserAvatar } from '@/components/ui/user-avatar';
+import { formatTime } from '@/lib/format';
 import { log } from '@/lib/log';
 import { selectUIArchivedChats, selectUIChats, useChatStore } from '@/lib/store';
-import { formatTime, type PeerInfo } from '@/lib/telegram';
-import type { UIChat, UISearchResult } from '@/lib/types';
+import type { PeerInfo, UIChat, UISearchResult } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { EmojiStatusBadge } from './EmojiStatusBadge';
 

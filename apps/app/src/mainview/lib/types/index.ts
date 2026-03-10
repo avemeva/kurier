@@ -22,6 +22,8 @@ export {
 export type {
   ChatKind,
   MessageContentKind,
+  PeerInfo,
+  TextEntityKind,
   UIChat,
   UIKeyboardButton,
   UIKeyboardRow,

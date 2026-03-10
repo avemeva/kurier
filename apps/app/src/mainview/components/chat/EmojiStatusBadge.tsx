@@ -1,19 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { PureEmojiStatusIcon } from '@/components/ui/chat/EmojiStatusIcon';
-import { getCustomEmojiUrl } from '@/lib/telegram';
+import { useChatStore } from '@/lib/store';
 
 export function EmojiStatusBadge({ documentId }: { documentId: string }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const url = useChatStore((s) => s.customEmojiUrls[documentId] ?? null);
+  const loadCustomEmojiUrl = useChatStore((s) => s.loadCustomEmojiUrl);
 
   useEffect(() => {
-    let cancelled = false;
-    getCustomEmojiUrl(documentId).then((u) => {
-      if (!cancelled) setUrl(u);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [documentId]);
+    loadCustomEmojiUrl(documentId);
+  }, [documentId, loadCustomEmojiUrl]);
 
   return <PureEmojiStatusIcon url={url} />;
 }

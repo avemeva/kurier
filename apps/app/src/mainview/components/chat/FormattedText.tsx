@@ -1,19 +1,14 @@
 import { useEffect, useState } from 'react';
-import { getCustomEmojiUrl } from '@/lib/telegram';
+import { useChatStore } from '@/lib/store';
 import type { UITextEntity } from '@/lib/types';
 
 function CustomEmoji({ documentId, fallback }: { documentId: string; fallback: string }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const url = useChatStore((s) => s.customEmojiUrls[documentId] ?? null);
+  const loadCustomEmojiUrl = useChatStore((s) => s.loadCustomEmojiUrl);
 
   useEffect(() => {
-    let cancelled = false;
-    getCustomEmojiUrl(documentId).then((u) => {
-      if (!cancelled) setUrl(u);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [documentId]);
+    loadCustomEmojiUrl(documentId);
+  }, [documentId, loadCustomEmojiUrl]);
 
   if (!url) {
     return <span className="inline-block align-text-bottom">{fallback}</span>;
@@ -70,21 +65,21 @@ export function FormattedText({ text, entities }: { text: string; entities: UITe
     const entityType = entity.type;
 
     switch (entityType) {
-      case 'textEntityTypeBold':
+      case 'bold':
         parts.push(<strong key={key}>{slice}</strong>);
         break;
-      case 'textEntityTypeItalic':
+      case 'italic':
         parts.push(<em key={key}>{slice}</em>);
         break;
-      case 'textEntityTypeCode':
+      case 'code':
         parts.push(
           <code key={key} className="rounded bg-code-bg px-1 font-mono text-[13px]">
             {slice}
           </code>,
         );
         break;
-      case 'textEntityTypePre':
-      case 'textEntityTypePreCode':
+      case 'pre':
+      case 'preCode':
         parts.push(
           <pre
             key={key}
@@ -94,12 +89,12 @@ export function FormattedText({ text, entities }: { text: string; entities: UITe
           </pre>,
         );
         break;
-      case 'textEntityTypeUrl':
-      case 'textEntityTypeEmailAddress':
+      case 'url':
+      case 'email':
         parts.push(
           <a
             key={key}
-            href={entityType === 'textEntityTypeEmailAddress' ? `mailto:${slice}` : slice}
+            href={entityType === 'email' ? `mailto:${slice}` : slice}
             target="_blank"
             rel="noopener noreferrer"
             className="break-all text-accent-blue underline"
@@ -108,7 +103,7 @@ export function FormattedText({ text, entities }: { text: string; entities: UITe
           </a>,
         );
         break;
-      case 'textEntityTypeTextUrl':
+      case 'textUrl':
         parts.push(
           <a
             key={key}
@@ -121,25 +116,25 @@ export function FormattedText({ text, entities }: { text: string; entities: UITe
           </a>,
         );
         break;
-      case 'textEntityTypeStrikethrough':
+      case 'strikethrough':
         parts.push(<s key={key}>{slice}</s>);
         break;
-      case 'textEntityTypeUnderline':
+      case 'underline':
         parts.push(<u key={key}>{slice}</u>);
         break;
-      case 'textEntityTypeMention':
-      case 'textEntityTypeHashtag':
-      case 'textEntityTypeBotCommand':
+      case 'mention':
+      case 'hashtag':
+      case 'botCommand':
         parts.push(
           <span key={key} className="text-accent-blue">
             {slice}
           </span>,
         );
         break;
-      case 'textEntityTypeSpoiler':
+      case 'spoiler':
         parts.push(<SpoilerText key={key}>{slice}</SpoilerText>);
         break;
-      case 'textEntityTypeCustomEmoji': {
+      case 'customEmoji': {
         const customEmojiId = entity.customEmojiId;
         parts.push(
           customEmojiId ? (

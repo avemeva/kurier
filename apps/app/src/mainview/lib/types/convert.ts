@@ -3,6 +3,7 @@ import type { PendingMessage } from './index';
 import type {
   ChatKind,
   MessageContentKind,
+  TextEntityKind,
   UIChat,
   UIKeyboardRow,
   UIMessage,
@@ -247,6 +248,26 @@ export function extractInlineKeyboard(msg: Td.message): UIKeyboardRow[] | null {
   );
 }
 
+// --- Entity kind ---
+
+const ENTITY_KIND_MAP: Record<string, TextEntityKind> = {
+  textEntityTypeBold: 'bold',
+  textEntityTypeItalic: 'italic',
+  textEntityTypeCode: 'code',
+  textEntityTypePre: 'pre',
+  textEntityTypePreCode: 'preCode',
+  textEntityTypeUrl: 'url',
+  textEntityTypeEmailAddress: 'email',
+  textEntityTypeTextUrl: 'textUrl',
+  textEntityTypeStrikethrough: 'strikethrough',
+  textEntityTypeUnderline: 'underline',
+  textEntityTypeMention: 'mention',
+  textEntityTypeHashtag: 'hashtag',
+  textEntityTypeBotCommand: 'botCommand',
+  textEntityTypeSpoiler: 'spoiler',
+  textEntityTypeCustomEmoji: 'customEmoji',
+};
+
 // --- Public converters ---
 
 export function toUITextEntities(entities: Td.textEntity[]): UITextEntity[] {
@@ -254,7 +275,7 @@ export function toUITextEntities(entities: Td.textEntity[]): UITextEntity[] {
     const result: UITextEntity = {
       offset: e.offset,
       length: e.length,
-      type: e.type._,
+      type: ENTITY_KIND_MAP[e.type._] ?? 'unknown',
     };
     if (e.type._ === 'textEntityTypeTextUrl') {
       result.url = e.type.url;

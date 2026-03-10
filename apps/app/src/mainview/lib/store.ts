@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type {
+  PeerInfo,
   PendingMessage,
   Td,
   TelegramUpdateEvent,
@@ -9,13 +10,14 @@ import type {
   UIUser,
 } from '@/lib/types';
 import { toUIChat, toUIMessage, toUIPendingMessage, toUISearchResult, toUIUser } from '@/lib/types';
+import { formatLastSeen } from './format';
 import { log } from './log';
 import {
   clearMediaCache,
   closeTdChat,
   downloadMedia,
   downloadThumbnail,
-  formatLastSeen,
+  getCustomEmojiUrl,
   getDialogs,
   getMessages,
   getMessageText,
@@ -25,12 +27,12 @@ import {
   markAsRead,
   onUpdate,
   openTdChat,
-  type PeerInfo,
   searchContacts,
   searchGlobal,
   searchInChat,
   sendMessage,
   sendReaction,
+  recognizeSpeech as tdRecognizeSpeech,
 } from './telegram';
 
 // --- Types ---
@@ -54,6 +56,7 @@ interface ChatState {
   profilePhotos: Record<number, string>;
   mediaUrls: Record<string, string | null>;
   thumbUrls: Record<string, string | null>;
+  customEmojiUrls: Record<string, string | null>;
   typingByChat: Record<number, Record<number, { action: Td.ChatAction; expiresAt: number }>>;
   userStatuses: Record<number, Td.UserStatus>;
   authState: Td.AuthorizationState | null;
@@ -98,6 +101,8 @@ interface ChatState {
   loadMedia: (chatId: number, messageId: number) => void;
   clearMediaUrl: (chatId: number, messageId: number) => void;
   seedMedia: (urls: Record<string, string>) => void;
+  loadCustomEmojiUrl: (documentId: string) => void;
+  recognizeSpeech: (chatId: number, messageId: number) => void;
   clearError: () => void;
 
   // Global search actions
@@ -128,6 +133,7 @@ let tempIdCounter = 0;
 const photoRequested = new Set<number>();
 const mediaRequested = new Set<string>();
 const thumbRequested = new Set<string>();
+const customEmojiRequested = new Set<string>();
 
 /** Content types that may have a downloadable thumbnail. */
 const THUMB_CONTENT_TYPES = new Set([
@@ -204,6 +210,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   profilePhotos: {},
   mediaUrls: {},
   thumbUrls: {},
+  customEmojiUrls: {},
   typingByChat: {},
   userStatuses: {},
   authState: null,
@@ -970,6 +977,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
+  loadCustomEmojiUrl: (documentId: string) => {
+    if (customEmojiRequested.has(documentId)) return;
+    customEmojiRequested.add(documentId);
+    getCustomEmojiUrl(documentId).then((url) => {
+      set((s) => ({ customEmojiUrls: { ...s.customEmojiUrls, [documentId]: url } }));
+    });
+  },
+
+  recognizeSpeech: (chatId: number, messageId: number) => {
+    tdRecognizeSpeech(chatId, messageId).catch(() => {});
+  },
+
   clearMediaUrl: (chatId: number, messageId: number) => {
     const key = `${chatId}_${messageId}`;
     mediaRequested.delete(key);
@@ -1469,6 +1488,7 @@ export function _resetForTests() {
   tempIdCounter = 0;
   photoRequested.clear();
   mediaRequested.clear();
+  customEmojiRequested.clear();
   userFetchRequested.clear();
   for (const t of typingTimers.values()) clearTimeout(t);
   typingTimers.clear();

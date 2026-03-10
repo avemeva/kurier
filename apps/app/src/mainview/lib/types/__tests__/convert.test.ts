@@ -77,8 +77,8 @@ describe('toUIMessage', () => {
     const ui = toUIMessage(MSG_TEXT_WITH_ENTITIES, users, 0);
     expect(ui.text).toContain('Hey Andery!');
     expect(ui.entities).toHaveLength(6);
-    expect(ui.entities[0]).toEqual({ offset: 103, length: 12, type: 'textEntityTypeBold' });
-    expect(ui.entities[1]).toEqual({ offset: 371, length: 17, type: 'textEntityTypeUrl' });
+    expect(ui.entities[0]).toEqual({ offset: 103, length: 12, type: 'bold' });
+    expect(ui.entities[1]).toEqual({ offset: 371, length: 17, type: 'url' });
     expect(ui.reactions).toHaveLength(1);
     expect(ui.reactions[0]).toEqual({ emoji: '👍', count: 1, chosen: true });
   });
@@ -339,7 +339,7 @@ describe('toUITextEntities', () => {
       { _: 'textEntity', offset: 0, length: 4, type: { _: 'textEntityTypeBold' } },
     ];
     const result = toUITextEntities(entities);
-    expect(result).toEqual([{ offset: 0, length: 4, type: 'textEntityTypeBold' }]);
+    expect(result).toEqual([{ offset: 0, length: 4, type: 'bold' }]);
   });
 
   it('converts url entity', () => {
@@ -347,7 +347,7 @@ describe('toUITextEntities', () => {
       { _: 'textEntity', offset: 0, length: 15, type: { _: 'textEntityTypeUrl' } },
     ];
     const result = toUITextEntities(entities);
-    expect(result).toEqual([{ offset: 0, length: 15, type: 'textEntityTypeUrl' }]);
+    expect(result).toEqual([{ offset: 0, length: 15, type: 'url' }]);
   });
 
   it('converts textUrl entity with url', () => {
@@ -361,7 +361,7 @@ describe('toUITextEntities', () => {
     ];
     const result = toUITextEntities(entities);
     expect(result).toEqual([
-      { offset: 0, length: 10, type: 'textEntityTypeTextUrl', url: 'https://example.com' },
+      { offset: 0, length: 10, type: 'textUrl', url: 'https://example.com' },
     ]);
   });
 
@@ -375,9 +375,7 @@ describe('toUITextEntities', () => {
       },
     ];
     const result = toUITextEntities(entities);
-    expect(result).toEqual([
-      { offset: 0, length: 5, type: 'textEntityTypeCustomEmoji', customEmojiId: '12345' },
-    ]);
+    expect(result).toEqual([{ offset: 0, length: 5, type: 'customEmoji', customEmojiId: '12345' }]);
   });
 
   it('converts spoiler entity', () => {
@@ -385,7 +383,7 @@ describe('toUITextEntities', () => {
       { _: 'textEntity', offset: 5, length: 3, type: { _: 'textEntityTypeSpoiler' } },
     ];
     const result = toUITextEntities(entities);
-    expect(result).toEqual([{ offset: 5, length: 3, type: 'textEntityTypeSpoiler' }]);
+    expect(result).toEqual([{ offset: 5, length: 3, type: 'spoiler' }]);
   });
 
   it('handles empty entities array', () => {

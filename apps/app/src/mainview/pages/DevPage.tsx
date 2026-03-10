@@ -74,9 +74,7 @@ const stickerMessages = MESSAGES.filter((m) => m.contentKind === 'sticker');
 const gifMessages = MESSAGES.filter((m) => m.contentKind === 'animation');
 const voiceMessages = MESSAGES.filter((m) => m.contentKind === 'voice');
 const linkPreviewMessages = MESSAGES.filter((m) => !!m.webPreview);
-const spoilerMessages = MESSAGES.filter((m) =>
-  m.entities.some((e) => e.type === 'textEntityTypeSpoiler'),
-);
+const spoilerMessages = MESSAGES.filter((m) => m.entities.some((e) => e.type === 'spoiler'));
 const photoCaptionMessages = MESSAGES.filter((m) => m.contentKind === 'photo' && m.text);
 const forwardMessages = MESSAGES.filter((m) => !!m.forwardFromName);
 const botKeyboardMessages = MESSAGES.filter((m) => !!m.inlineKeyboard);
@@ -449,7 +447,7 @@ export default function DevPage() {
         {/* --- Entities --- */}
         <Section id="entities" title="Entities">
           {entityMessages
-            .filter((m) => !m.entities.some((e) => e.type === 'textEntityTypeSpoiler'))
+            .filter((m) => !m.entities.some((e) => e.type === 'spoiler'))
             .slice(0, 4)
             .map((msg) => (
               <Case

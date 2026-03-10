@@ -19,7 +19,7 @@ import type {
   StickerRenderState,
 } from '@/hooks/useMessage';
 import { useMessage } from '@/hooks/useMessage';
-import { recognizeSpeech } from '@/lib/telegram';
+import { useChatStore } from '@/lib/store';
 import type { UIReaction } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { AlbumGrid } from './AlbumGrid';
@@ -159,9 +159,10 @@ function BubbleLayout({
   const hasMedia = isPhoto || isVideo || isVoice;
   const hasReactions = msg.reactions.length > 0;
 
+  const storeRecognizeSpeech = useChatStore((s) => s.recognizeSpeech);
   const handleTranscribe = useCallback(() => {
-    recognizeSpeech(msg.chatId, msg.id).catch(() => {});
-  }, [msg.chatId, msg.id]);
+    storeRecognizeSpeech(msg.chatId, msg.id);
+  }, [msg.chatId, msg.id, storeRecognizeSpeech]);
 
   const bubble = (
     <div

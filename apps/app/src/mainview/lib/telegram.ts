@@ -10,7 +10,7 @@
  */
 
 import { TelegramClient } from '@tg/protocol';
-import type { SearchResultMessage, Td, TelegramUpdateEvent } from '@/lib/types';
+import type { PeerInfo, SearchResultMessage, Td, TelegramUpdateEvent } from '@/lib/types';
 import { telegramLog } from './log';
 
 // --- TelegramClient instance (same-origin in dev, Vite proxies /api/tg → daemon) ---
@@ -135,14 +135,7 @@ export async function isAuthorized(): Promise<boolean> {
 
 export type { SearchResultMessage, TelegramUpdateEvent } from '@/lib/types';
 
-export interface PeerInfo {
-  id: number;
-  name: string;
-  username: string | null;
-  isUser: boolean;
-  isGroup: boolean;
-  isChannel: boolean;
-}
+export type { PeerInfo } from './types/ui';
 
 // --- Update events ---
 
@@ -870,30 +863,7 @@ export async function searchContacts(
 
 // --- Formatting ---
 
-export function formatTime(timestamp: number): string {
-  if (!timestamp) return '';
-  const date = new Date(timestamp * 1000);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const dayMs = 86_400_000;
-
-  if (diffMs < dayMs && date.getDate() === now.getDate()) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-  if (diffMs < 7 * dayMs) {
-    return date.toLocaleDateString([], { weekday: 'short' });
-  }
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
-
-export function formatLastSeen(timestamp: number): string {
-  const date = new Date(timestamp * 1000);
-  const now = new Date();
-  if (date.toDateString() === now.toDateString()) {
-    return `last seen at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-  }
-  return `last seen ${formatTime(timestamp)}`;
-}
+export { formatLastSeen, formatTime } from './format';
 
 // --- TDLib message utilities ---
 
