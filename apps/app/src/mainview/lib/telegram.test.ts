@@ -283,17 +283,23 @@ describe('formatTelegramError', () => {
 // --- Data fetching via TelegramClient ---
 
 describe('getDialogs', () => {
-  it('fetches chats via getChats + getChat', async () => {
+  it('fetches chats via loadChats + getChats + getChat', async () => {
     const chat1 = makeChat({ id: 1, title: 'Chat 1' });
     const chat2 = makeChat({ id: 2, title: 'Chat 2' });
 
     mockInvoke
+      .mockResolvedValueOnce(undefined) // loadChats
       .mockResolvedValueOnce({ _: 'chats', total_count: 2, chat_ids: [1, 2] })
       .mockResolvedValueOnce(chat1)
       .mockResolvedValueOnce(chat2);
 
     const result = await getDialogs();
 
+    expect(mockInvoke).toHaveBeenCalledWith({
+      _: 'loadChats',
+      chat_list: { _: 'chatListMain' },
+      limit: 100,
+    });
     expect(mockInvoke).toHaveBeenCalledWith({
       _: 'getChats',
       chat_list: { _: 'chatListMain' },
@@ -303,10 +309,17 @@ describe('getDialogs', () => {
   });
 
   it('uses chatListArchive for archived option', async () => {
-    mockInvoke.mockResolvedValueOnce({ _: 'chats', total_count: 0, chat_ids: [] });
+    mockInvoke
+      .mockResolvedValueOnce(undefined) // loadChats
+      .mockResolvedValueOnce({ _: 'chats', total_count: 0, chat_ids: [] });
 
     await getDialogs({ archived: true });
 
+    expect(mockInvoke).toHaveBeenCalledWith({
+      _: 'loadChats',
+      chat_list: { _: 'chatListArchive' },
+      limit: 100,
+    });
     expect(mockInvoke).toHaveBeenCalledWith({
       _: 'getChats',
       chat_list: { _: 'chatListArchive' },
@@ -315,11 +328,14 @@ describe('getDialogs', () => {
   });
 
   it('respects limit option', async () => {
-    mockInvoke.mockResolvedValueOnce({ _: 'chats', total_count: 0, chat_ids: [] });
+    mockInvoke
+      .mockResolvedValueOnce(undefined) // loadChats
+      .mockResolvedValueOnce({ _: 'chats', total_count: 0, chat_ids: [] });
 
     await getDialogs({ limit: 20 });
 
-    expect(mockInvoke).toHaveBeenCalledWith(expect.objectContaining({ limit: 20 }));
+    expect(mockInvoke).toHaveBeenCalledWith(expect.objectContaining({ _: 'loadChats', limit: 20 }));
+    expect(mockInvoke).toHaveBeenCalledWith(expect.objectContaining({ _: 'getChats', limit: 20 }));
   });
 });
 

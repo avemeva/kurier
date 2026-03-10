@@ -167,11 +167,46 @@ export async function getDialogs(
     ? { _: 'chatListArchive' as const }
     : { _: 'chatListMain' as const };
 
+  try {
+    await client.invoke({ _: 'loadChats', chat_list, limit });
+  } catch {
+    // loadChats throws when there are no more chats to load — safe to ignore
+  }
+
   const result = await client.invoke({ _: 'getChats', chat_list, limit });
   const chats = await Promise.all(
     result.chat_ids.map((id: number) => client.invoke({ _: 'getChat', chat_id: id })),
   );
   return chats;
+}
+
+export async function loadMoreDialogs(opts: {
+  archived?: boolean;
+  currentCount: number;
+}): Promise<{ chats: Td.chat[]; hasMore: boolean }> {
+  const chat_list = opts.archived
+    ? { _: 'chatListArchive' as const }
+    : { _: 'chatListMain' as const };
+
+  let hasMore = true;
+  try {
+    await client.invoke({ _: 'loadChats', chat_list, limit: 100 });
+  } catch {
+    hasMore = false;
+  }
+
+  const result = await client.invoke({
+    _: 'getChats',
+    chat_list,
+    limit: opts.currentCount + 100,
+  });
+
+  const newIds = result.chat_ids.slice(opts.currentCount);
+  const chats = await Promise.all(
+    newIds.map((id: number) => client.invoke({ _: 'getChat', chat_id: id })),
+  );
+
+  return { chats, hasMore };
 }
 
 export async function getMessages(

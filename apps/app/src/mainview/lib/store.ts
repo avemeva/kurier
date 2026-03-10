@@ -24,6 +24,7 @@ import {
   getProfilePhotoUrl,
   getSenderUserId,
   getUser,
+  loadMoreDialogs,
   markAsRead,
   onUpdate,
   openTdChat,
@@ -65,6 +66,10 @@ interface ChatState {
   loadingMessages: boolean;
   loadingOlderMessages: boolean;
   hasMoreMessages: Record<number, boolean>;
+  hasMoreChats: boolean;
+  hasMoreArchivedChats: boolean;
+  loadingMoreChats: boolean;
+  loadingMoreArchivedChats: boolean;
   error: string;
 
   // Global search state
@@ -91,6 +96,7 @@ interface ChatState {
 
   // Actions
   loadDialogs: () => Promise<void>;
+  loadMoreChats: (archived: boolean) => Promise<void>;
   openChat: (chat: Td.chat) => Promise<void>;
   openChatById: (chatId: number) => Promise<void>;
   loadOlderMessages: () => Promise<void>;
@@ -219,6 +225,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadingMessages: false,
   loadingOlderMessages: false,
   hasMoreMessages: {},
+  hasMoreChats: true,
+  hasMoreArchivedChats: true,
+  loadingMoreChats: false,
+  loadingMoreArchivedChats: false,
   error: '',
 
   // Global search initial state
@@ -254,6 +264,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set({
         chats: regular,
         archivedChats: filteredArchived,
+        hasMoreChats: regular.length >= 100,
+        hasMoreArchivedChats: filteredArchived.length >= 100,
       });
       loadThumbnailsForChats(regular, set);
       loadThumbnailsForChats(filteredArchived, set);
@@ -261,6 +273,32 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set({ error: err instanceof Error ? err.message : String(err) });
     } finally {
       set({ loadingDialogs: false });
+    }
+  },
+
+  loadMoreChats: async (archived: boolean) => {
+    const loadingKey = archived ? 'loadingMoreArchivedChats' : 'loadingMoreChats';
+    const hasMoreKey = archived ? 'hasMoreArchivedChats' : 'hasMoreChats';
+    const chatsKey = archived ? 'archivedChats' : 'chats';
+
+    if (get()[loadingKey] || !get()[hasMoreKey]) return;
+    set({ [loadingKey]: true });
+
+    try {
+      const currentChats = get()[chatsKey];
+      const result = await loadMoreDialogs({ archived, currentCount: currentChats.length });
+
+      if (result.chats.length > 0) {
+        set((s) => ({
+          [chatsKey]: [...s[chatsKey], ...result.chats],
+          [hasMoreKey]: result.hasMore,
+          [loadingKey]: false,
+        }));
+      } else {
+        set({ [hasMoreKey]: false, [loadingKey]: false });
+      }
+    } catch {
+      set({ [loadingKey]: false });
     }
   },
 

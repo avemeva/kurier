@@ -390,9 +390,12 @@ export function toUIChat(chat: Td.chat, ctx: UIChatContext): UIChat {
   const kind = toChatKind(chat.type);
   const isPrivate = kind === 'private';
   const lastMsg = chat.last_message;
+  const isDeletedUser =
+    isPrivate && (ctx.user?.type?._ === 'userTypeDeleted' || (!chat.title && !ctx.user));
+  const title = chat.title || (isDeletedUser ? 'Deleted Account' : '');
   return {
     id: chat.id,
-    title: chat.title,
+    title,
     kind,
     userId: chat.type._ === 'chatTypePrivate' ? chat.type.user_id : 0,
     unreadCount: chat.unread_count,

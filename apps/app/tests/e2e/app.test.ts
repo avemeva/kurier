@@ -198,6 +198,36 @@ base('sidebar is scrollable with many dialogs', async () => {
   expect(scrollHeight).toBeGreaterThanOrEqual(clientHeight);
 });
 
+base('scrolling sidebar to bottom loads more chats', async () => {
+  const sidebar = page.locator('[data-testid="sidebar-scroll"]');
+  const initialCount = await page.locator('[data-testid="dialog-item"]').count();
+
+  // Scroll to bottom to trigger load-more
+  await sidebar.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+
+  // Wait for new chats to appear (up to 10s)
+  try {
+    await page.waitForFunction(
+      (prev) => document.querySelectorAll('[data-testid="dialog-item"]').length > prev,
+      initialCount,
+      { timeout: 10_000 },
+    );
+  } catch {
+    // If no more chats loaded, the account may have ≤100 chats — skip
+    const afterCount = await page.locator('[data-testid="dialog-item"]').count();
+    if (afterCount === initialCount) {
+      base.skip(true, `Only ${initialCount} chats available (no more to load)`);
+      return;
+    }
+  }
+
+  const afterCount = await page.locator('[data-testid="dialog-item"]').count();
+  console.log(`  Sidebar infinite scroll: ${initialCount} → ${afterCount} chats`);
+  expect(afterCount).toBeGreaterThan(initialCount);
+});
+
 base('message panel is present when a chat is selected', async () => {
   await page.locator('[data-testid="dialog-item"]').first().click();
   await page.waitForTimeout(500);

@@ -302,6 +302,9 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
   const thumbUrls = useChatStore((s) => s.thumbUrls);
   const typingByChat = useChatStore((s) => s.typingByChat);
   const loadingDialogs = useChatStore((s) => s.loadingDialogs);
+  const loadingMoreChats = useChatStore((s) => s.loadingMoreChats);
+  const loadingMoreArchivedChats = useChatStore((s) => s.loadingMoreArchivedChats);
+  const loadMoreChats = useChatStore((s) => s.loadMoreChats);
 
   const searchMode = useChatStore((s) => s.searchMode);
   const searchQuery = useChatStore((s) => s.searchQuery);
@@ -332,7 +335,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: loadProfilePhoto deduplicates internally
   useEffect(() => {
-    for (const c of displayedChats.slice(0, 30)) {
+    for (const c of displayedChats) {
       loadProfilePhoto(c.id);
     }
   }, [displayedChats]);
@@ -416,6 +419,17 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
     }
     closeGlobalSearch();
   }, [closeGlobalSearch]);
+
+  const handleSidebarScroll = useCallback(
+    (e: React.UIEvent<HTMLDivElement>) => {
+      const el = e.currentTarget;
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200) {
+        const isArchive = tab === 'archive';
+        loadMoreChats(isArchive);
+      }
+    },
+    [tab, loadMoreChats],
+  );
 
   function handleSelectChat(chatId: number) {
     if (isSearchActive) {
@@ -548,7 +562,11 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
             </div>
           )}
 
-          <div data-testid="sidebar-scroll" className="flex-1 overflow-y-auto scrollbar-subtle">
+          <div
+            data-testid="sidebar-scroll"
+            className="flex-1 overflow-y-auto scrollbar-subtle"
+            onScroll={handleSidebarScroll}
+          >
             {loadingDialogs && (
               <p className="animate-pulse p-4 text-sm text-text-tertiary">Loading chats...</p>
             )}
@@ -629,6 +647,14 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                 </button>
               );
             })}
+            {(tab === 'all' ? loadingMoreChats : loadingMoreArchivedChats) && (
+              <div
+                data-testid="loading-more-chats"
+                className="flex items-center justify-center py-3"
+              >
+                <Loader2 size={16} className="animate-spin text-text-tertiary" />
+              </div>
+            )}
           </div>
         </>
       )}
