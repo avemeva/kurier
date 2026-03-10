@@ -106,7 +106,45 @@ export type TelegramUpdateEvent =
     }
   | { type: 'user'; user: Td.user }
   | { type: 'reconnected' }
-  | { type: 'auth_state'; authorization_state: Td.AuthorizationState };
+  | { type: 'auth_state'; authorization_state: Td.AuthorizationState }
+  | {
+      type: 'chat_read_inbox';
+      chat_id: number;
+      last_read_inbox_message_id: number;
+      unread_count: number;
+    }
+  | { type: 'new_chat'; chat: Td.chat }
+  | {
+      type: 'chat_last_message';
+      chat_id: number;
+      last_message?: Td.message;
+      positions: Td.chatPosition[];
+    }
+  | { type: 'chat_position'; chat_id: number; position: Td.chatPosition }
+  | {
+      type: 'message_send_failed';
+      chat_id: number;
+      old_message_id: number;
+      message: Td.message;
+      error: Td.error;
+    }
+  | { type: 'chat_title'; chat_id: number; title: string }
+  | { type: 'chat_photo'; chat_id: number; photo?: Td.chatPhotoInfo }
+  | {
+      type: 'chat_notification_settings';
+      chat_id: number;
+      notification_settings: Td.chatNotificationSettings;
+    }
+  | {
+      type: 'chat_draft_message';
+      chat_id: number;
+      draft_message?: Td.draftMessage;
+      positions: Td.chatPosition[];
+    }
+  | { type: 'connection_state'; state: Td.ConnectionState }
+  | { type: 'chat_is_marked_as_unread'; chat_id: number; is_marked_as_unread: boolean }
+  | { type: 'chat_unread_mention_count'; chat_id: number; unread_mention_count: number }
+  | { type: 'message_is_pinned'; chat_id: number; message_id: number; is_pinned: boolean };
 
 // Search result extends message with chat context
 export type SearchResultMessage = Td.message & {

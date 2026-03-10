@@ -55,6 +55,7 @@ interface ChatState {
   typingByChat: Record<number, Record<number, { action: Td.ChatAction; expiresAt: number }>>;
   userStatuses: Record<number, Td.UserStatus>;
   authState: Td.AuthorizationState | null;
+  connectionState: Td.ConnectionState | null;
   loadingDialogs: boolean;
   loadingMessages: boolean;
   loadingOlderMessages: boolean;
@@ -169,6 +170,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   typingByChat: {},
   userStatuses: {},
   authState: null,
+  connectionState: null,
   loadingDialogs: true,
   loadingMessages: false,
   loadingOlderMessages: false,
@@ -748,6 +750,163 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return {
           messagesByChat: { ...s.messagesByChat, [chatId]: newMsgs },
           pendingByChat: { ...s.pendingByChat, [chatId]: newPending },
+        };
+      });
+    }
+
+    if (event.type === 'chat_read_inbox') {
+      set((s) => {
+        const update = (list: Td.chat[]) =>
+          list.map((c) =>
+            c.id === event.chat_id
+              ? {
+                  ...c,
+                  last_read_inbox_message_id: event.last_read_inbox_message_id,
+                  unread_count: event.unread_count,
+                }
+              : c,
+          );
+        return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
+      });
+    }
+
+    if (event.type === 'new_chat') {
+      set((s) => {
+        const exists =
+          s.chats.some((c) => c.id === event.chat.id) ||
+          s.archivedChats.some((c) => c.id === event.chat.id);
+        if (exists) return s;
+        return { chats: [event.chat, ...s.chats] };
+      });
+    }
+
+    if (event.type === 'chat_last_message') {
+      set((s) => {
+        const update = (list: Td.chat[]) =>
+          list.map((c) =>
+            c.id === event.chat_id
+              ? {
+                  ...c,
+                  last_message: event.last_message,
+                  positions: event.positions.length > 0 ? event.positions : c.positions,
+                }
+              : c,
+          );
+        return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
+      });
+    }
+
+    if (event.type === 'chat_position') {
+      set((s) => {
+        const update = (list: Td.chat[]) =>
+          list.map((c) => {
+            if (c.id !== event.chat_id) return c;
+            const pos = event.position;
+            const newPositions = c.positions.filter((p) => p.list._ !== pos.list._);
+            // Only add position if order is non-zero (zero means removed from list)
+            if (pos.order !== '0') newPositions.push(pos);
+            return { ...c, positions: newPositions };
+          });
+        return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
+      });
+    }
+
+    if (event.type === 'message_send_failed') {
+      set((s) => {
+        const pending = s.pendingByChat[event.chat_id];
+        if (!pending) return s;
+        return {
+          pendingByChat: {
+            ...s.pendingByChat,
+            [event.chat_id]: pending.map((p) =>
+              p.localId === String(event.old_message_id)
+                ? { ...p, _pending: 'failed' as const }
+                : p,
+            ),
+          },
+        };
+      });
+    }
+
+    if (event.type === 'chat_title') {
+      set((s) => {
+        const update = (list: Td.chat[]) =>
+          list.map((c) => (c.id === event.chat_id ? { ...c, title: event.title } : c));
+        return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
+      });
+    }
+
+    if (event.type === 'chat_photo') {
+      set((s) => {
+        const update = (list: Td.chat[]) =>
+          list.map((c) => (c.id === event.chat_id ? { ...c, photo: event.photo } : c));
+        return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
+      });
+    }
+
+    if (event.type === 'chat_notification_settings') {
+      set((s) => {
+        const update = (list: Td.chat[]) =>
+          list.map((c) =>
+            c.id === event.chat_id
+              ? { ...c, notification_settings: event.notification_settings }
+              : c,
+          );
+        return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
+      });
+    }
+
+    if (event.type === 'chat_draft_message') {
+      set((s) => {
+        const update = (list: Td.chat[]) =>
+          list.map((c) =>
+            c.id === event.chat_id
+              ? {
+                  ...c,
+                  draft_message: event.draft_message,
+                  positions: event.positions.length > 0 ? event.positions : c.positions,
+                }
+              : c,
+          );
+        return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
+      });
+    }
+
+    if (event.type === 'connection_state') {
+      set({ connectionState: event.state });
+    }
+
+    if (event.type === 'chat_is_marked_as_unread') {
+      set((s) => {
+        const update = (list: Td.chat[]) =>
+          list.map((c) =>
+            c.id === event.chat_id ? { ...c, is_marked_as_unread: event.is_marked_as_unread } : c,
+          );
+        return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
+      });
+    }
+
+    if (event.type === 'chat_unread_mention_count') {
+      set((s) => {
+        const update = (list: Td.chat[]) =>
+          list.map((c) =>
+            c.id === event.chat_id ? { ...c, unread_mention_count: event.unread_mention_count } : c,
+          );
+        return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
+      });
+    }
+
+    if (event.type === 'message_is_pinned') {
+      set((s) => {
+        const msgs = s.messagesByChat[event.chat_id];
+        if (!msgs) return s;
+        return {
+          messagesByChat: {
+            ...s.messagesByChat,
+            [event.chat_id]: msgs.map((m) =>
+              m.id === event.message_id ? { ...m, is_pinned: event.is_pinned } : m,
+            ),
+          },
         };
       });
     }

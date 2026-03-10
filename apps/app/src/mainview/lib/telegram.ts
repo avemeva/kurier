@@ -544,6 +544,101 @@ async function translateUpdate(update: Td.Update): Promise<TelegramUpdateEvent |
         authorization_state: update.authorization_state,
       };
 
+    case 'updateChatReadInbox':
+      return {
+        type: 'chat_read_inbox',
+        chat_id: update.chat_id,
+        last_read_inbox_message_id: update.last_read_inbox_message_id,
+        unread_count: update.unread_count,
+      };
+
+    case 'updateNewChat':
+      return {
+        type: 'new_chat',
+        chat: update.chat,
+      };
+
+    case 'updateChatLastMessage':
+      return {
+        type: 'chat_last_message',
+        chat_id: update.chat_id,
+        last_message: update.last_message,
+        positions: update.positions,
+      };
+
+    case 'updateChatPosition':
+      return {
+        type: 'chat_position',
+        chat_id: update.chat_id,
+        position: update.position,
+      };
+
+    case 'updateMessageSendFailed':
+      return {
+        type: 'message_send_failed',
+        chat_id: update.message.chat_id,
+        old_message_id: update.old_message_id,
+        message: update.message,
+        error: update.error,
+      };
+
+    case 'updateChatTitle':
+      return {
+        type: 'chat_title',
+        chat_id: update.chat_id,
+        title: update.title,
+      };
+
+    case 'updateChatPhoto':
+      return {
+        type: 'chat_photo',
+        chat_id: update.chat_id,
+        photo: update.photo,
+      };
+
+    case 'updateChatNotificationSettings':
+      return {
+        type: 'chat_notification_settings',
+        chat_id: update.chat_id,
+        notification_settings: update.notification_settings,
+      };
+
+    case 'updateChatDraftMessage':
+      return {
+        type: 'chat_draft_message',
+        chat_id: update.chat_id,
+        draft_message: update.draft_message,
+        positions: update.positions,
+      };
+
+    case 'updateConnectionState':
+      return {
+        type: 'connection_state',
+        state: update.state,
+      };
+
+    case 'updateChatIsMarkedAsUnread':
+      return {
+        type: 'chat_is_marked_as_unread',
+        chat_id: update.chat_id,
+        is_marked_as_unread: update.is_marked_as_unread,
+      };
+
+    case 'updateChatUnreadMentionCount':
+      return {
+        type: 'chat_unread_mention_count',
+        chat_id: update.chat_id,
+        unread_mention_count: update.unread_mention_count,
+      };
+
+    case 'updateMessageIsPinned':
+      return {
+        type: 'message_is_pinned',
+        chat_id: update.chat_id,
+        message_id: update.message_id,
+        is_pinned: update.is_pinned,
+      };
+
     default:
       return null;
   }

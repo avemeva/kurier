@@ -257,6 +257,16 @@ function BubbleLayout({
             displayType={displayType}
           />
         </span>
+      ) : msg.webPreview ? (
+        <span className="mt-1 flex justify-end">
+          <PureMessageTime
+            date={msg.date}
+            out={msg.isOutgoing}
+            read={msg.isRead}
+            edited={msg.editDate > 0}
+            displayType={displayType}
+          />
+        </span>
       ) : (
         <span className="absolute bottom-1 right-2">
           <PureMessageTime

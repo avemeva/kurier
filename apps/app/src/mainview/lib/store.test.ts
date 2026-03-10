@@ -534,6 +534,356 @@ describe('handleUpdate', () => {
       expect(updated.interaction_info?.reactions?.reactions[0].total_count).toBe(3);
     });
   });
+
+  describe('chat_read_inbox', () => {
+    it('updates unread count and last_read_inbox_message_id on matching chat', () => {
+      useChatStore.setState({
+        chats: [makeChat({ id: 10, unread_count: 5, last_read_inbox_message_id: 100 })],
+      });
+      useChatStore.getState().handleUpdate({
+        type: 'chat_read_inbox',
+        chat_id: 10,
+        last_read_inbox_message_id: 200,
+        unread_count: 0,
+      });
+      const chat = useChatStore.getState().chats[0];
+      expect(chat.unread_count).toBe(0);
+      expect(chat.last_read_inbox_message_id).toBe(200);
+    });
+
+    it('updates archived chats too', () => {
+      useChatStore.setState({ archivedChats: [makeChat({ id: 10, unread_count: 3 })] });
+      useChatStore.getState().handleUpdate({
+        type: 'chat_read_inbox',
+        chat_id: 10,
+        last_read_inbox_message_id: 50,
+        unread_count: 0,
+      });
+      expect(useChatStore.getState().archivedChats[0].unread_count).toBe(0);
+    });
+
+    it('ignores unknown chat id', () => {
+      useChatStore.setState({ chats: [makeChat({ id: 10, unread_count: 5 })] });
+      useChatStore.getState().handleUpdate({
+        type: 'chat_read_inbox',
+        chat_id: 999,
+        last_read_inbox_message_id: 200,
+        unread_count: 0,
+      });
+      expect(useChatStore.getState().chats[0].unread_count).toBe(5);
+    });
+  });
+
+  describe('new_chat', () => {
+    it('adds new chat to the beginning of the list', () => {
+      useChatStore.setState({ chats: [makeChat({ id: 1 })] });
+      const newChat = makeChat({ id: 2, title: 'New Chat' });
+      useChatStore.getState().handleUpdate({ type: 'new_chat', chat: newChat });
+      const { chats } = useChatStore.getState();
+      expect(chats).toHaveLength(2);
+      expect(chats[0].id).toBe(2);
+    });
+
+    it('does not add duplicate chat', () => {
+      useChatStore.setState({ chats: [makeChat({ id: 1 })] });
+      useChatStore.getState().handleUpdate({ type: 'new_chat', chat: makeChat({ id: 1 }) });
+      expect(useChatStore.getState().chats).toHaveLength(1);
+    });
+
+    it('does not add if exists in archived', () => {
+      useChatStore.setState({ chats: [], archivedChats: [makeChat({ id: 5 })] });
+      useChatStore.getState().handleUpdate({ type: 'new_chat', chat: makeChat({ id: 5 }) });
+      expect(useChatStore.getState().chats).toHaveLength(0);
+    });
+  });
+
+  describe('chat_last_message', () => {
+    it('updates last_message on matching chat', () => {
+      useChatStore.setState({ chats: [makeChat({ id: 10 })] });
+      const msg = makeMessage({ id: 50, chat_id: 10 });
+      useChatStore.getState().handleUpdate({
+        type: 'chat_last_message',
+        chat_id: 10,
+        last_message: msg,
+        positions: [],
+      });
+      expect(useChatStore.getState().chats[0].last_message).toEqual(msg);
+    });
+
+    it('clears last_message when undefined', () => {
+      const msg = makeMessage({ id: 50 });
+      useChatStore.setState({ chats: [makeChat({ id: 10, last_message: msg })] });
+      useChatStore.getState().handleUpdate({
+        type: 'chat_last_message',
+        chat_id: 10,
+        last_message: undefined,
+        positions: [],
+      });
+      expect(useChatStore.getState().chats[0].last_message).toBeUndefined();
+    });
+
+    it('updates positions when provided', () => {
+      useChatStore.setState({ chats: [makeChat({ id: 10 })] });
+      const positions = [
+        {
+          _: 'chatPosition' as const,
+          list: { _: 'chatListMain' as const },
+          order: '123',
+          is_pinned: false,
+          source: undefined,
+        },
+      ] as Td.chatPosition[];
+      useChatStore.getState().handleUpdate({
+        type: 'chat_last_message',
+        chat_id: 10,
+        last_message: makeMessage({ id: 1 }),
+        positions,
+      });
+      expect(useChatStore.getState().chats[0].positions).toEqual(positions);
+    });
+  });
+
+  describe('chat_position', () => {
+    it('adds new position to chat', () => {
+      useChatStore.setState({ chats: [makeChat({ id: 10, positions: [] })] });
+      const pos = {
+        _: 'chatPosition' as const,
+        list: { _: 'chatListMain' as const },
+        order: '100',
+        is_pinned: true,
+        source: undefined,
+      } as Td.chatPosition;
+      useChatStore.getState().handleUpdate({ type: 'chat_position', chat_id: 10, position: pos });
+      expect(useChatStore.getState().chats[0].positions).toHaveLength(1);
+      expect(useChatStore.getState().chats[0].positions[0].is_pinned).toBe(true);
+    });
+
+    it('removes position when order is zero', () => {
+      const existing = {
+        _: 'chatPosition' as const,
+        list: { _: 'chatListMain' as const },
+        order: '100',
+        is_pinned: false,
+        source: undefined,
+      } as Td.chatPosition;
+      useChatStore.setState({ chats: [makeChat({ id: 10, positions: [existing] })] });
+      const pos = {
+        _: 'chatPosition' as const,
+        list: { _: 'chatListMain' as const },
+        order: '0',
+        is_pinned: false,
+        source: undefined,
+      } as Td.chatPosition;
+      useChatStore.getState().handleUpdate({ type: 'chat_position', chat_id: 10, position: pos });
+      expect(useChatStore.getState().chats[0].positions).toHaveLength(0);
+    });
+  });
+
+  describe('message_send_failed', () => {
+    it('marks pending message as failed', () => {
+      const pending: PendingMessage = {
+        _pending: 'sending',
+        localId: '999',
+        chat_id: 10,
+        text: 'hi',
+        date: 1000,
+      };
+      useChatStore.setState({ pendingByChat: { 10: [pending] } });
+      useChatStore.getState().handleUpdate({
+        type: 'message_send_failed',
+        chat_id: 10,
+        old_message_id: 999,
+        message: makeMessage({ id: 999, chat_id: 10 }),
+        error: { _: 'error', code: 400, message: 'Bad Request' } as Td.error,
+      });
+      expect(useChatStore.getState().pendingByChat[10][0]._pending).toBe('failed');
+    });
+
+    it('ignores when no matching pending message', () => {
+      useChatStore.setState({ pendingByChat: {} });
+      useChatStore.getState().handleUpdate({
+        type: 'message_send_failed',
+        chat_id: 10,
+        old_message_id: 999,
+        message: makeMessage({ id: 999 }),
+        error: { _: 'error', code: 400, message: 'Bad Request' } as Td.error,
+      });
+      expect(useChatStore.getState().pendingByChat).toEqual({});
+    });
+  });
+
+  describe('chat_title', () => {
+    it('updates title on matching chat', () => {
+      useChatStore.setState({ chats: [makeChat({ id: 10, title: 'Old Title' })] });
+      useChatStore.getState().handleUpdate({ type: 'chat_title', chat_id: 10, title: 'New Title' });
+      expect(useChatStore.getState().chats[0].title).toBe('New Title');
+    });
+
+    it('updates archived chats too', () => {
+      useChatStore.setState({ archivedChats: [makeChat({ id: 10, title: 'Old' })] });
+      useChatStore.getState().handleUpdate({ type: 'chat_title', chat_id: 10, title: 'New' });
+      expect(useChatStore.getState().archivedChats[0].title).toBe('New');
+    });
+  });
+
+  describe('chat_photo', () => {
+    it('updates photo on matching chat', () => {
+      useChatStore.setState({ chats: [makeChat({ id: 10 })] });
+      const photo = {
+        _: 'chatPhotoInfo',
+        small: {},
+        big: {},
+        has_animation: false,
+        is_personal: false,
+      } as unknown as Td.chatPhotoInfo;
+      useChatStore.getState().handleUpdate({ type: 'chat_photo', chat_id: 10, photo });
+      expect(useChatStore.getState().chats[0].photo).toEqual(photo);
+    });
+
+    it('clears photo when undefined', () => {
+      useChatStore.setState({ chats: [makeChat({ id: 10 })] });
+      useChatStore.getState().handleUpdate({ type: 'chat_photo', chat_id: 10, photo: undefined });
+      expect(useChatStore.getState().chats[0].photo).toBeUndefined();
+    });
+  });
+
+  describe('chat_notification_settings', () => {
+    it('updates notification settings on matching chat', () => {
+      useChatStore.setState({ chats: [makeChat({ id: 10 })] });
+      const settings = {
+        _: 'chatNotificationSettings',
+        mute_for: 3600,
+      } as unknown as Td.chatNotificationSettings;
+      useChatStore.getState().handleUpdate({
+        type: 'chat_notification_settings',
+        chat_id: 10,
+        notification_settings: settings,
+      });
+      expect(useChatStore.getState().chats[0].notification_settings).toEqual(settings);
+    });
+  });
+
+  describe('chat_draft_message', () => {
+    it('sets draft message on matching chat', () => {
+      useChatStore.setState({ chats: [makeChat({ id: 10 })] });
+      const draft = {
+        _: 'draftMessage',
+        date: 1000,
+        input_message_text: {},
+        effect_id: '0',
+      } as unknown as Td.draftMessage;
+      useChatStore.getState().handleUpdate({
+        type: 'chat_draft_message',
+        chat_id: 10,
+        draft_message: draft,
+        positions: [],
+      });
+      expect(useChatStore.getState().chats[0].draft_message).toEqual(draft);
+    });
+
+    it('clears draft message when undefined', () => {
+      const draft = { _: 'draftMessage' } as unknown as Td.draftMessage;
+      useChatStore.setState({ chats: [makeChat({ id: 10, draft_message: draft })] });
+      useChatStore.getState().handleUpdate({
+        type: 'chat_draft_message',
+        chat_id: 10,
+        draft_message: undefined,
+        positions: [],
+      });
+      expect(useChatStore.getState().chats[0].draft_message).toBeUndefined();
+    });
+  });
+
+  describe('connection_state', () => {
+    it('stores connection state', () => {
+      useChatStore.getState().handleUpdate({
+        type: 'connection_state',
+        state: { _: 'connectionStateReady' },
+      });
+      expect(useChatStore.getState().connectionState).toEqual({ _: 'connectionStateReady' });
+    });
+
+    it('updates when state changes', () => {
+      useChatStore.getState().handleUpdate({
+        type: 'connection_state',
+        state: { _: 'connectionStateConnecting' },
+      });
+      expect(useChatStore.getState().connectionState).toEqual({ _: 'connectionStateConnecting' });
+    });
+  });
+
+  describe('chat_is_marked_as_unread', () => {
+    it('marks chat as unread', () => {
+      useChatStore.setState({ chats: [makeChat({ id: 10, is_marked_as_unread: false })] });
+      useChatStore.getState().handleUpdate({
+        type: 'chat_is_marked_as_unread',
+        chat_id: 10,
+        is_marked_as_unread: true,
+      });
+      expect(useChatStore.getState().chats[0].is_marked_as_unread).toBe(true);
+    });
+
+    it('unmarks chat as unread', () => {
+      useChatStore.setState({ chats: [makeChat({ id: 10, is_marked_as_unread: true })] });
+      useChatStore.getState().handleUpdate({
+        type: 'chat_is_marked_as_unread',
+        chat_id: 10,
+        is_marked_as_unread: false,
+      });
+      expect(useChatStore.getState().chats[0].is_marked_as_unread).toBe(false);
+    });
+  });
+
+  describe('chat_unread_mention_count', () => {
+    it('updates unread mention count', () => {
+      useChatStore.setState({ chats: [makeChat({ id: 10, unread_mention_count: 0 })] });
+      useChatStore.getState().handleUpdate({
+        type: 'chat_unread_mention_count',
+        chat_id: 10,
+        unread_mention_count: 3,
+      });
+      expect(useChatStore.getState().chats[0].unread_mention_count).toBe(3);
+    });
+  });
+
+  describe('message_is_pinned', () => {
+    it('pins a message', () => {
+      useChatStore.setState({
+        messagesByChat: { 10: [makeMessage({ id: 1, chat_id: 10, is_pinned: false })] },
+      });
+      useChatStore.getState().handleUpdate({
+        type: 'message_is_pinned',
+        chat_id: 10,
+        message_id: 1,
+        is_pinned: true,
+      });
+      expect(useChatStore.getState().messagesByChat[10][0].is_pinned).toBe(true);
+    });
+
+    it('unpins a message', () => {
+      useChatStore.setState({
+        messagesByChat: { 10: [makeMessage({ id: 1, chat_id: 10, is_pinned: true })] },
+      });
+      useChatStore.getState().handleUpdate({
+        type: 'message_is_pinned',
+        chat_id: 10,
+        message_id: 1,
+        is_pinned: false,
+      });
+      expect(useChatStore.getState().messagesByChat[10][0].is_pinned).toBe(false);
+    });
+
+    it('ignores when chat messages not loaded', () => {
+      useChatStore.setState({ messagesByChat: {} });
+      useChatStore.getState().handleUpdate({
+        type: 'message_is_pinned',
+        chat_id: 10,
+        message_id: 1,
+        is_pinned: true,
+      });
+      expect(useChatStore.getState().messagesByChat[10]).toBeUndefined();
+    });
+  });
 });
 
 // --- Selectors ---
