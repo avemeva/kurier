@@ -10,17 +10,14 @@ export function ChatHeader() {
   const headerStatus = useChatStore(selectHeaderStatus);
   const openChatSearch = useChatStore((s) => s.openChatSearch);
   const user = useChatStore((s) => selectUIUser(s, selectedChat?.userId ?? 0));
-  const profilePhotos = useChatStore((s) => s.profilePhotos);
+  const avatarId = selectedChat?.userId || selectedChat?.id;
+  const avatarSrc = useChatStore((s) => (avatarId ? s.profilePhotos[avatarId] : undefined));
 
   if (!selectedChat) return null;
 
   return (
     <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/80 px-4 py-3 backdrop-blur-sm">
-      <UserAvatar
-        name={selectedChat.title}
-        src={profilePhotos[selectedChat.userId || selectedChat.id]}
-        className="size-8 text-xs"
-      />
+      <UserAvatar name={selectedChat.title} src={avatarSrc} className="size-8 text-xs" />
       <div className="flex-1">
         <h2
           data-testid="chat-title"

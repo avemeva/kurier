@@ -1200,10 +1200,16 @@ export function selectUIArchivedChats(state: ChatState): UIChat[] {
   return _prevUIArchivedResult;
 }
 
+let _prevUIUserRaw: Td.user | undefined;
+let _prevUIUserResult: UIUser | null = null;
+
 export function selectUIUser(state: ChatState, userId: number): UIUser | null {
   const user = state.users.get(userId);
   if (!user) return null;
-  return toUIUser(user);
+  if (user === _prevUIUserRaw) return _prevUIUserResult;
+  _prevUIUserRaw = user;
+  _prevUIUserResult = toUIUser(user);
+  return _prevUIUserResult;
 }
 
 // --- Test helpers ---
