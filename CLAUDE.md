@@ -35,6 +35,8 @@ cp "$MAIN/.env" .env
 bun run dev:hmr
 ```
 
+Long-running process — run with `run_in_background`, **never pipe through `head`/`tail`** (blocks until pipe closes, hangs forever).
+
 Auto-detects worktree name for portless URL:
 - Main repo: `tg.localhost:1355`
 - Worktree: `<worktree-name>.localhost:1355`

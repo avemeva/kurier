@@ -74,11 +74,11 @@ function PendingLayout({ state }: { state: PendingRenderState }) {
       <div
         data-testid="message-bubble"
         data-is-outgoing="true"
-        className="group/bubble relative max-w-[55%] rounded-2xl bg-message-own px-4 py-2.5"
+        className="group/bubble relative max-w-[55%] rounded-xl bg-message-own px-3 py-1.5"
       >
         <p className="whitespace-pre-wrap break-words text-[13px] leading-[18px] text-text-primary">
           {state.text}
-          <span className="float-right h-[18px] w-14" aria-hidden="true" />
+          <span className="float-right h-[18px] w-12" aria-hidden="true" />
         </p>
         <span className="absolute bottom-1 right-2">
           <PureMessageTime
@@ -169,7 +169,7 @@ function BubbleLayout({
       data-testid="message-bubble"
       data-is-outgoing={msg.isOutgoing ? 'true' : 'false'}
       className={cn(
-        'group/bubble relative rounded-2xl px-4 py-2.5',
+        'group/bubble relative rounded-xl px-3 py-1.5',
         msg.isOutgoing ? 'bg-message-own' : 'bg-message-peer',
         hasReactions && 'pb-5',
         state.showAvatar ? 'max-w-[calc(100%-36px)]' : 'max-w-[55%]',
@@ -233,7 +233,7 @@ function BubbleLayout({
           )}
         >
           <FormattedText text={msg.text} entities={msg.entities} />
-          <span className="float-right h-[18px] w-14" aria-hidden="true" />
+          <span className="float-right h-[18px] w-12" aria-hidden="true" />
         </p>
       )}
       {msg.webPreview && (
@@ -323,7 +323,7 @@ function AlbumLayout({
       data-testid="message-bubble"
       data-is-outgoing={first.isOutgoing ? 'true' : 'false'}
       className={cn(
-        'group/bubble relative rounded-2xl px-4 py-2.5',
+        'group/bubble relative rounded-xl px-3 py-1.5',
         first.isOutgoing ? 'bg-message-own' : 'bg-message-peer',
         hasReactions && 'pb-5',
         state.showAvatar ? 'max-w-[calc(100%-36px)]' : 'max-w-[55%]',
@@ -337,7 +337,7 @@ function AlbumLayout({
       {first.text && (
         <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-[18px] text-text-primary">
           <FormattedText text={first.text} entities={first.entities} />
-          <span className="inline-block w-14 align-baseline" aria-hidden="true">
+          <span className="inline-block w-12 align-baseline" aria-hidden="true">
             {'\u00A0'}
           </span>
         </p>
