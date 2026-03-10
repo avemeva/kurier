@@ -30,7 +30,7 @@ type TgResult = {
 
 /** Run a CLI command and parse JSON result */
 async function tg(...args: string[]): Promise<TgResult> {
-  const proc = Bun.spawn(['bun', 'run', CLI_ENTRY, ...args], {
+  const proc = Bun.spawn(['bun', 'run', CLI_ENTRY, '--timeout', '30', ...args], {
     stdout: 'pipe',
     stderr: 'pipe',
     env: { ...process.env },
