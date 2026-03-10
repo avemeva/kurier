@@ -173,6 +173,27 @@ function loadThumbnailsForChats(
     });
   }
 }
+/** Download a thumbnail for a single message and write it into thumbUrls. */
+function loadThumbnailForMessage(
+  chatId: number,
+  msg: Td.message,
+  set: (partial: Partial<ChatState> | ((s: ChatState) => Partial<ChatState>)) => void,
+): void {
+  const contentType = msg.content._;
+  const hasThumb =
+    THUMB_CONTENT_TYPES.has(contentType) ||
+    (contentType === 'messageText' && !!(msg.content as Td.messageText).link_preview);
+  if (!hasThumb) return;
+  const key = `${chatId}_${msg.id}`;
+  if (thumbRequested.has(key)) return;
+  thumbRequested.add(key);
+  downloadThumbnail(chatId, msg.id).then((url) => {
+    if (url) {
+      set((s) => ({ thumbUrls: { ...s.thumbUrls, [key]: url } }));
+    }
+  });
+}
+
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const statusTimers = new Map<number, ReturnType<typeof setTimeout>>();
 const userFetchRequested = new Set<number>();
@@ -667,6 +688,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           archivedChats: updateChatList(s.archivedChats),
         };
       });
+      loadThumbnailForMessage(event.chat_id, event.message, set);
     }
 
     if (event.type === 'edit_message') {
@@ -878,6 +900,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
           );
         return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
       });
+      if (event.last_message) {
+        loadThumbnailForMessage(event.chat_id, event.last_message, set);
+      }
     }
 
     if (event.type === 'chat_position') {

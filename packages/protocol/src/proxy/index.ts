@@ -307,7 +307,17 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
           }
         });
 
+        // Send heartbeat every 15s so clients can detect dead connections
+        const heartbeat = setInterval(() => {
+          try {
+            controller.enqueue(encoder.encode(': ping\n\n'));
+          } catch {
+            clearInterval(heartbeat);
+          }
+        }, 15_000);
+
         req.signal.addEventListener('abort', () => {
+          clearInterval(heartbeat);
           unsub();
           try {
             controller.close();

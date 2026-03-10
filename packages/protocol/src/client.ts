@@ -136,6 +136,20 @@ export class TelegramClient {
     this.abortController = new AbortController();
 
     const connect = async () => {
+      let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
+
+      const resetHeartbeat = () => {
+        if (heartbeatTimer) clearTimeout(heartbeatTimer);
+        // If no data (including pings) for 30s, consider connection dead
+        heartbeatTimer = setTimeout(() => {
+          this.abortController?.abort();
+          this.abortController = new AbortController();
+          if (this.sseConnected && this.handlers.size > 0) {
+            setTimeout(() => connect(), 1000);
+          }
+        }, 30_000);
+      };
+
       try {
         const res = await fetch(`${this.baseUrl}/api/tg/updates`, {
           signal: this.abortController?.signal,
@@ -150,9 +164,13 @@ export class TelegramClient {
         const decoder = new TextDecoder();
         let buffer = '';
 
+        resetHeartbeat();
+
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+
+          resetHeartbeat();
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
@@ -174,8 +192,18 @@ export class TelegramClient {
             }
           }
         }
+
+        // Stream ended cleanly — reconnect
+        if (heartbeatTimer) clearTimeout(heartbeatTimer);
+        if (this.sseConnected && this.handlers.size > 0) {
+          setTimeout(() => connect(), 1000);
+        }
       } catch (e: unknown) {
-        if ((e as Error)?.name === 'AbortError') return;
+        if (heartbeatTimer) clearTimeout(heartbeatTimer);
+        if ((e as Error)?.name === 'AbortError') {
+          // AbortError from heartbeat timeout triggers reconnect above
+          return;
+        }
         // Reconnect after 1 second on unexpected disconnect
         if (this.sseConnected && this.handlers.size > 0) {
           setTimeout(() => connect(), 1000);
