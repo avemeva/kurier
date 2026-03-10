@@ -1,9 +1,13 @@
 import {
   Bot,
+  Camera,
   Check,
   CheckCheck,
+  FileText,
+  Film,
   Loader2,
   Megaphone,
+  Mic,
   Pin,
   Search,
   Star,
@@ -59,6 +63,34 @@ function SectionBar({ label }: { label: string }) {
     <div className="flex h-7 items-center bg-bg-secondary px-3.5">
       <span className="text-[13px] text-text-tertiary">{label}</span>
     </div>
+  );
+}
+
+// --- Chat preview line (last message preview with media) ---
+
+const MEDIA_ICON_KINDS = {
+  photo: Camera,
+  video: Film,
+  voice: Mic,
+  document: FileText,
+} as const;
+
+function ChatPreviewLine({ chat, thumbUrl }: { chat: UIChat; thumbUrl: string | null }) {
+  const kind = chat.lastMessageContentKind;
+  const IconComponent = kind ? MEDIA_ICON_KINDS[kind as keyof typeof MEDIA_ICON_KINDS] : null;
+  return (
+    <span
+      data-testid="dialog-preview"
+      className="flex min-w-0 items-center gap-1.5 text-[13px] text-text-tertiary"
+    >
+      {thumbUrl && (
+        <img src={thumbUrl} alt="" className="size-5 shrink-0 rounded-[3px] object-cover" />
+      )}
+      {!thumbUrl && IconComponent && (
+        <IconComponent size={14} className="shrink-0 text-text-quaternary" />
+      )}
+      <span className="truncate">{chat.lastMessagePreview || '\u00A0'}</span>
+    </span>
   );
 }
 
@@ -267,6 +299,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
   const archivedChats = useChatStore(selectUIArchivedChats);
   const selectedChatId = useChatStore((s) => s.selectedChatId);
   const profilePhotos = useChatStore((s) => s.profilePhotos);
+  const thumbUrls = useChatStore((s) => s.thumbUrls);
   const typingByChat = useChatStore((s) => s.typingByChat);
   const loadingDialogs = useChatStore((s) => s.loadingDialogs);
 
@@ -578,17 +611,15 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                       {typingByChat[chat.id] && Object.keys(typingByChat[chat.id]).length > 0 ? (
                         <PureTypingIndicator text="typing" />
                       ) : (
-                        <span
-                          data-testid="dialog-preview"
-                          className="truncate text-[13px] text-text-tertiary"
-                        >
-                          {chat.lastMessagePreview || '\u00A0'}
-                        </span>
+                        <ChatPreviewLine
+                          chat={chat}
+                          thumbUrl={thumbUrls[`${chat.id}_${chat.lastMessageId}`] ?? null}
+                        />
                       )}
                       <div className="flex shrink-0 items-center gap-1">
                         {chat.isPinned && <Pin size={12} className="text-text-quaternary" />}
                         {chat.unreadCount > 0 && (
-                          <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-unread px-1 text-[10px] font-medium leading-none text-white">
+                          <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-sand-8 px-1 text-[10px] font-medium leading-none text-white dark:bg-unread">
                             {chat.unreadCount}
                           </span>
                         )}

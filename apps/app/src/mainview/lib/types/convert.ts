@@ -368,6 +368,7 @@ export function toUIChat(chat: Td.chat, ctx: UIChatContext): UIChat {
   const draftText = draftInput?._ === 'inputMessageText' ? draftInput.text.text || null : null;
   const kind = toChatKind(chat.type);
   const isPrivate = kind === 'private';
+  const lastMsg = chat.last_message;
   return {
     id: chat.id,
     title: chat.title,
@@ -375,11 +376,13 @@ export function toUIChat(chat: Td.chat, ctx: UIChatContext): UIChat {
     userId: chat.type._ === 'chatTypePrivate' ? chat.type.user_id : 0,
     unreadCount: chat.unread_count,
     isPinned: chat.positions.some((p) => p.is_pinned),
-    lastMessagePreview: extractMessagePreview(chat.last_message),
-    lastMessageDate: chat.last_message?.date ?? 0,
-    lastMessageStatus: !chat.last_message?.is_outgoing
+    lastMessagePreview: extractMessagePreview(lastMsg),
+    lastMessageContentKind: lastMsg ? toContentKind(lastMsg.content) : null,
+    lastMessageId: lastMsg?.id ?? 0,
+    lastMessageDate: lastMsg?.date ?? 0,
+    lastMessageStatus: !lastMsg?.is_outgoing
       ? 'none'
-      : chat.last_message.id <= chat.last_read_outbox_message_id
+      : lastMsg.id <= chat.last_read_outbox_message_id
         ? 'read'
         : 'sent',
     photoUrl: ctx.photoUrl,

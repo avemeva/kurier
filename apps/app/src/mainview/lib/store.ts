@@ -14,6 +14,7 @@ import {
   clearMediaCache,
   closeTdChat,
   downloadMedia,
+  downloadThumbnail,
   formatLastSeen,
   getDialogs,
   getMessages,
@@ -52,6 +53,7 @@ interface ChatState {
   users: Map<number, Td.user>;
   profilePhotos: Record<number, string>;
   mediaUrls: Record<string, string | null>;
+  thumbUrls: Record<string, string | null>;
   typingByChat: Record<number, Record<number, { action: Td.ChatAction; expiresAt: number }>>;
   userStatuses: Record<number, Td.UserStatus>;
   authState: Td.AuthorizationState | null;
@@ -125,6 +127,40 @@ function isChatPinned(chat: Td.chat): boolean {
 let tempIdCounter = 0;
 const photoRequested = new Set<number>();
 const mediaRequested = new Set<string>();
+const thumbRequested = new Set<string>();
+
+/** Content types that may have a downloadable thumbnail. */
+const THUMB_CONTENT_TYPES = new Set([
+  'messagePhoto',
+  'messageVideo',
+  'messageAnimation',
+  'messageVideoNote',
+  'messageSticker',
+]);
+
+/** Load thumbnails for the first N chats that have media last messages. */
+function loadThumbnailsForChats(
+  chats: Td.chat[],
+  set: (partial: Partial<ChatState> | ((s: ChatState) => Partial<ChatState>)) => void,
+): void {
+  for (const chat of chats.slice(0, 30)) {
+    const msg = chat.last_message;
+    if (!msg) continue;
+    const contentType = msg.content._;
+    const hasThumb =
+      THUMB_CONTENT_TYPES.has(contentType) ||
+      (contentType === 'messageText' && !!msg.content.link_preview);
+    if (!hasThumb) continue;
+    const key = `${chat.id}_${msg.id}`;
+    if (thumbRequested.has(key)) continue;
+    thumbRequested.add(key);
+    downloadThumbnail(chat.id, msg.id).then((url) => {
+      if (url) {
+        set((s) => ({ thumbUrls: { ...s.thumbUrls, [key]: url } }));
+      }
+    });
+  }
+}
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const statusTimers = new Map<number, ReturnType<typeof setTimeout>>();
 const userFetchRequested = new Set<number>();
@@ -167,6 +203,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   users: new Map(),
   profilePhotos: {},
   mediaUrls: {},
+  thumbUrls: {},
   typingByChat: {},
   userStatuses: {},
   authState: null,
@@ -211,6 +248,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         chats: regular,
         archivedChats: filteredArchived,
       });
+      loadThumbnailsForChats(regular, set);
+      loadThumbnailsForChats(filteredArchived, set);
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -1464,6 +1503,7 @@ export function _resetForTests() {
       users: new Map(),
       profilePhotos: {},
       mediaUrls: {},
+      thumbUrls: {},
       typingByChat: {},
       userStatuses: {},
       authState: null,

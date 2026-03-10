@@ -562,6 +562,9 @@ export const CHATS: UIChat[] = [
     unreadCount: 0,
     isPinned: true,
     lastMessagePreview: 'All good, take your time.',
+    lastMessageContentKind: 'text',
+    lastMessageId: 0,
+
     lastMessageDate: 1770743729,
     lastMessageStatus: 'read',
     photoUrl: null,
@@ -581,6 +584,9 @@ export const CHATS: UIChat[] = [
     isPinned: true,
     lastMessagePreview:
       '\u043F\u0440\u043E\u0448\u043B\u0430 \u043D\u0435\u0434\u0435\u043B\u044F, \u0430 \u0446\u0432\u0435\u0442 \u0443\u0436\u0435 \u0438\u0437\u043C\u0435\u043D\u0438\u043B\u0441\u044F\n\u0442\u0430\u043A \u043A\u0440\u0443\u0442\u043E',
+    lastMessageContentKind: 'text',
+    lastMessageId: 0,
+
     lastMessageDate: 1772462041,
     lastMessageStatus: 'none',
     photoUrl: null,
@@ -601,6 +607,9 @@ export const CHATS: UIChat[] = [
     unreadCount: 42,
     isPinned: false,
     lastMessagePreview: '',
+    lastMessageContentKind: null,
+    lastMessageId: 0,
+
     lastMessageDate: 0,
     photoUrl: null,
     isMuted: true,
@@ -619,6 +628,9 @@ export const CHATS: UIChat[] = [
     unreadCount: 0,
     isPinned: false,
     lastMessagePreview: '',
+    lastMessageContentKind: null,
+    lastMessageId: 0,
+
     lastMessageDate: 0,
     photoUrl: null,
     isMuted: false,
@@ -637,6 +649,9 @@ export const CHATS: UIChat[] = [
     unreadCount: 0,
     isPinned: false,
     lastMessagePreview: '',
+    lastMessageContentKind: null,
+    lastMessageId: 0,
+
     lastMessageDate: 0,
     photoUrl: null,
     isMuted: false,
@@ -655,6 +670,9 @@ export const CHATS: UIChat[] = [
     unreadCount: 0,
     isPinned: false,
     lastMessagePreview: '',
+    lastMessageContentKind: null,
+    lastMessageId: 0,
+
     lastMessageDate: 0,
     photoUrl: null,
     isMuted: false,
@@ -673,6 +691,9 @@ export const CHATS: UIChat[] = [
     unreadCount: 0,
     isPinned: false,
     lastMessagePreview: '',
+    lastMessageContentKind: null,
+    lastMessageId: 0,
+
     lastMessageDate: 0,
     photoUrl: null,
     isMuted: false,

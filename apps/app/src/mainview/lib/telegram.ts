@@ -415,6 +415,71 @@ function getFileFromContent(content: Td.MessageContent): Td.file | null {
   }
 }
 
+/** Pick the smallest photo size suitable for a sidebar thumbnail. */
+function getThumbnailFile(content: Td.MessageContent): Td.file | null {
+  switch (content._) {
+    case 'messagePhoto': {
+      const sizes = content.photo.sizes;
+      return sizes[0]?.photo ?? null;
+    }
+    case 'messageVideo':
+      return content.video.thumbnail?.file ?? null;
+    case 'messageAnimation':
+      return content.animation.thumbnail?.file ?? null;
+    case 'messageVideoNote':
+      return content.video_note.thumbnail?.file ?? null;
+    case 'messageSticker':
+      return content.sticker.thumbnail?.file ?? null;
+    case 'messageText': {
+      // Link preview with photo
+      const lp = content.link_preview;
+      if (!lp) return null;
+      const t = lp.type;
+      if (t._ === 'linkPreviewTypePhoto') return t.photo.sizes[0]?.photo ?? null;
+      if (t._ === 'linkPreviewTypeVideo') return t.video.thumbnail?.file ?? null;
+      return null;
+    }
+    default:
+      return null;
+  }
+}
+
+const thumbUrlCache = new Map<string, Promise<string | null>>();
+
+export function downloadThumbnail(chatId: number, messageId: number): Promise<string | null> {
+  const key = `thumb_${chatId}_${messageId}`;
+  const cached = thumbUrlCache.get(key);
+  if (cached) return cached;
+  const promise = (async (): Promise<string | null> => {
+    try {
+      const msg = await client.invoke({
+        _: 'getMessage',
+        chat_id: chatId,
+        message_id: messageId,
+      });
+      const file = getThumbnailFile(msg.content);
+      if (!file) return null;
+      const downloaded = await client.invoke({
+        _: 'downloadFile',
+        file_id: file.id,
+        priority: 1,
+        offset: 0,
+        limit: 0,
+        synchronous: true,
+      });
+      if (downloaded.local.is_downloading_completed && downloaded.local.path) {
+        const match = downloaded.local.path.match(/(?:media_cache|tdlib_db)\/(.+)$/);
+        if (match) return `/api/media/${match[1]}`;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  })();
+  thumbUrlCache.set(key, promise);
+  return promise;
+}
+
 const customEmojiCache = new Map<string, Promise<string | null>>();
 
 export function getCustomEmojiUrl(documentId: string): Promise<string | null> {

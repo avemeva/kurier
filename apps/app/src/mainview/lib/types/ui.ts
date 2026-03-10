@@ -101,6 +101,8 @@ export type UIChat = {
   unreadCount: number;
   isPinned: boolean;
   lastMessagePreview: string;
+  lastMessageContentKind: MessageContentKind | null;
+  lastMessageId: number;
   lastMessageDate: number;
   lastMessageStatus: 'none' | 'sent' | 'read';
   photoUrl: string | null;
