@@ -156,6 +156,8 @@ export function PureVoiceView({
   const [duration, setDuration] = useState(tdDuration ?? 0);
   const [currentTime, setCurrentTime] = useState(0);
   const rafRef = useRef<number>(0);
+  const draggingRef = useRef(false);
+  const wasPlayingRef = useRef(false);
   const [expanded, setExpanded] = useState(false);
   const [requesting, setRequesting] = useState(false);
 
@@ -197,6 +199,43 @@ export function PureVoiceView({
     }
   }, []);
 
+  const seekToX = useCallback((clientX: number, rect: DOMRect) => {
+    const audio = audioRef.current;
+    if (!audio || !audio.duration) return;
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    audio.currentTime = ratio * audio.duration;
+    setCurrentTime(audio.currentTime);
+  }, []);
+
+  const handleWaveformMouseDown = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const audio = audioRef.current;
+      if (!audio || !audio.duration) return;
+      e.preventDefault();
+      draggingRef.current = true;
+      wasPlayingRef.current = !audio.paused;
+      if (!audio.paused) audio.pause();
+      const rect = e.currentTarget.getBoundingClientRect();
+      seekToX(e.clientX, rect);
+
+      const onMove = (ev: MouseEvent) => {
+        if (!draggingRef.current) return;
+        seekToX(ev.clientX, rect);
+      };
+      const onUp = (ev: MouseEvent) => {
+        if (!draggingRef.current) return;
+        draggingRef.current = false;
+        seekToX(ev.clientX, rect);
+        if (wasPlayingRef.current) audio.play();
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    },
+    [seekToX],
+  );
+
   const handleTranscribe = useCallback(() => {
     if (speechStatus === 'done') {
       setExpanded((v) => !v);
@@ -208,6 +247,7 @@ export function PureVoiceView({
     }
   }, [speechStatus, onTranscribe, requesting]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: url triggers re-attach when <audio> mounts after async load
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -242,7 +282,7 @@ export function PureVoiceView({
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
     };
-  }, [tick]);
+  }, [tick, url]);
 
   const progress = duration > 0 ? currentTime / duration : 0;
   const displayTime =
@@ -333,7 +373,14 @@ export function PureVoiceView({
             <div
               ref={waveformRef}
               data-testid="voice-waveform"
-              className="flex min-w-0 flex-1 items-center gap-[1px]"
+              role="slider"
+              aria-label="Audio position"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(progress * 100)}
+              tabIndex={0}
+              className="flex min-w-0 flex-1 cursor-pointer items-center gap-[1px]"
+              onMouseDown={handleWaveformMouseDown}
             >
               {bars.map((height, i) => {
                 const barProgress = bars.length > 0 ? (i + 0.5) / bars.length : 0;
