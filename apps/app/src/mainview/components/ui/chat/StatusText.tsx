@@ -6,15 +6,15 @@ export function PureStatusText({ status }: { status: HeaderStatus }) {
 
   if (status.type === 'typing') {
     return (
-      <p className="text-[10px]">
+      <p className="text-xs">
         <PureTypingIndicator text={status.text} />
       </p>
     );
   }
 
   if (status.type === 'online') {
-    return <p className="text-[10px] text-accent-blue">online</p>;
+    return <p className="text-xs text-accent-blue">online</p>;
   }
 
-  return <p className="text-[10px] text-text-quaternary">{status.text}</p>;
+  return <p className="text-xs text-text-quaternary">{status.text}</p>;
 }

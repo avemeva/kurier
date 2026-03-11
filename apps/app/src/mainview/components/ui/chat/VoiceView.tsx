@@ -338,7 +338,7 @@ export function PureVoiceView({
         </div>
 
         {/* Placeholder duration */}
-        <span className="min-w-[32px] shrink-0 text-right text-[11px] tabular-nums text-text-quaternary">
+        <span className="min-w-[32px] shrink-0 text-right text-xs tabular-nums text-text-quaternary">
           --:--
         </span>
       </div>
@@ -424,7 +424,7 @@ export function PureVoiceView({
                     className={`transition-transform ${expanded ? '' : 'rotate-180'}`}
                   />
                 ) : (
-                  <span className="text-[11px] font-medium leading-none">→A</span>
+                  <span className="text-xs font-medium leading-none">→A</span>
                 )}
               </button>
             )}
@@ -433,7 +433,7 @@ export function PureVoiceView({
           {/* Duration + file size */}
           <span
             data-testid="voice-duration"
-            className="mt-0.5 block text-[11px] tabular-nums text-text-tertiary"
+            className="mt-0.5 block text-xs tabular-nums text-text-tertiary"
           >
             {metaText}
           </span>
@@ -442,7 +442,7 @@ export function PureVoiceView({
 
       {/* Transcription text (when expanded) */}
       {hasTranscription && expanded && (
-        <p className="mt-1.5 text-[13px] leading-[18px] text-text-primary">{speechText}</p>
+        <p className="mt-1.5 tg-text-chat text-text-primary">{speechText}</p>
       )}
     </div>
   );

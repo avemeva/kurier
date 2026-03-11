@@ -44,14 +44,12 @@ export function PureReplyHeader({
   mediaType,
   mediaUrl,
   isOutgoing,
-  isQuote,
 }: {
   senderName: string;
   text?: string;
   mediaType?: string;
   mediaUrl?: string;
   isOutgoing?: boolean;
-  isQuote?: boolean;
 }) {
   const label = text || mediaType || '';
 
@@ -63,15 +61,8 @@ export function PureReplyHeader({
       )}
     >
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[10px] font-semibold text-accent-blue">{senderName}</p>
-        <p
-          className={cn(
-            'truncate text-[11px] leading-[14px] text-text-secondary',
-            isQuote && 'italic',
-          )}
-        >
-          {label}
-        </p>
+        <p className="truncate text-xs font-semibold text-accent-blue">{senderName}</p>
+        <p className="truncate text-xs text-text-secondary">{label}</p>
       </div>
       {mediaUrl && hasVisualThumb(mediaType) && (
         <div className="relative size-8 shrink-0">
@@ -89,7 +80,7 @@ export function PureReplyHeader({
         <img src={mediaUrl} alt="" className="size-8 shrink-0 rounded object-cover" />
       )}
       {!mediaUrl && mediaType && (
-        <div className="flex size-8 shrink-0 items-center justify-center rounded bg-muted text-[10px] text-text-tertiary">
+        <div className="flex size-8 shrink-0 items-center justify-center rounded bg-muted text-xs text-text-tertiary">
           {mediaType === 'GIF' ? 'GIF' : (MEDIA_ICONS[mediaType] ?? mediaType.charAt(0))}
         </div>
       )}

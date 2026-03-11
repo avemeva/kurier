@@ -217,7 +217,7 @@ function VideoPlayer({ url }: { url: string }) {
         <div className="relative flex w-full flex-col gap-1 px-2.5 pb-2 pt-6">
           {/* Time + fullscreen row */}
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium leading-none text-white drop-shadow-sm">
+            <span className="text-xs font-medium leading-none text-white drop-shadow-sm">
               {formatTime(currentTime)}
               <span className="text-white/60">
                 {' / '}

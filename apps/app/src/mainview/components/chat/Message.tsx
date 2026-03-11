@@ -90,7 +90,7 @@ function PendingLayout({
       )}
     >
       <PureBubble isOutgoing={true} groupPosition={groupPosition} showAvatar={false}>
-        <p className="whitespace-pre-wrap break-words text-[13px] leading-[18px] text-text-primary">
+        <p className="whitespace-pre-wrap break-words tg-text-chat text-text-primary">
           {state.text}
           <span className="float-right h-[18px] w-12" aria-hidden="true" />
         </p>
@@ -149,7 +149,7 @@ function StickerLayout({
       <UserAvatar
         name={msg.senderName}
         src={state.senderPhotoUrl}
-        className="size-7 shrink-0 text-[11px]"
+        className="size-7 shrink-0 text-xs"
       />
       {stickerEl}
     </div>
@@ -195,7 +195,7 @@ function BubbleLayout({
     >
       <PureReactionPicker onReact={(e, c) => onReact(msg.id, e, c)} />
       {state.showSenderName && (
-        <p className="mb-0.5 text-[10px] font-medium text-accent-blue">{msg.senderName}</p>
+        <p className="mb-0.5 text-xs font-medium text-accent-blue">{msg.senderName}</p>
       )}
       {msg.forwardFromName && <PureForwardHeader fromName={msg.forwardFromName} />}
       {msg.replyPreview ? (
@@ -205,7 +205,6 @@ function BubbleLayout({
           mediaType={msg.replyPreview.mediaLabel}
           mediaUrl={replyThumbUrl ?? undefined}
           isOutgoing={msg.isOutgoing}
-          isQuote={!!msg.replyPreview.quoteText}
         />
       ) : (
         msg.replyToMessageId > 0 && (
@@ -248,7 +247,7 @@ function BubbleLayout({
       {msg.text && (
         <p
           className={cn(
-            'whitespace-pre-wrap break-words text-[13px] leading-[18px] text-text-primary',
+            'whitespace-pre-wrap break-words tg-text-chat text-text-primary',
             hasMedia && 'mt-2',
           )}
         >
@@ -267,7 +266,7 @@ function BubbleLayout({
         />
       )}
       {!msg.text && !msg.mediaLabel && (
-        <p className="text-sm italic text-text-quaternary">Unsupported message</p>
+        <p className="tg-text-chat italic text-text-quaternary">Unsupported message</p>
       )}
       {hasReactions && (
         <PureReactionBar
@@ -338,11 +337,11 @@ function AlbumLayout({
     >
       <PureReactionPicker onReact={(e, c) => onReact(first.id, e, c)} />
       {state.showSenderName && (
-        <p className="mb-0.5 text-[10px] font-medium text-accent-blue">{first.senderName}</p>
+        <p className="mb-0.5 text-xs font-medium text-accent-blue">{first.senderName}</p>
       )}
       <AlbumGrid messages={messages} chatId={first.chatId} />
       {first.text && (
-        <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-[18px] text-text-primary">
+        <p className="mt-1 whitespace-pre-wrap break-words tg-text-chat text-text-primary">
           <FormattedText text={first.text} entities={first.entities} />
           <span className="inline-block w-12 align-baseline" aria-hidden="true">
             {'\u00A0'}

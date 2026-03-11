@@ -21,16 +21,37 @@
 
 @custom-variant dark (&:is(.dark *, [data-theme="dark"], [data-theme="dark"] *));
 
-/* Geist Sans — variable font */
+/* Open Sans — matching tdesktop's bundled font */
 @font-face {
-  font-family: "Geist";
-  src: url("./fonts/Geist-Variable.woff2") format("woff2");
-  font-weight: 100 900;
+  font-family: "Open Sans";
+  src: url("./fonts/OpenSans-Regular.woff2") format("woff2");
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
+@font-face {
+  font-family: "Open Sans";
+  src: url("./fonts/OpenSans-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Open Sans";
+  src: url("./fonts/OpenSans-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Open Sans";
+  src: url("./fonts/OpenSans-SemiBoldItalic.woff2") format("woff2");
+  font-weight: 600;
+  font-style: italic;
+  font-display: swap;
+}
 
-/* Geist Mono — variable font */
+/* Geist Mono — variable font (kept for monospace) */
 @font-face {
   font-family: "Geist Mono";
   src: url("./fonts/GeistMono-Variable.woff2") format("woff2");
@@ -147,7 +168,7 @@
 }
 
 @theme inline {
-  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Open Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
 
   /* Semantic colors */
@@ -252,9 +273,14 @@
   --radius-4xl: 1.75rem;
 }
 
+/* Telegram-specific text styles (tg- prefix) */
+.tg-text-chat {
+  font-size: 13px;
+  line-height: 18px;
+}
+
 * {
   box-sizing: border-box;
-  letter-spacing: -0.01em;
 }
 
 @layer base {
@@ -268,7 +294,7 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
+    font-family: "Open Sans", ui-sans-serif, system-ui, sans-serif;
   }
 }
 

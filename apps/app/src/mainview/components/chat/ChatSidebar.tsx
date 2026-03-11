@@ -75,7 +75,7 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
 function SectionBar({ label }: { label: string }) {
   return (
     <div className="flex h-7 items-center bg-bg-secondary px-3.5">
-      <span className="text-[13px] text-text-tertiary">{label}</span>
+      <span className="text-sm text-text-tertiary">{label}</span>
     </div>
   );
 }
@@ -95,7 +95,7 @@ function ChatPreviewLine({ chat, thumbUrl }: { chat: UIChat; thumbUrl: string | 
   return (
     <span
       data-testid="dialog-preview"
-      className="flex min-w-0 items-center gap-1.5 text-[13px] text-text-tertiary"
+      className="flex min-w-0 items-center gap-1.5 text-sm text-text-tertiary"
     >
       {thumbUrl && (
         <img src={thumbUrl} alt="" className="size-5 shrink-0 rounded-[3px] object-cover" />
@@ -136,9 +136,7 @@ function SearchMessageRow({
         <div className="flex items-baseline justify-between gap-2">
           <span className="truncate text-sm font-medium text-text-primary">{result.chatTitle}</span>
           {result.date > 0 && (
-            <span className="shrink-0 text-[10px] text-text-quaternary">
-              {formatTime(result.date)}
-            </span>
+            <span className="shrink-0 text-xs text-text-quaternary">{formatTime(result.date)}</span>
           )}
         </div>
         <div className="truncate text-xs text-text-tertiary">
@@ -634,7 +632,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                         )}
                       </span>
                       {chat.lastMessageDate > 0 && (
-                        <span className="flex shrink-0 items-center gap-0.5 text-[11px] text-text-quaternary">
+                        <span className="flex shrink-0 items-center gap-0.5 text-xs text-text-quaternary">
                           {chat.lastMessageStatus === 'read' && (
                             <CheckCheck size={14} className="text-unread" />
                           )}
@@ -655,7 +653,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                       <div className="flex shrink-0 items-center gap-1">
                         {chat.isPinned && <Pin size={12} className="text-text-quaternary" />}
                         {chat.unreadCount > 0 && (
-                          <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-sand-8 px-1 text-[10px] font-medium leading-none text-white dark:bg-unread">
+                          <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-sand-8 px-1 text-xs font-medium leading-none text-white dark:bg-unread">
                             {chat.unreadCount}
                           </span>
                         )}

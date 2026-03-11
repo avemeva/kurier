@@ -62,7 +62,7 @@ export function PureMessageTime({
 
   /* ── Container: pill background for image/background types ── */
   const wrapperClasses = cn(
-    'inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-[11px] leading-none',
+    'inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-xs leading-none',
     textColor,
     displayType === 'image' && 'rounded-[10px] bg-black/40 px-1.5 py-0.5',
     displayType === 'background' && 'rounded-[10px] bg-black/40 px-1.5 py-0.5',

@@ -74,7 +74,7 @@ export function PureBubble({
       <UserAvatar
         name={senderName ?? ''}
         src={senderPhotoUrl}
-        className="size-7 shrink-0 text-[11px]"
+        className="size-7 shrink-0 text-xs"
       />
       {bubble}
     </div>

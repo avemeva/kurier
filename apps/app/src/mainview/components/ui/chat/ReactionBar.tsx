@@ -31,7 +31,7 @@ export function PureReactionBar({
           )}
         >
           <span className="text-[15px] leading-none">{r.emoticon}</span>
-          <span className="text-[11px] leading-none font-medium">{r.count}</span>
+          <span className="text-xs leading-none font-medium">{r.count}</span>
         </button>
       ))}
     </div>
@@ -49,7 +49,7 @@ export function PureReactionPicker({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="absolute -right-1 -top-3 hidden rounded-full bg-card px-1 py-0.5 text-[10px] shadow group-hover/bubble:block"
+        className="absolute -right-1 -top-3 hidden rounded-full bg-card px-1 py-0.5 text-xs shadow group-hover/bubble:block"
       >
         +
       </button>

@@ -73,7 +73,7 @@ export function FormattedText({ text, entities }: { text: string; entities: UITe
         break;
       case 'code':
         parts.push(
-          <code key={key} className="rounded bg-code-bg px-1 font-mono text-[13px]">
+          <code key={key} className="rounded bg-code-bg px-1 font-mono tg-text-chat">
             {slice}
           </code>,
         );
@@ -83,7 +83,7 @@ export function FormattedText({ text, entities }: { text: string; entities: UITe
         parts.push(
           <pre
             key={key}
-            className="my-1 overflow-x-auto rounded bg-code-bg p-2 font-mono text-[13px]"
+            className="my-1 overflow-x-auto rounded bg-code-bg p-2 font-mono tg-text-chat"
           >
             {slice}
           </pre>,
