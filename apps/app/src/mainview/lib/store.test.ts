@@ -970,27 +970,102 @@ describe('selectHeaderStatus', () => {
     });
   });
 
-  it('returns Group label for basic group', () => {
+  it('returns null for group without cached info', () => {
     const chat = makeChat({
       id: 42,
       type: { _: 'chatTypeBasicGroup', basic_group_id: 42 },
     });
     useChatStore.setState({ chats: [chat], selectedChatId: 42 });
-    expect(selectHeaderStatus(useChatStore.getState())).toEqual({
-      type: 'label',
-      text: 'group',
-    });
+    expect(selectHeaderStatus(useChatStore.getState())).toBeNull();
   });
 
-  it('returns Channel label for supergroup channel', () => {
+  it('returns null for channel without cached info', () => {
     const chat = makeChat({
       id: 42,
       type: { _: 'chatTypeSupergroup', supergroup_id: 42, is_channel: true },
     });
     useChatStore.setState({ chats: [chat], selectedChatId: 42 });
+    expect(selectHeaderStatus(useChatStore.getState())).toBeNull();
+  });
+
+  it('returns member count for group with cached info', () => {
+    const chat = makeChat({
+      id: 42,
+      type: { _: 'chatTypeBasicGroup', basic_group_id: 42 },
+    });
+    useChatStore.setState({
+      chats: [chat],
+      selectedChatId: 42,
+      chatInfoCache: { 42: { memberCount: 150, isChannel: false } },
+    });
     expect(selectHeaderStatus(useChatStore.getState())).toEqual({
       type: 'label',
-      text: 'channel',
+      text: '150 members',
+    });
+  });
+
+  it('returns member count with online for group', () => {
+    const chat = makeChat({
+      id: 42,
+      type: { _: 'chatTypeBasicGroup', basic_group_id: 42 },
+    });
+    useChatStore.setState({
+      chats: [chat],
+      selectedChatId: 42,
+      chatInfoCache: { 42: { memberCount: 150, isChannel: false } },
+      chatOnlineCounts: { 42: 12 },
+    });
+    expect(selectHeaderStatus(useChatStore.getState())).toEqual({
+      type: 'label',
+      text: '150 members, 12 online',
+    });
+  });
+
+  it('returns subscriber count for channel with cached info', () => {
+    const chat = makeChat({
+      id: 42,
+      type: { _: 'chatTypeSupergroup', supergroup_id: 42, is_channel: true },
+    });
+    useChatStore.setState({
+      chats: [chat],
+      selectedChatId: 42,
+      chatInfoCache: { 42: { memberCount: 5000, isChannel: true } },
+    });
+    expect(selectHeaderStatus(useChatStore.getState())).toEqual({
+      type: 'label',
+      text: '5,000 subscribers',
+    });
+  });
+
+  it('returns bot active users for bot', () => {
+    const chat = makeChat({
+      id: 42,
+      type: { _: 'chatTypePrivate', user_id: 42 },
+    });
+    useChatStore.setState({
+      chats: [chat],
+      selectedChatId: 42,
+      chatInfoCache: { 42: { memberCount: 0, isChannel: false, botActiveUsers: 2500000 } },
+    });
+    expect(selectHeaderStatus(useChatStore.getState())).toEqual({
+      type: 'label',
+      text: '2,500,000 monthly users',
+    });
+  });
+
+  it('returns "bot" for bot with no active users', () => {
+    const chat = makeChat({
+      id: 42,
+      type: { _: 'chatTypePrivate', user_id: 42 },
+    });
+    useChatStore.setState({
+      chats: [chat],
+      selectedChatId: 42,
+      chatInfoCache: { 42: { memberCount: 0, isChannel: false, botActiveUsers: 0 } },
+    });
+    expect(selectHeaderStatus(useChatStore.getState())).toEqual({
+      type: 'label',
+      text: 'bot',
     });
   });
 });

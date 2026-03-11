@@ -1583,7 +1583,7 @@ function computeHeaderStatus(state: ChatState): HeaderStatus {
     if (info?.memberCount) {
       return { type: 'label', text: formatCount(info.memberCount, 'subscriber') };
     }
-    return { type: 'label', text: 'channel' };
+    return null;
   }
   if (isGroup) {
     const info = state.chatInfoCache[chatId];
@@ -1595,7 +1595,7 @@ function computeHeaderStatus(state: ChatState): HeaderStatus {
       }
       return { type: 'label', text: membersText };
     }
-    return { type: 'label', text: 'group' };
+    return null;
   }
   return null;
 }
