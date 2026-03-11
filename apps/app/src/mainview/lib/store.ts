@@ -5,6 +5,7 @@ import type {
   Td,
   TelegramUpdateEvent,
   UIChat,
+  UIChatContext,
   UIMessageItem,
   UIReplyPreview,
   UISearchResult,
@@ -271,6 +272,24 @@ const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const statusTimers = new Map<number, ReturnType<typeof setTimeout>>();
 const userFetchRequested = new Set<number>();
 
+/** Fetch last-message senders for group chats shown in the sidebar. */
+function fetchMissingChatPreviewUsers(
+  chats: Td.chat[],
+  get: () => ChatState,
+  set: (partial: Partial<ChatState> | ((s: ChatState) => Partial<ChatState>)) => void,
+): void {
+  const msgs = chats
+    .filter(
+      (c) =>
+        (c.type._ === 'chatTypeBasicGroup' ||
+          (c.type._ === 'chatTypeSupergroup' && !c.type.is_channel)) &&
+        c.last_message &&
+        !c.last_message.is_outgoing,
+    )
+    .map((c) => c.last_message as Td.message);
+  if (msgs.length > 0) fetchMissingUsers(msgs, get, set);
+}
+
 /** Fetch any sender users not yet in the store's users Map. */
 function fetchMissingUsers(
   messages: Td.message[],
@@ -376,6 +395,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
       loadThumbnailsForChats(regular, set);
       loadThumbnailsForChats(filteredArchived, set);
+      fetchMissingChatPreviewUsers(regular, get, set);
+      fetchMissingChatPreviewUsers(filteredArchived, get, set);
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -882,6 +903,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         };
       });
       loadThumbnailForMessage(event.chat_id, event.message, set);
+      fetchMissingUsers([event.message], get, set);
     }
 
     if (event.type === 'edit_message') {
@@ -1620,6 +1642,7 @@ export function selectSelectedChat(state: ChatState): UIChat | null {
     user,
     isOnline: status?._ === 'userStatusOnline',
     myUserId: state.myUserId,
+    users: state.users,
   });
   return _prevSelUIChat;
 }
@@ -1748,16 +1771,14 @@ let _prevUIChatsStatuses: Record<number, Td.UserStatus> = {};
 let _prevUIChatsMyUserId = 0;
 let _prevUIChatsResult: UIChat[] = [];
 
-function chatContext(
-  c: Td.chat,
-  state: ChatState,
-): { photoUrl: string | null; user: Td.user | undefined; isOnline: boolean; myUserId: number } {
+function chatContext(c: Td.chat, state: ChatState): UIChatContext {
   const userId = c.type._ === 'chatTypePrivate' ? c.type.user_id : 0;
   return {
     photoUrl: state.profilePhotos[c.id] ?? null,
     user: userId ? state.users.get(userId) : undefined,
     isOnline: userId ? state.userStatuses[userId]?._ === 'userStatusOnline' : false,
     myUserId: state.myUserId,
+    users: state.users,
   };
 }
 

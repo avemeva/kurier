@@ -132,6 +132,7 @@ export type UIChat = {
   unreadCount: number;
   isPinned: boolean;
   lastMessagePreview: string;
+  lastMessageSenderName: string | null;
   lastMessageContentKind: MessageContentKind | null;
   lastMessageId: number;
   lastMessageDate: number;

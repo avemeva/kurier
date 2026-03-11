@@ -90,8 +90,22 @@ const MEDIA_ICON_KINDS = {
 } as const;
 
 function ChatPreviewLine({ chat, thumbUrl }: { chat: UIChat; thumbUrl: string | null }) {
+  if (chat.draftText) {
+    return (
+      <span
+        data-testid="dialog-preview"
+        className="flex min-w-0 items-center gap-1.5 text-sm text-text-tertiary"
+      >
+        <span className="truncate">
+          <span className="text-red-500">Draft: </span>
+          {chat.draftText}
+        </span>
+      </span>
+    );
+  }
   const kind = chat.lastMessageContentKind;
   const IconComponent = kind ? MEDIA_ICON_KINDS[kind as keyof typeof MEDIA_ICON_KINDS] : null;
+  const senderPrefix = chat.lastMessageSenderName;
   return (
     <span
       data-testid="dialog-preview"
@@ -103,7 +117,10 @@ function ChatPreviewLine({ chat, thumbUrl }: { chat: UIChat; thumbUrl: string | 
       {!thumbUrl && IconComponent && (
         <IconComponent size={14} className="shrink-0 text-text-quaternary" />
       )}
-      <span className="truncate">{chat.lastMessagePreview || '\u00A0'}</span>
+      <span className="truncate">
+        {senderPrefix && <span className="font-medium text-text-primary">{senderPrefix}: </span>}
+        {chat.lastMessagePreview || '\u00A0'}
+      </span>
     </span>
   );
 }
@@ -313,6 +330,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
   const profilePhotos = useChatStore((s) => s.profilePhotos);
   const thumbUrls = useChatStore((s) => s.thumbUrls);
   const typingByChat = useChatStore((s) => s.typingByChat);
+  const users = useChatStore((s) => s.users);
   const loadingDialogs = useChatStore((s) => s.loadingDialogs);
   const loadingMoreChats = useChatStore((s) => s.loadingMoreChats);
   const loadingMoreArchivedChats = useChatStore((s) => s.loadingMoreArchivedChats);
@@ -643,7 +661,22 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                     </div>
                     <div className="flex items-center justify-between gap-2">
                       {typingByChat[chat.id] && Object.keys(typingByChat[chat.id]).length > 0 ? (
-                        <PureTypingIndicator text="typing" />
+                        <PureTypingIndicator
+                          text={
+                            chat.kind === 'basicGroup' || chat.kind === 'supergroup'
+                              ? (() => {
+                                  const typerIds = Object.keys(typingByChat[chat.id]);
+                                  const names = typerIds.map((uid) => {
+                                    const u = users.get(Number(uid));
+                                    return u?.first_name ?? 'Someone';
+                                  });
+                                  return names.length === 1
+                                    ? `${names[0]} is typing`
+                                    : `${names.join(', ')} are typing`;
+                                })()
+                              : 'typing'
+                          }
+                        />
                       ) : (
                         <ChatPreviewLine
                           chat={chat}

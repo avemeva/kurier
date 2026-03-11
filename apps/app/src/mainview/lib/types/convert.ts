@@ -174,6 +174,20 @@ export function extractMessagePreview(msg: Td.message | undefined): string {
   return extractMediaLabel(msg.content);
 }
 
+function extractLastMessageSenderName(
+  msg: Td.message | undefined,
+  chatKind: ChatKind,
+  ctx: UIChatContext,
+): string | null {
+  if (!msg) return null;
+  // Only show sender in groups (not private chats or channels)
+  if (chatKind !== 'basicGroup' && chatKind !== 'supergroup') return null;
+  if (msg.is_outgoing) return 'You';
+  if (!ctx.users || msg.sender_id._ !== 'messageSenderUser') return null;
+  const user = ctx.users.get(msg.sender_id.user_id);
+  return user?.first_name ?? null;
+}
+
 // --- Sender ---
 
 function extractSenderUserId(sender: Td.MessageSender): number {
@@ -409,6 +423,7 @@ export type UIChatContext = {
   user: Td.user | undefined;
   isOnline: boolean;
   myUserId?: number;
+  users?: Map<number, Td.user>;
 };
 
 export function toUIChat(chat: Td.chat, ctx: UIChatContext): UIChat {
@@ -428,6 +443,7 @@ export function toUIChat(chat: Td.chat, ctx: UIChatContext): UIChat {
     unreadCount: chat.unread_count,
     isPinned: chat.positions.some((p) => p.is_pinned),
     lastMessagePreview: extractMessagePreview(lastMsg),
+    lastMessageSenderName: extractLastMessageSenderName(lastMsg, kind, ctx),
     lastMessageContentKind: lastMsg ? toContentKind(lastMsg.content) : null,
     lastMessageId: lastMsg?.id ?? 0,
     lastMessageDate: lastMsg?.date ?? 0,
