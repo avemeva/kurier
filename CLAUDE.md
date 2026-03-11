@@ -6,7 +6,7 @@ Open-source Telegram desktop client with native AI integration. Built for produc
 
 ## Git Commits
 
-Use conventional prefixes in commit messages: `[fix]`, `[bug]`, `[feat]`.
+Use conventional prefixes in commit messages: `[fix]`, `[bug]`, `[feat]`, `[doc]`.
 
 ## Worktree Vocabulary
 
