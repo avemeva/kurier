@@ -115,8 +115,7 @@ export function MessagePanel() {
   }
 
   const isGroup = selectedChat.kind === 'basicGroup' || selectedChat.kind === 'supergroup';
-  const isChannel = selectedChat.kind === 'channel';
-  const showSender = isGroup || isChannel;
+  const showSender = isGroup;
 
   const grouped = groupUIMessages(messages);
 

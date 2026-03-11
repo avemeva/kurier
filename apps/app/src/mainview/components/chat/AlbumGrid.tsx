@@ -1,82 +1,99 @@
 import { PurePhotoView } from '@/components/ui/chat/PhotoView';
 import { PureVideoView } from '@/components/ui/chat/VideoView';
 import { useMedia } from '@/hooks/useMedia';
+import {
+  ALBUM_SPACING,
+  type Corners,
+  computeAlbumLayout,
+  cornersFromSides,
+  MIN_MEDIA_SIZE,
+  type Rect,
+} from '@/lib/media-sizing';
 import type { UIMessage } from '@/lib/types';
 
-export function getAlbumRows(count: number): number[][] {
-  switch (count) {
-    case 1:
-      return [[1]];
-    case 2:
-      return [[2]];
-    case 3:
-      return [[2], [1]];
-    case 4:
-      return [[2], [2]];
-    case 5:
-      return [[2], [3]];
-    case 6:
-      return [[3], [3]];
-    case 7:
-      return [[3], [2], [2]];
-    case 8:
-      return [[2], [3], [3]];
-    case 9:
-      return [[2], [2], [2], [3]];
-    default: {
-      const rows: number[][] = [];
-      let remaining = count;
-      while (remaining > 0) {
-        const take = Math.min(remaining, 3);
-        rows.push([take]);
-        remaining -= take;
-      }
-      return rows;
-    }
-  }
-}
+type AlbumGridProps = {
+  messages: UIMessage[];
+  chatId: number;
+  maxWidth: number;
+};
 
-function AlbumCell({ chatId, msg }: { chatId: number; msg: UIMessage }) {
+type AlbumCellProps = {
+  msg: UIMessage;
+  chatId: number;
+  geometry: Rect;
+  corners: Corners;
+};
+
+function AlbumCell({ msg, chatId, geometry, corners }: AlbumCellProps) {
   const { url, loading, retry } = useMedia(chatId, msg.id);
-  const ct = msg.contentKind;
-  const isVideo = ct === 'video' || ct === 'videoNote' || ct === 'animation';
+  const lg = '12px';
+  const none = '0px';
+  const borderRadius = `${corners.topLeft ? lg : none} ${corners.topRight ? lg : none} ${corners.bottomRight ? lg : none} ${corners.bottomLeft ? lg : none}`;
 
-  if (isVideo) {
-    return (
-      <PureVideoView url={url} loading={loading} isGif={ct === 'animation'} cover onRetry={retry} />
-    );
-  }
-
-  const isPhoto = ct === 'photo' || ct === 'sticker';
-  if (isPhoto) {
-    return <PurePhotoView url={url} loading={loading} cover onRetry={retry} />;
-  }
+  const isVideo = msg.contentKind === 'video' || msg.contentKind === 'animation';
 
   return (
-    <div className="flex h-full items-center justify-center bg-accent text-xs italic text-text-tertiary">
-      {msg.contentKind}
+    <div
+      className="absolute overflow-hidden"
+      style={{
+        left: geometry.x,
+        top: geometry.y,
+        width: geometry.width,
+        height: geometry.height,
+        borderRadius,
+      }}
+    >
+      {isVideo ? (
+        <PureVideoView
+          url={url}
+          loading={loading}
+          isGif={msg.contentKind === 'animation'}
+          cover
+          onRetry={retry}
+        />
+      ) : (
+        <PurePhotoView
+          url={url}
+          loading={loading}
+          cover
+          onRetry={retry}
+          minithumbnail={msg.minithumbnail}
+        />
+      )}
     </div>
   );
 }
 
-export function AlbumGrid({ messages, chatId }: { messages: UIMessage[]; chatId: number }) {
-  const rows = getAlbumRows(messages.length);
-  let idx = 0;
+export function AlbumGrid({ messages, chatId, maxWidth }: AlbumGridProps) {
+  const sizes = messages.map((m) => ({
+    width: m.mediaWidth || 100,
+    height: m.mediaHeight || 100,
+  }));
+  const layout = computeAlbumLayout(sizes, maxWidth, MIN_MEDIA_SIZE, ALBUM_SPACING);
+
+  const containerWidth = maxWidth;
+  const containerHeight = layout.reduce(
+    (max, item) => Math.max(max, item.geometry.y + item.geometry.height),
+    0,
+  );
 
   return (
-    <div className="flex max-w-sm flex-col gap-0.5 overflow-hidden rounded-lg">
-      {rows.map((row) => {
-        const cols = row[0];
-        const rowMsgs = messages.slice(idx, idx + cols);
-        idx += cols;
+    <div
+      className="relative overflow-hidden"
+      style={{ width: containerWidth, height: containerHeight }}
+    >
+      {messages.map((msg, i) => {
+        const item = layout[i];
+        if (!item) return null;
+        const corners = cornersFromSides(item.sides);
         return (
-          <div key={rowMsgs[0].id} className="flex h-[180px] gap-0.5">
-            {rowMsgs.map((msg) => (
-              <div key={msg.id} className="min-w-0 flex-1 overflow-hidden">
-                <AlbumCell chatId={chatId} msg={msg} />
-              </div>
-            ))}
-          </div>
+          <AlbumCell
+            key={msg.id}
+            msg={msg}
+            chatId={chatId}
+            geometry={item.geometry}
+            corners={corners}
+          />
         );
       })}
     </div>

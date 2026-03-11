@@ -48,6 +48,7 @@ const SECTIONS: [string, string][] = [
   ['replies', 'Replies'],
   ['media', 'Media Pure Views'],
   ['formatted-text', 'FormattedText'],
+  ['media-variants', 'Media Variants'],
   ['albums', 'Albums'],
   ['reactions', 'Reactions'],
   ['forwards', 'Forwards'],
@@ -80,6 +81,22 @@ const forwardMessages = MESSAGES.filter((m) => !!m.forwardFromName);
 const botKeyboardMessages = MESSAGES.filter((m) => !!m.inlineKeyboard);
 const serviceMessages = MESSAGES.filter((m) => !!m.serviceText);
 const replyMediaMessages = MESSAGES.filter((m) => !!m.replyPreview?.mediaLabel);
+// Media variant fixture messages
+// biome-ignore lint/style/noNonNullAssertion: dev-only fixture lookups
+const mediaVariantStandalone = MESSAGES.find((m) => m.id === 100000001)!;
+// biome-ignore lint/style/noNonNullAssertion: dev-only fixture lookups
+const mediaVariantCaption = MESSAGES.find((m) => m.id === 100000002)!;
+// biome-ignore lint/style/noNonNullAssertion: dev-only fixture lookups
+const mediaVariantPortrait = MESSAGES.find((m) => m.id === 100000003)!;
+// biome-ignore lint/style/noNonNullAssertion: dev-only fixture lookups
+const mediaVariantReply = MESSAGES.find((m) => m.id === 100000004)!;
+// biome-ignore lint/style/noNonNullAssertion: dev-only fixture lookups
+const mediaVariantOutgoing = MESSAGES.find((m) => m.id === 100000005)!;
+const mediaVariant3Album = MESSAGES.filter((m) => [100000006, 100000007, 100000008].includes(m.id));
+const mediaVariant4Album = MESSAGES.filter((m) =>
+  [100000009, 100000010, 100000011, 100000012].includes(m.id),
+);
+
 const albums = groupUIMessages(MESSAGES).filter(
   (g): g is { type: 'album'; messages: UIMessage[] } => g.type === 'album',
 );
@@ -211,8 +228,11 @@ export default function DevPage() {
     }
   }, []);
 
-  // Seed the store with dev media URLs so useMedia can resolve them
-  useEffect(() => {
+  // Seed the store with dev media URLs so useMedia can resolve them.
+  // Must run before first render (not in useEffect) to prevent race with useMedia hooks.
+  const seededRef = useRef(false);
+  if (!seededRef.current) {
+    seededRef.current = true;
     const mediaMap: Record<string, string> = {};
     for (const [msgIdStr, url] of Object.entries(MEDIA_URLS)) {
       const msgId = Number(msgIdStr);
@@ -222,7 +242,7 @@ export default function DevPage() {
       }
     }
     useChatStore.getState().seedMedia(mediaMap);
-  }, []);
+  }
 
   const now = Math.floor(Date.now() / 1000);
 
@@ -767,6 +787,88 @@ export default function DevPage() {
               </p>
             </Case>
           ))}
+        </Section>
+
+        {/* --- Media Variants --- */}
+        <Section id="media-variants" title="Media Variants">
+          <Case text="Standalone Photo (no bubble). No caption, no reply, no forward — renders without a text bubble frame.">
+            <div className="flex justify-start">
+              <Message
+                input={{ kind: 'single', message: mediaVariantStandalone }}
+                showSender={false}
+                senderPhotoUrl={PROFILE_PHOTOS[mediaVariantStandalone.senderUserId]}
+                onReact={() => {}}
+              />
+            </div>
+          </Case>
+          <Case text="Portrait Photo (square cap). Tall 1080x1920 image — should get square-capped border radius at top/bottom.">
+            <div className="flex justify-start">
+              <Message
+                input={{ kind: 'single', message: mediaVariantPortrait }}
+                showSender={false}
+                senderPhotoUrl={PROFILE_PHOTOS[mediaVariantPortrait.senderUserId]}
+                onReact={() => {}}
+              />
+            </div>
+          </Case>
+          <Case text="Photo + Caption (framed). Image above, caption text below inside a bubble frame.">
+            <div className="flex justify-start">
+              <Message
+                input={{ kind: 'single', message: mediaVariantCaption }}
+                showSender={true}
+                senderPhotoUrl={PROFILE_PHOTOS[mediaVariantCaption.senderUserId]}
+                onReact={() => {}}
+              />
+            </div>
+          </Case>
+          <Case text="Photo + Reply (framed). Reply header above the photo inside a bubble frame.">
+            <div className="flex justify-start">
+              <Message
+                input={{ kind: 'single', message: mediaVariantReply }}
+                showSender={true}
+                senderPhotoUrl={PROFILE_PHOTOS[mediaVariantReply.senderUserId]}
+                onReact={() => {}}
+              />
+            </div>
+          </Case>
+          <Case text="Outgoing Photo. Own standalone photo aligned right with read checkmarks.">
+            <div className="flex justify-end">
+              <Message
+                input={{ kind: 'single', message: mediaVariantOutgoing }}
+                showSender={false}
+                onReact={() => {}}
+              />
+            </div>
+          </Case>
+          <Case text="3-Photo Album (mixed ratios). Landscape + portrait + square grouped together.">
+            <div className="flex justify-start">
+              <Message
+                input={{ kind: 'album', messages: mediaVariant3Album }}
+                showSender={false}
+                onReact={() => {}}
+              />
+            </div>
+          </Case>
+          <Case text="4-Photo Album (all landscape). Four 1920x1080 photos in an outgoing album grid.">
+            <div className="flex justify-end">
+              <Message
+                input={{ kind: 'album', messages: mediaVariant4Album }}
+                showSender={false}
+                onReact={() => {}}
+              />
+            </div>
+          </Case>
+          <Case text="Existing 2-Photo Album. Original fixture album with two forwarded photos.">
+            {albums.length > 0 ? (
+              <Message
+                input={{ kind: 'album', messages: albums[0].messages }}
+                showSender={false}
+                onReact={() => {}}
+              />
+            ) : (
+              <p className="text-xs italic text-text-quaternary">No albums in data</p>
+            )}
+          </Case>
         </Section>
 
         {/* --- Albums --- */}

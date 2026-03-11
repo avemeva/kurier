@@ -11,10 +11,10 @@ import { PureReplyHeader } from '@/components/ui/chat/ReplyHeader';
 import { PureServiceMessage } from '@/components/ui/chat/ServiceMessage';
 import { PureVideoView } from '@/components/ui/chat/VideoView';
 import { PureVoiceView } from '@/components/ui/chat/VoiceView';
-import { UserAvatar } from '@/components/ui/user-avatar';
 import type {
   AlbumRenderState,
   BubbleRenderState,
+  MediaRenderState,
   MessageContext,
   MessageInput,
   PendingRenderState,
@@ -22,6 +22,7 @@ import type {
 } from '@/hooks/useMessage';
 import { useMessage } from '@/hooks/useMessage';
 import { useReplyThumb } from '@/hooks/useReplyThumb';
+import { MAX_MEDIA_SIZE } from '@/lib/media-sizing';
 import { useChatStore } from '@/lib/store';
 import type { UIReaction } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -67,6 +68,8 @@ export function Message({
       return <PendingLayout state={state} groupPosition={groupPosition} />;
     case 'sticker':
       return <StickerLayout state={state} onReact={onReact} />;
+    case 'media':
+      return <MediaLayout state={state} groupPosition={groupPosition} onReact={onReact} />;
     case 'bubble':
       return (
         <BubbleLayout
@@ -129,8 +132,17 @@ function StickerLayout({
   const { msg, media } = state;
   const hasReactions = msg.reactions.length > 0;
 
-  const stickerEl = (
-    <div className="group/bubble relative max-w-[224px]">
+  return (
+    <PureBubble
+      variant="media"
+      isOutgoing={msg.isOutgoing}
+      groupPosition="single"
+      showAvatar={state.showAvatar}
+      senderName={msg.senderName}
+      senderPhotoUrl={state.senderPhotoUrl}
+      hasReactions={hasReactions}
+      className="max-w-[224px]"
+    >
       <PureReactionPicker onReact={(e, c) => onReact(msg.id, e, c)} />
       <PurePhotoView url={media.url} loading={media.loading} onRetry={media.retry} />
       {hasReactions && (
@@ -148,20 +160,122 @@ function StickerLayout({
           displayType="background"
         />
       </span>
-    </div>
+    </PureBubble>
   );
+}
 
-  if (!state.showAvatar) return stickerEl;
+// --- Media layout ---
+
+function MediaLayout({
+  state,
+  groupPosition,
+  onReact,
+}: {
+  state: MediaRenderState;
+  groupPosition: GroupPosition;
+  onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
+}) {
+  const { msg, media, bubbleVariant, displayWidth, displayHeight, minithumbnail } = state;
+  const hasReactions = msg.reactions.length > 0;
+  const isVideo = msg.contentKind === 'video' || msg.contentKind === 'animation';
 
   return (
-    <div className="flex items-end gap-2">
-      <UserAvatar
-        name={msg.senderName}
-        src={state.senderPhotoUrl}
-        className="size-7 shrink-0 text-xs"
-      />
-      {stickerEl}
-    </div>
+    <PureBubble
+      variant={bubbleVariant}
+      isOutgoing={msg.isOutgoing}
+      groupPosition={groupPosition}
+      showAvatar={state.showAvatar}
+      senderName={state.senderName}
+      senderPhotoUrl={state.senderPhotoUrl}
+      hasReactions={hasReactions}
+    >
+      <PureReactionPicker onReact={(e, c) => onReact(msg.id, e, c)} />
+      {bubbleVariant === 'framed' && state.showSenderName && (
+        <div className="px-3 pt-1.5">
+          <p className="mb-0.5 text-xs font-medium text-accent-blue">{msg.senderName}</p>
+        </div>
+      )}
+      {bubbleVariant === 'framed' && msg.forwardFromName && (
+        <div className="px-3">
+          <PureForwardHeader fromName={msg.forwardFromName} />
+        </div>
+      )}
+      {bubbleVariant === 'framed' &&
+        (msg.replyPreview ? (
+          <div className="px-3">
+            <PureReplyHeader
+              senderName={msg.replyPreview.senderName}
+              text={msg.replyPreview.text}
+              mediaType={msg.replyPreview.mediaLabel}
+              isOutgoing={msg.isOutgoing}
+            />
+          </div>
+        ) : (
+          msg.replyToMessageId > 0 && (
+            <div className="px-3">
+              <PureReplyHeader
+                senderName=""
+                text={`Reply to message #${msg.replyToMessageId}`}
+                mediaType=""
+                isOutgoing={msg.isOutgoing}
+              />
+            </div>
+          )
+        ))}
+      {isVideo ? (
+        <PureVideoView
+          url={media.url}
+          loading={media.loading}
+          isCircle={false}
+          isGif={msg.contentKind === 'animation'}
+          onRetry={media.retry}
+        />
+      ) : (
+        <PurePhotoView
+          url={media.url}
+          loading={media.loading}
+          width={displayWidth}
+          height={displayHeight}
+          minithumbnail={minithumbnail}
+          onRetry={media.retry}
+        />
+      )}
+      {msg.text && (
+        <div className="px-3 py-1.5">
+          <p className="whitespace-pre-wrap break-words tg-text-chat text-text-primary">
+            <FormattedText text={msg.text} entities={msg.entities} />
+            <span className="float-right h-[18px] w-12" aria-hidden="true" />
+          </p>
+        </div>
+      )}
+      {hasReactions && (
+        <PureReactionBar
+          reactions={toReactionInfos(msg.reactions)}
+          onReact={(e, c) => onReact(msg.id, e, c)}
+        />
+      )}
+      {state.isMediaOnly ? (
+        <span className="absolute bottom-2 right-2">
+          <PureMessageTime
+            date={msg.date}
+            out={msg.isOutgoing}
+            read={msg.isRead}
+            edited={msg.editDate > 0}
+            displayType="image"
+          />
+        </span>
+      ) : (
+        <span className="absolute bottom-1 right-2">
+          <PureMessageTime
+            date={msg.date}
+            out={msg.isOutgoing}
+            read={msg.isRead}
+            edited={msg.editDate > 0}
+            displayType={state.displayType}
+          />
+        </span>
+      )}
+    </PureBubble>
   );
 }
 
@@ -336,11 +450,12 @@ function AlbumLayout({
   groupPosition: GroupPosition;
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
 }) {
-  const { first, messages } = state;
+  const { first, messages, bubbleVariant } = state;
   const hasReactions = first.reactions.length > 0;
 
   return (
     <PureBubble
+      variant={bubbleVariant}
       isOutgoing={first.isOutgoing}
       groupPosition={groupPosition}
       showAvatar={state.showAvatar}
@@ -349,17 +464,46 @@ function AlbumLayout({
       hasReactions={hasReactions}
     >
       <PureReactionPicker onReact={(e, c) => onReact(first.id, e, c)} />
-      {state.showSenderName && (
-        <p className="mb-0.5 text-xs font-medium text-accent-blue">{first.senderName}</p>
+      {bubbleVariant === 'framed' && state.showSenderName && (
+        <div className="px-3 pt-1.5">
+          <p className="mb-0.5 text-xs font-medium text-accent-blue">{first.senderName}</p>
+        </div>
       )}
-      <AlbumGrid messages={messages} chatId={first.chatId} />
+      {bubbleVariant === 'framed' && first.forwardFromName && (
+        <div className="px-3">
+          <PureForwardHeader fromName={first.forwardFromName} />
+        </div>
+      )}
+      {bubbleVariant === 'framed' &&
+        (first.replyPreview ? (
+          <div className="px-3">
+            <PureReplyHeader
+              senderName={first.replyPreview.senderName}
+              text={first.replyPreview.text}
+              mediaType={first.replyPreview.mediaLabel}
+              isOutgoing={first.isOutgoing}
+            />
+          </div>
+        ) : (
+          first.replyToMessageId > 0 && (
+            <div className="px-3">
+              <PureReplyHeader
+                senderName=""
+                text={`Reply to message #${first.replyToMessageId}`}
+                mediaType=""
+                isOutgoing={first.isOutgoing}
+              />
+            </div>
+          )
+        ))}
+      <AlbumGrid messages={messages} chatId={first.chatId} maxWidth={MAX_MEDIA_SIZE} />
       {first.text && (
-        <p className="mt-1 whitespace-pre-wrap break-words tg-text-chat text-text-primary">
-          <FormattedText text={first.text} entities={first.entities} />
-          <span className="inline-block w-12 align-baseline" aria-hidden="true">
-            {'\u00A0'}
-          </span>
-        </p>
+        <div className="px-3 py-1.5">
+          <p className="whitespace-pre-wrap break-words tg-text-chat text-text-primary">
+            <FormattedText text={first.text} entities={first.entities} />
+            <span className="float-right h-[18px] w-12" aria-hidden="true" />
+          </p>
+        </div>
       )}
       {hasReactions && (
         <PureReactionBar
@@ -367,15 +511,27 @@ function AlbumLayout({
           onReact={(e, c) => onReact(first.id, e, c)}
         />
       )}
-      <span className="absolute bottom-1 right-2">
-        <PureMessageTime
-          date={first.date}
-          out={first.isOutgoing}
-          read={first.isRead}
-          edited={first.editDate > 0}
-          displayType={first.text ? 'default' : 'image'}
-        />
-      </span>
+      {first.text ? (
+        <span className="absolute bottom-1 right-2">
+          <PureMessageTime
+            date={first.date}
+            out={first.isOutgoing}
+            read={first.isRead}
+            edited={first.editDate > 0}
+            displayType="default"
+          />
+        </span>
+      ) : (
+        <span className="absolute bottom-2 right-2">
+          <PureMessageTime
+            date={first.date}
+            out={first.isOutgoing}
+            read={first.isRead}
+            edited={first.editDate > 0}
+            displayType="image"
+          />
+        </span>
+      )}
     </PureBubble>
   );
 }

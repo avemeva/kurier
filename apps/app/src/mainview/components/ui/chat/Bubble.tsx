@@ -4,6 +4,8 @@ import { cn } from '@/lib/utils';
 
 export type GroupPosition = 'single' | 'first' | 'middle' | 'last';
 
+export type BubbleVariant = 'filled' | 'media' | 'framed';
+
 export type PureBubbleProps = {
   isOutgoing: boolean;
   groupPosition: GroupPosition;
@@ -11,6 +13,7 @@ export type PureBubbleProps = {
   senderName?: string;
   senderPhotoUrl?: string;
   hasReactions?: boolean;
+  variant?: BubbleVariant;
   className?: string;
   children: ReactNode;
 };
@@ -47,6 +50,7 @@ export function PureBubble({
   senderName,
   senderPhotoUrl,
   hasReactions,
+  variant = 'filled',
   className,
   children,
 }: PureBubbleProps) {
@@ -55,8 +59,10 @@ export function PureBubble({
       data-testid="message-bubble"
       data-is-outgoing={isOutgoing ? 'true' : 'false'}
       className={cn(
-        'group/bubble relative px-3 py-1.5',
-        isOutgoing ? 'bg-message-own' : 'bg-message-peer',
+        'group/bubble relative',
+        variant === 'filled' && 'px-3 py-1.5',
+        variant !== 'media' && (isOutgoing ? 'bg-message-own' : 'bg-message-peer'),
+        variant !== 'filled' && 'overflow-hidden',
         hasReactions && 'pb-5',
         showAvatar ? 'max-w-[calc(100%-36px)]' : 'max-w-[55%]',
         className,

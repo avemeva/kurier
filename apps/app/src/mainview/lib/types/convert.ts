@@ -134,6 +134,34 @@ function extractVoiceSpeechText(content: Td.MessageContent): string {
   return '';
 }
 
+// --- Media dimensions & minithumbnail ---
+
+function extractMediaWidth(content: Td.MessageContent): number {
+  if (content._ === 'messagePhoto') {
+    const sizes = content.photo.sizes;
+    return sizes.length > 0 ? (sizes[sizes.length - 1] as Td.photoSize).width : 0;
+  }
+  if (content._ === 'messageVideo') return content.video.width;
+  if (content._ === 'messageAnimation') return content.animation.width;
+  return 0;
+}
+
+function extractMediaHeight(content: Td.MessageContent): number {
+  if (content._ === 'messagePhoto') {
+    const sizes = content.photo.sizes;
+    return sizes.length > 0 ? (sizes[sizes.length - 1] as Td.photoSize).height : 0;
+  }
+  if (content._ === 'messageVideo') return content.video.height;
+  if (content._ === 'messageAnimation') return content.animation.height;
+  return 0;
+}
+
+function extractMinithumbnail(content: Td.MessageContent): string | null {
+  if (content._ === 'messagePhoto') return content.photo.minithumbnail?.data ?? null;
+  if (content._ === 'messageVideo') return content.video.minithumbnail?.data ?? null;
+  return null;
+}
+
 // --- Web preview ---
 
 function extractWebPreview(content: Td.MessageContent): UIWebPreview | null {
@@ -366,6 +394,9 @@ export function toUIMessage(
     voiceFileSize: extractVoiceFileSize(msg.content),
     voiceSpeechStatus: extractVoiceSpeechStatus(msg.content),
     voiceSpeechText: extractVoiceSpeechText(msg.content),
+    mediaWidth: extractMediaWidth(msg.content),
+    mediaHeight: extractMediaHeight(msg.content),
+    minithumbnail: extractMinithumbnail(msg.content),
   };
 }
 

@@ -105,6 +105,9 @@ export type UIMessage = {
   voiceFileSize: number;
   voiceSpeechStatus: 'none' | 'pending' | 'done' | 'error';
   voiceSpeechText: string;
+  mediaWidth: number;
+  mediaHeight: number;
+  minithumbnail: string | null;
 };
 
 export type UIPendingMessage = {

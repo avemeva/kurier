@@ -1,5 +1,6 @@
 import type { InfoDisplayType } from '@/components/ui/chat/MessageTime';
 import type { UIMessage, UIMessageItem } from '@/lib/types';
+import { computeMediaSize, MAX_MEDIA_SIZE, MIN_MEDIA_SIZE } from '../lib/media-sizing';
 import { type MediaState, useMedia } from './useMedia';
 
 // --- Input types ---
@@ -53,15 +54,33 @@ export type AlbumRenderState = {
   layout: 'album';
   messages: UIMessage[];
   first: UIMessage;
+  bubbleVariant: 'media' | 'framed';
   showAvatar: boolean;
   showSenderName: boolean;
   senderPhotoUrl?: string;
+};
+
+export type MediaRenderState = {
+  layout: 'media';
+  msg: UIMessage;
+  media: MediaState;
+  bubbleVariant: 'media' | 'framed';
+  displayWidth: number;
+  displayHeight: number;
+  minithumbnail: string | null;
+  showAvatar: boolean;
+  senderName?: string;
+  senderPhotoUrl?: string;
+  showSenderName: boolean;
+  displayType: InfoDisplayType;
+  isMediaOnly: boolean;
 };
 
 export type MessageRenderState =
   | ServiceRenderState
   | PendingRenderState
   | StickerRenderState
+  | MediaRenderState
   | BubbleRenderState
   | AlbumRenderState;
 
@@ -112,12 +131,16 @@ export function useMessage(input: MessageInput, ctx: MessageContext): MessageRen
   if (input.kind === 'album') {
     const first = input.messages[0];
     const showAvatar = ctx.showSender && !first.isOutgoing;
+    const showSenderName = ctx.showSender && !first.isOutgoing;
+    const needsBubble =
+      !!first.text || !!first.replyToMessageId || !!first.forwardFromName || showSenderName;
     return {
       layout: 'album',
       messages: input.messages,
       first,
+      bubbleVariant: needsBubble ? 'framed' : 'media',
       showAvatar,
-      showSenderName: ctx.showSender && !first.isOutgoing,
+      showSenderName,
       senderPhotoUrl: ctx.senderPhotoUrl,
     };
   }
@@ -152,6 +175,48 @@ export function useMessage(input: MessageInput, ctx: MessageContext): MessageRen
       media: resolvedMedia,
       showAvatar: ctx.showSender && !msg.isOutgoing,
       senderPhotoUrl: ctx.senderPhotoUrl,
+    };
+  }
+
+  // Media layout (photos, videos, animations — NOT videoNote which is circular)
+  const ck = msg.contentKind;
+  if (ck === 'photo' || ck === 'video' || ck === 'animation') {
+    const showAvatar = ctx.showSender && !msg.isOutgoing;
+    const showSenderName = ctx.showSender && !msg.isOutgoing;
+    const needsBubble =
+      !!msg.text || !!msg.replyToMessageId || !!msg.forwardFromName || showSenderName;
+    const bubbleVariant = needsBubble ? 'framed' : 'media';
+
+    let displayWidth: number;
+    let displayHeight: number;
+    if (msg.mediaWidth > 0 && msg.mediaHeight > 0) {
+      const sized = computeMediaSize(
+        msg.mediaWidth,
+        msg.mediaHeight,
+        MAX_MEDIA_SIZE,
+        MIN_MEDIA_SIZE,
+      );
+      displayWidth = sized.width;
+      displayHeight = sized.height;
+    } else {
+      displayWidth = MAX_MEDIA_SIZE;
+      displayHeight = Math.round((MAX_MEDIA_SIZE * 9) / 16);
+    }
+
+    return {
+      layout: 'media',
+      msg,
+      media: resolvedMedia,
+      bubbleVariant,
+      displayWidth,
+      displayHeight,
+      minithumbnail: msg.minithumbnail,
+      showAvatar,
+      senderName: msg.senderName,
+      senderPhotoUrl: ctx.senderPhotoUrl,
+      showSenderName,
+      displayType: msg.text ? 'default' : 'image',
+      isMediaOnly: !msg.text,
     };
   }
 
