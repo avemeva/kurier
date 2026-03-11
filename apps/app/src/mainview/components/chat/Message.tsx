@@ -44,6 +44,7 @@ export type MessageProps = {
   senderPhotoUrl?: string;
   groupPosition?: GroupPosition;
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
+  onReplyClick?: (messageId: number) => void;
 };
 
 // --- Main component ---
@@ -54,6 +55,7 @@ export function Message({
   senderPhotoUrl,
   groupPosition = 'single',
   onReact,
+  onReplyClick,
 }: MessageProps) {
   const ctx: MessageContext = { showSender, senderPhotoUrl };
   const state = useMessage(input, ctx);
@@ -66,7 +68,14 @@ export function Message({
     case 'sticker':
       return <StickerLayout state={state} onReact={onReact} />;
     case 'bubble':
-      return <BubbleLayout state={state} groupPosition={groupPosition} onReact={onReact} />;
+      return (
+        <BubbleLayout
+          state={state}
+          groupPosition={groupPosition}
+          onReact={onReact}
+          onReplyClick={onReplyClick}
+        />
+      );
     case 'album':
       return <AlbumLayout state={state} groupPosition={groupPosition} onReact={onReact} />;
   }
@@ -162,10 +171,12 @@ function BubbleLayout({
   state,
   groupPosition,
   onReact,
+  onReplyClick,
 }: {
   state: BubbleRenderState;
   groupPosition: GroupPosition;
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
+  onReplyClick?: (messageId: number) => void;
 }) {
   const { msg, media, displayType, isMediaOnly } = state;
   const replyThumbUrl = useReplyThumb(
@@ -205,6 +216,7 @@ function BubbleLayout({
           mediaType={msg.replyPreview.mediaLabel}
           mediaUrl={replyThumbUrl ?? undefined}
           isOutgoing={msg.isOutgoing}
+          onClick={() => onReplyClick?.(msg.replyToMessageId)}
         />
       ) : (
         msg.replyToMessageId > 0 && (
@@ -213,6 +225,7 @@ function BubbleLayout({
             text="Loading..."
             mediaType=""
             isOutgoing={msg.isOutgoing}
+            onClick={() => onReplyClick?.(msg.replyToMessageId)}
           />
         )
       )}

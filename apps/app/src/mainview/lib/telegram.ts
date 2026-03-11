@@ -241,6 +241,69 @@ export async function getMessages(
   return { messages, hasMore: messages.length > 0 };
 }
 
+export async function getNewerMessages(
+  chatId: number,
+  options: { fromMessageId: number; limit?: number },
+): Promise<{ messages: Td.message[]; hasMore: boolean }> {
+  const limit = options.limit ?? 50;
+
+  const result = await client.invoke({
+    _: 'getChatHistory',
+    chat_id: chatId,
+    from_message_id: options.fromMessageId,
+    offset: -limit,
+    limit,
+    only_local: false,
+  });
+
+  const batch = result.messages.filter((m): m is Td.message => m !== undefined);
+  // Filter out the anchor message and any older messages, then reverse to oldest-first
+  const newer = batch.filter((m) => m.id > options.fromMessageId).reverse();
+
+  return { messages: newer, hasMore: newer.length >= limit - 1 };
+}
+
+export async function getMessagesAroundMessage(
+  chatId: number,
+  messageId: number,
+  limit = 50,
+): Promise<{ messages: Td.message[]; hasOlder: boolean; hasNewer: boolean }> {
+  const halfLimit = Math.floor(limit / 2);
+
+  const [olderResult, newerResult] = await Promise.all([
+    client.invoke({
+      _: 'getChatHistory',
+      chat_id: chatId,
+      from_message_id: messageId,
+      offset: 0,
+      limit: halfLimit,
+      only_local: false,
+    }),
+    client.invoke({
+      _: 'getChatHistory',
+      chat_id: chatId,
+      from_message_id: messageId,
+      offset: -(halfLimit + 1),
+      limit: halfLimit + 1,
+      only_local: false,
+    }),
+  ]);
+
+  const olderBatch = olderResult.messages.filter((m): m is Td.message => m !== undefined);
+  const newerBatch = newerResult.messages.filter((m): m is Td.message => m !== undefined);
+
+  // Deduplicate by ID and sort ascending
+  const byId = new Map<number, Td.message>();
+  for (const m of olderBatch) byId.set(m.id, m);
+  for (const m of newerBatch) byId.set(m.id, m);
+  const messages = [...byId.values()].sort((a, b) => a.id - b.id);
+
+  const hasOlder = olderBatch.length === halfLimit;
+  const hasNewer = newerBatch.filter((m) => m.id !== messageId).length === halfLimit;
+
+  return { messages, hasOlder, hasNewer };
+}
+
 // --- Send ---
 
 export async function sendMessage(chatId: number, text: string): Promise<Td.message> {

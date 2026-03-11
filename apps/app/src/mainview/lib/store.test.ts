@@ -13,6 +13,8 @@ vi.mock('./log', () => {
 vi.mock('./telegram', () => ({
   getDialogs: vi.fn(),
   getMessages: vi.fn(),
+  getNewerMessages: vi.fn(),
+  getMessagesAroundMessage: vi.fn(),
   getMessageText: vi.fn((msg: Td.message) => {
     const c = msg.content;
     if (c._ === 'messageText') return c.text.text;
@@ -53,6 +55,8 @@ import {
 import {
   getDialogs,
   getMessages,
+  getMessagesAroundMessage,
+  getNewerMessages,
   getProfilePhotoUrl,
   markAsRead,
   sendMessage,
@@ -205,6 +209,19 @@ describe('openChat', () => {
 
     await useChatStore.getState().openChat(chat);
     expect(useChatStore.getState().chats[0].unread_count).toBe(0);
+  });
+
+  it('sets isAtLatest=true, hasNewer=false on fresh load', async () => {
+    const chat = makeChat({ id: 42 });
+    vi.mocked(getMessages).mockResolvedValueOnce({
+      messages: [makeMessage({ id: 10 })],
+      hasMore: false,
+    });
+
+    await useChatStore.getState().openChat(chat);
+    const s = useChatStore.getState();
+    expect(s.isAtLatest[42]).toBe(true);
+    expect(s.hasNewer[42]).toBe(false);
   });
 
   it('uses cache on second open', async () => {
@@ -389,6 +406,44 @@ describe('handleUpdate', () => {
       });
 
       expect(useChatStore.getState().pendingByChat[42]).toHaveLength(0);
+    });
+
+    it('does NOT append to messagesByChat when isAtLatest is false', () => {
+      const chat = makeChat({ id: 42 });
+      useChatStore.setState({
+        chats: [chat],
+        archivedChats: [],
+        messagesByChat: { 42: [makeMessage({ id: 1 })] },
+        isAtLatest: { 42: false },
+      });
+
+      useChatStore.getState().handleUpdate({
+        type: 'new_message',
+        chat_id: 42,
+        message: makeMessage({ id: 2, content: textContent('new') }),
+      });
+
+      expect(useChatStore.getState().messagesByChat[42]).toHaveLength(1);
+      expect(useChatStore.getState().messagesByChat[42][0].id).toBe(1);
+    });
+
+    it('still updates chat last_message when isAtLatest is false', () => {
+      const chat = makeChat({ id: 42 });
+      const newMsg = makeMessage({ id: 2, chat_id: 42, content: textContent('new') });
+      useChatStore.setState({
+        chats: [chat],
+        archivedChats: [],
+        messagesByChat: { 42: [makeMessage({ id: 1 })] },
+        isAtLatest: { 42: false },
+      });
+
+      useChatStore.getState().handleUpdate({
+        type: 'new_message',
+        chat_id: 42,
+        message: newMsg,
+      });
+
+      expect(useChatStore.getState().chats[0].last_message).toEqual(newMsg);
     });
   });
 
@@ -1087,5 +1142,215 @@ describe('loadProfilePhoto', () => {
     useChatStore.getState().loadProfilePhoto(42);
     useChatStore.getState().loadProfilePhoto(42);
     expect(getProfilePhotoUrl).toHaveBeenCalledTimes(1);
+  });
+});
+
+// --- loadNewerMessages ---
+
+describe('loadNewerMessages', () => {
+  it('appends newer messages to array', async () => {
+    useChatStore.setState({
+      selectedChatId: 42,
+      messagesByChat: { 42: [makeMessage({ id: 10, chat_id: 42 })] },
+      hasNewer: { 42: true },
+      isAtLatest: { 42: false },
+    });
+    vi.mocked(getNewerMessages).mockResolvedValueOnce({
+      messages: [makeMessage({ id: 20, chat_id: 42 }), makeMessage({ id: 30, chat_id: 42 })],
+      hasMore: false,
+    });
+
+    await useChatStore.getState().loadNewerMessages();
+    const msgs = useChatStore.getState().messagesByChat[42];
+    expect(msgs).toHaveLength(3);
+    expect(msgs[msgs.length - 1].id).toBe(30);
+  });
+
+  it('deduplicates by ID', async () => {
+    useChatStore.setState({
+      selectedChatId: 42,
+      messagesByChat: { 42: [makeMessage({ id: 10, chat_id: 42 })] },
+      hasNewer: { 42: true },
+      isAtLatest: { 42: false },
+    });
+    vi.mocked(getNewerMessages).mockResolvedValueOnce({
+      messages: [makeMessage({ id: 10, chat_id: 42 })],
+      hasMore: false,
+    });
+
+    await useChatStore.getState().loadNewerMessages();
+    expect(useChatStore.getState().messagesByChat[42]).toHaveLength(1);
+  });
+
+  it('sets hasNewer=false and isAtLatest=true when empty batch', async () => {
+    useChatStore.setState({
+      selectedChatId: 42,
+      messagesByChat: { 42: [makeMessage({ id: 10, chat_id: 42 })] },
+      hasNewer: { 42: true },
+      isAtLatest: { 42: false },
+    });
+    vi.mocked(getNewerMessages).mockResolvedValueOnce({ messages: [], hasMore: false });
+
+    await useChatStore.getState().loadNewerMessages();
+    const s = useChatStore.getState();
+    expect(s.hasNewer[42]).toBe(false);
+    expect(s.isAtLatest[42]).toBe(true);
+  });
+
+  it('guards when isAtLatest is true', async () => {
+    useChatStore.setState({
+      selectedChatId: 42,
+      messagesByChat: { 42: [makeMessage({ id: 10, chat_id: 42 })] },
+      hasNewer: { 42: true },
+      isAtLatest: { 42: true },
+    });
+
+    await useChatStore.getState().loadNewerMessages();
+    expect(getNewerMessages).not.toHaveBeenCalled();
+  });
+
+  it('guards when loadingNewerMessages is true', async () => {
+    useChatStore.setState({
+      selectedChatId: 42,
+      messagesByChat: { 42: [makeMessage({ id: 10, chat_id: 42 })] },
+      hasNewer: { 42: true },
+      isAtLatest: { 42: false },
+      loadingNewerMessages: true,
+    });
+
+    await useChatStore.getState().loadNewerMessages();
+    expect(getNewerMessages).not.toHaveBeenCalled();
+  });
+
+  it('guards when hasNewer is false', async () => {
+    useChatStore.setState({
+      selectedChatId: 42,
+      messagesByChat: { 42: [makeMessage({ id: 10, chat_id: 42 })] },
+      hasNewer: { 42: false },
+      isAtLatest: { 42: false },
+    });
+
+    await useChatStore.getState().loadNewerMessages();
+    expect(getNewerMessages).not.toHaveBeenCalled();
+  });
+});
+
+// --- loadMessagesAround ---
+
+describe('loadMessagesAround', () => {
+  it('replaces messagesByChat with new window', async () => {
+    useChatStore.setState({
+      selectedChatId: 42,
+      messagesByChat: { 42: [makeMessage({ id: 1, chat_id: 42 })] },
+    });
+    vi.mocked(getMessagesAroundMessage).mockResolvedValueOnce({
+      messages: [makeMessage({ id: 50, chat_id: 42 }), makeMessage({ id: 51, chat_id: 42 })],
+      hasOlder: true,
+      hasNewer: true,
+    });
+
+    await useChatStore.getState().loadMessagesAround(50);
+    const msgs = useChatStore.getState().messagesByChat[42];
+    expect(msgs).toHaveLength(2);
+    expect(msgs.find((m) => m.id === 1)).toBeUndefined();
+    expect(msgs.find((m) => m.id === 50)).toBeDefined();
+  });
+
+  it('target message included in window', async () => {
+    useChatStore.setState({ selectedChatId: 42, messagesByChat: { 42: [] } });
+    vi.mocked(getMessagesAroundMessage).mockResolvedValueOnce({
+      messages: [
+        makeMessage({ id: 49, chat_id: 42 }),
+        makeMessage({ id: 50, chat_id: 42 }),
+        makeMessage({ id: 51, chat_id: 42 }),
+      ],
+      hasOlder: false,
+      hasNewer: false,
+    });
+
+    await useChatStore.getState().loadMessagesAround(50);
+    const msgs = useChatStore.getState().messagesByChat[42];
+    expect(msgs.some((m) => m.id === 50)).toBe(true);
+  });
+
+  it('sets isAtLatest to false', async () => {
+    useChatStore.setState({
+      selectedChatId: 42,
+      messagesByChat: { 42: [] },
+      isAtLatest: { 42: true },
+    });
+    vi.mocked(getMessagesAroundMessage).mockResolvedValueOnce({
+      messages: [makeMessage({ id: 50, chat_id: 42 })],
+      hasOlder: false,
+      hasNewer: false,
+    });
+
+    await useChatStore.getState().loadMessagesAround(50);
+    expect(useChatStore.getState().isAtLatest[42]).toBe(false);
+  });
+
+  it('sets hasOlder and hasNewer from response', async () => {
+    useChatStore.setState({ selectedChatId: 42, messagesByChat: { 42: [] } });
+    vi.mocked(getMessagesAroundMessage).mockResolvedValueOnce({
+      messages: [makeMessage({ id: 50, chat_id: 42 })],
+      hasOlder: true,
+      hasNewer: true,
+    });
+
+    await useChatStore.getState().loadMessagesAround(50);
+    const s = useChatStore.getState();
+    expect(s.hasOlder[42]).toBe(true);
+    expect(s.hasNewer[42]).toBe(true);
+  });
+});
+
+// --- loadLatestMessages ---
+
+describe('loadLatestMessages', () => {
+  it('replaces window with recent messages', async () => {
+    useChatStore.setState({
+      selectedChatId: 42,
+      messagesByChat: { 42: [makeMessage({ id: 1, chat_id: 42 })] },
+      isAtLatest: { 42: false },
+    });
+    vi.mocked(getMessages).mockResolvedValueOnce({
+      messages: [makeMessage({ id: 100, chat_id: 42 }), makeMessage({ id: 99, chat_id: 42 })],
+      hasMore: false,
+    });
+
+    await useChatStore.getState().loadLatestMessages();
+    const msgs = useChatStore.getState().messagesByChat[42];
+    expect(msgs.find((m) => m.id === 1)).toBeUndefined();
+    expect(msgs.find((m) => m.id === 99)).toBeDefined();
+    expect(msgs.find((m) => m.id === 100)).toBeDefined();
+  });
+
+  it('sets isAtLatest=true and hasNewer=false', async () => {
+    useChatStore.setState({
+      selectedChatId: 42,
+      messagesByChat: { 42: [] },
+      isAtLatest: { 42: false },
+      hasNewer: { 42: true },
+    });
+    vi.mocked(getMessages).mockResolvedValueOnce({ messages: [], hasMore: false });
+
+    await useChatStore.getState().loadLatestMessages();
+    const s = useChatStore.getState();
+    expect(s.isAtLatest[42]).toBe(true);
+    expect(s.hasNewer[42]).toBe(false);
+  });
+
+  it('sets hasOlder based on response', async () => {
+    useChatStore.setState({
+      selectedChatId: 42,
+      messagesByChat: { 42: [] },
+    });
+    vi.mocked(getMessages).mockResolvedValueOnce({
+      messages: [makeMessage({ id: 100, chat_id: 42 })],
+      hasMore: true,
+    });
+
+    await useChatStore.getState().loadLatestMessages();
+    expect(useChatStore.getState().hasOlder[42]).toBe(true);
   });
 });

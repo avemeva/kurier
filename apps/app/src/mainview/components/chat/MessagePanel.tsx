@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { PureCornerButton, PureCornerButtonStack } from '@/components/ui/chat/CornerButtons';
 import { PureMessageInput } from '@/components/ui/chat/MessageInput';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { scrollToMessage } from '@/lib/scrollToMessage';
 import { selectChatMessages, selectSelectedChat, useChatStore } from '@/lib/store';
 import type { UIMessage, UIPendingMessage } from '@/lib/types';
 import { groupUIMessages } from '@/lib/types';
@@ -8,78 +11,90 @@ import { ComposeSearchBottomBar } from './ComposeSearch';
 import type { GroupPosition } from './Message';
 import { Message } from './Message';
 
+const ArrowDownIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+);
+
 export function MessagePanel() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const prevMessageCountRef = useRef(0);
-  const prevScrollHeightRef = useRef(0);
-  // Block scroll-triggered loads until user scrolls down past the threshold
-  const canLoadRef = useRef(false);
 
   const selectedChat = useChatStore(selectSelectedChat);
   const messages = useChatStore(selectChatMessages);
   const loadingMessages = useChatStore((s) => s.loadingMessages);
   const loadingOlderMessages = useChatStore((s) => s.loadingOlderMessages);
   const loadOlderMessages = useChatStore((s) => s.loadOlderMessages);
-  const hasMoreMessages = useChatStore((s) =>
-    s.selectedChatId ? (s.hasMoreMessages[s.selectedChatId] ?? false) : false,
+  const loadNewerMessages = useChatStore((s) => s.loadNewerMessages);
+  const loadLatestMessages = useChatStore((s) => s.loadLatestMessages);
+  const hasOlder = useChatStore((s) =>
+    s.selectedChatId ? (s.hasOlder[s.selectedChatId] ?? false) : false,
   );
+  const hasNewer = useChatStore((s) =>
+    s.selectedChatId ? (s.hasNewer[s.selectedChatId] ?? false) : false,
+  );
+  const isAtLatest = useChatStore((s) =>
+    s.selectedChatId ? (s.isAtLatest[s.selectedChatId] ?? true) : true,
+  );
+  const loadMessagesAround = useChatStore((s) => s.loadMessagesAround);
   const send = useChatStore((s) => s.send);
   const react = useChatStore((s) => s.react);
   const searchMode = useChatStore((s) => s.searchMode);
   const profilePhotos = useChatStore((s) => s.profilePhotos);
 
-  // Scroll to bottom on initial load
-  useEffect(() => {
-    if (messages.length > 0 && prevMessageCountRef.current === 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
-      // Allow loading after initial scroll settles
-      canLoadRef.current = false;
-    }
-    prevMessageCountRef.current = messages.length;
-  }, [messages]);
-
-  // Reset on chat change
-  const selectedChatId = selectedChat?.id;
-  useEffect(() => {
-    if (selectedChatId === undefined) return;
-    prevMessageCountRef.current = 0;
-    prevScrollHeightRef.current = 0;
-    canLoadRef.current = false;
-  }, [selectedChatId]);
-
-  // Preserve scroll position when older messages are prepended
-  useEffect(() => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    if (prevMessageCountRef.current > 0 && messages.length > prevMessageCountRef.current) {
-      const addedHeight = el.scrollHeight - prevScrollHeightRef.current;
-      if (addedHeight > 0 && el.scrollTop < 300) {
-        el.scrollTop += addedHeight;
-        // After restoring position, block loads until user scrolls down again
-        canLoadRef.current = false;
-      }
-    }
-    prevScrollHeightRef.current = el.scrollHeight;
+  useInfiniteScroll(scrollContainerRef, {
+    onTop: loadOlderMessages,
+    onBottom: loadNewerMessages,
+    hasOlder,
+    hasNewer,
   });
 
-  const handleScroll = useCallback(() => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
+  // Scroll to bottom when we arrive at latest (initial load or loadLatestMessages)
+  const prevIsAtLatestRef = useRef<boolean | undefined>(undefined);
+  useEffect(() => {
+    const wasAtLatest = prevIsAtLatestRef.current;
+    prevIsAtLatestRef.current = isAtLatest;
 
-    // Once user scrolls past 500px from top, arm the trigger
-    if (el.scrollTop > 500) {
-      canLoadRef.current = true;
+    if (!isAtLatest || messages.length === 0) return;
+
+    // Scroll to bottom on: initial render or transition to latest
+    if (wasAtLatest === undefined || wasAtLatest === false) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
     }
+  }, [isAtLatest, messages]);
 
-    if (!canLoadRef.current || loadingOlderMessages || !hasMoreMessages) return;
+  const handleReplyClick = useCallback(
+    async (messageId: number) => {
+      const el = scrollContainerRef.current;
+      if (!el || !messageId) return;
 
-    // Load when within 200px of the top
-    if (el.scrollTop < 200) {
-      canLoadRef.current = false;
-      loadOlderMessages();
-    }
-  }, [loadingOlderMessages, hasMoreMessages, loadOlderMessages]);
+      // If already in the DOM, just scroll to it
+      const existing = el.querySelector(`#msg-${messageId}`);
+      if (existing) {
+        scrollToMessage(el, messageId);
+        return;
+      }
+
+      // Load messages around the target, then scroll after render
+      await loadMessagesAround(messageId);
+      requestAnimationFrame(() => {
+        scrollToMessage(el, messageId);
+      });
+    },
+    [loadMessagesAround],
+  );
 
   if (!selectedChat) {
     return (
@@ -149,48 +164,58 @@ export function MessagePanel() {
 
   return (
     <>
-      <div
-        ref={scrollContainerRef}
-        onScroll={handleScroll}
-        data-testid="message-panel"
-        className="flex-1 overflow-y-auto px-4 py-3 scrollbar-subtle"
-      >
-        {loadingOlderMessages && (
-          <p className="shimmer py-4 text-center text-sm text-text-tertiary">
-            Loading older messages...
-          </p>
-        )}
-        {loadingMessages && (
-          <p className="shimmer py-8 text-center text-sm text-text-tertiary">Loading messages...</p>
-        )}
-        {!loadingMessages && messages.length === 0 && (
-          <p className="py-8 text-center text-sm text-text-tertiary">No messages</p>
-        )}
-        <div className="max-w-[720px] space-y-1">
-          {grouped.map((group, index) => {
-            const input =
-              group.type === 'album'
-                ? ({ kind: 'album', messages: group.messages } as const)
-                : ({ kind: 'single', message: group.message } as const);
-            const isOut = getIsOutgoing(group);
+      <div className="relative flex-1">
+        <div
+          ref={scrollContainerRef}
+          data-testid="message-panel"
+          className="absolute inset-0 overflow-y-auto px-4 py-3 scrollbar-subtle"
+        >
+          {loadingOlderMessages && (
+            <p className="shimmer py-4 text-center text-sm text-text-tertiary">
+              Loading older messages...
+            </p>
+          )}
+          {loadingMessages && (
+            <p className="shimmer py-8 text-center text-sm text-text-tertiary">
+              Loading messages...
+            </p>
+          )}
+          {!loadingMessages && messages.length === 0 && (
+            <p className="py-8 text-center text-sm text-text-tertiary">No messages</p>
+          )}
+          <div className="max-w-[720px] space-y-1">
+            {grouped.map((group, index) => {
+              const input =
+                group.type === 'album'
+                  ? ({ kind: 'album', messages: group.messages } as const)
+                  : ({ kind: 'single', message: group.message } as const);
+              const isOut = getIsOutgoing(group);
 
-            return (
-              <div
-                key={getKey(group)}
-                className={cn('flex', isOut ? 'justify-end' : 'justify-start')}
-              >
-                <Message
-                  input={input}
-                  showSender={showSender}
-                  senderPhotoUrl={getSenderPhotoUrl(group)}
-                  groupPosition={getGroupPosition(index)}
-                  onReact={handleReact}
-                />
-              </div>
-            );
-          })}
+              return (
+                <div
+                  key={getKey(group)}
+                  id={`msg-${getKey(group)}`}
+                  className={cn('flex', isOut ? 'justify-end' : 'justify-start')}
+                >
+                  <Message
+                    input={input}
+                    showSender={showSender}
+                    senderPhotoUrl={getSenderPhotoUrl(group)}
+                    groupPosition={getGroupPosition(index)}
+                    onReact={handleReact}
+                    onReplyClick={handleReplyClick}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div ref={messagesEndRef} />
         </div>
-        <div ref={messagesEndRef} />
+        {!isAtLatest && (
+          <PureCornerButtonStack>
+            <PureCornerButton icon={<ArrowDownIcon />} onClick={loadLatestMessages} />
+          </PureCornerButtonStack>
+        )}
       </div>
 
       {searchMode === 'chat' ? (

@@ -44,21 +44,27 @@ export function PureReplyHeader({
   mediaType,
   mediaUrl,
   isOutgoing,
+  onClick,
 }: {
   senderName: string;
   text?: string;
   mediaType?: string;
   mediaUrl?: string;
   isOutgoing?: boolean;
+  onClick?: () => void;
 }) {
   const label = text || mediaType || '';
+  const Tag = onClick ? 'button' : 'div';
 
   return (
-    <div
+    <Tag
+      type={onClick ? 'button' : undefined}
       className={cn(
-        'mb-1 flex gap-2 rounded border-l-2 border-accent-blue px-2 py-1',
+        'mb-1 flex gap-2 rounded border-l-2 border-accent-blue px-2 py-1 text-left',
         isOutgoing ? 'bg-accent-blue-subtle' : 'bg-code-bg',
+        onClick && 'cursor-pointer',
       )}
+      onClick={onClick}
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-semibold text-accent-blue">{senderName}</p>
@@ -84,6 +90,6 @@ export function PureReplyHeader({
           {mediaType === 'GIF' ? 'GIF' : (MEDIA_ICONS[mediaType] ?? mediaType.charAt(0))}
         </div>
       )}
-    </div>
+    </Tag>
   );
 }

@@ -409,3 +409,19 @@
     animation-duration: 0s;
   }
 }
+
+/* Message highlight — shown when navigating to a message via reply click */
+.highlight-message {
+  animation: message-highlight 2s ease-out;
+  border-radius: 8px;
+}
+
+@keyframes message-highlight {
+  0%,
+  50% {
+    background-color: var(--color-accent-blue-subtle, rgba(59, 130, 246, 0.15));
+  }
+  100% {
+    background-color: transparent;
+  }
+}

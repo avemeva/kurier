@@ -33,7 +33,9 @@ import {
   getDialogs,
   getMe,
   getMessages,
+  getMessagesAroundMessage,
   getMessageText,
+  getNewerMessages,
   getProfilePhotoUrl,
   getSenderUserId,
   getUser,
@@ -82,7 +84,10 @@ interface ChatState {
   loadingDialogs: boolean;
   loadingMessages: boolean;
   loadingOlderMessages: boolean;
-  hasMoreMessages: Record<number, boolean>;
+  hasOlder: Record<number, boolean>;
+  hasNewer: Record<number, boolean>;
+  isAtLatest: Record<number, boolean>;
+  loadingNewerMessages: boolean;
   hasMoreChats: boolean;
   hasMoreArchivedChats: boolean;
   loadingMoreChats: boolean;
@@ -117,6 +122,9 @@ interface ChatState {
   openChat: (chat: Td.chat) => Promise<void>;
   openChatById: (chatId: number) => Promise<void>;
   loadOlderMessages: () => Promise<void>;
+  loadNewerMessages: () => Promise<void>;
+  loadMessagesAround: (messageId: number) => Promise<void>;
+  loadLatestMessages: () => Promise<void>;
   send: (chatId: number, text: string) => void;
   react: (chatId: number, msgId: number, emoji: string, chosen: boolean) => void;
   handleUpdate: (event: TelegramUpdateEvent) => void;
@@ -314,7 +322,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadingDialogs: true,
   loadingMessages: false,
   loadingOlderMessages: false,
-  hasMoreMessages: {},
+  hasOlder: {},
+  hasNewer: {},
+  isAtLatest: {},
+  loadingNewerMessages: false,
   hasMoreChats: true,
   hasMoreArchivedChats: true,
   loadingMoreChats: false,
@@ -436,7 +447,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const ordered = msgs.reverse();
       set((s) => ({
         messagesByChat: { ...s.messagesByChat, [chat.id]: ordered },
-        hasMoreMessages: { ...s.hasMoreMessages, [chat.id]: hasMore },
+        hasOlder: { ...s.hasOlder, [chat.id]: hasMore },
+        hasNewer: { ...s.hasNewer, [chat.id]: false },
+        isAtLatest: { ...s.isAtLatest, [chat.id]: true },
       }));
       fetchMissingUsers(ordered, get, set);
       markAsRead(chat.id);
@@ -448,9 +461,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   loadOlderMessages: async () => {
-    const { selectedChatId, messagesByChat, hasMoreMessages, loadingOlderMessages } = get();
+    const { selectedChatId, messagesByChat, hasOlder, loadingOlderMessages } = get();
     if (!selectedChatId || loadingOlderMessages) return;
-    if (!hasMoreMessages[selectedChatId]) return;
+    if (!hasOlder[selectedChatId]) return;
 
     const existing = messagesByChat[selectedChatId] ?? [];
     if (existing.length === 0) return;
@@ -463,7 +476,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
       if (older.length === 0) {
         set((s) => ({
-          hasMoreMessages: { ...s.hasMoreMessages, [selectedChatId]: false },
+          hasOlder: { ...s.hasOlder, [selectedChatId]: false },
           loadingOlderMessages: false,
         }));
         return;
@@ -477,13 +490,101 @@ export const useChatStore = create<ChatState>((set, get) => ({
             ...s.messagesByChat,
             [selectedChatId]: [...deduped, ...current],
           },
-          hasMoreMessages: { ...s.hasMoreMessages, [selectedChatId]: hasMore },
+          hasOlder: { ...s.hasOlder, [selectedChatId]: hasMore },
           loadingOlderMessages: false,
         };
       });
       fetchMissingUsers(older, get, set);
     } catch {
       set({ loadingOlderMessages: false });
+    }
+  },
+
+  loadNewerMessages: async () => {
+    const { selectedChatId, messagesByChat, hasNewer, isAtLatest, loadingNewerMessages } = get();
+    if (!selectedChatId || loadingNewerMessages) return;
+    if (isAtLatest[selectedChatId]) return;
+    if (hasNewer[selectedChatId] === false) return;
+
+    const existing = messagesByChat[selectedChatId] ?? [];
+    if (existing.length === 0) return;
+
+    const newestId = existing[existing.length - 1].id;
+    set({ loadingNewerMessages: true });
+    try {
+      const { messages: newer, hasMore } = await getNewerMessages(selectedChatId, {
+        fromMessageId: newestId,
+      });
+      if (newer.length === 0) {
+        set((s) => ({
+          hasNewer: { ...s.hasNewer, [selectedChatId]: false },
+          isAtLatest: { ...s.isAtLatest, [selectedChatId]: true },
+          loadingNewerMessages: false,
+        }));
+        return;
+      }
+      set((s) => {
+        const current = s.messagesByChat[selectedChatId] ?? [];
+        const existingIds = new Set(current.map((m) => m.id));
+        const deduped = newer.filter((m) => !existingIds.has(m.id));
+        return {
+          messagesByChat: {
+            ...s.messagesByChat,
+            [selectedChatId]: [...current, ...deduped],
+          },
+          hasNewer: { ...s.hasNewer, [selectedChatId]: hasMore },
+          isAtLatest: { ...s.isAtLatest, [selectedChatId]: !hasMore },
+          loadingNewerMessages: false,
+        };
+      });
+      fetchMissingUsers(newer, get, set);
+    } catch {
+      set({ loadingNewerMessages: false });
+    }
+  },
+
+  loadMessagesAround: async (messageId: number) => {
+    const { selectedChatId } = get();
+    if (!selectedChatId) return;
+
+    set({ loadingMessages: true, error: '' });
+    try {
+      const {
+        messages: msgs,
+        hasOlder,
+        hasNewer,
+      } = await getMessagesAroundMessage(selectedChatId, messageId);
+      set((s) => ({
+        messagesByChat: { ...s.messagesByChat, [selectedChatId]: msgs },
+        hasOlder: { ...s.hasOlder, [selectedChatId]: hasOlder },
+        hasNewer: { ...s.hasNewer, [selectedChatId]: hasNewer },
+        isAtLatest: { ...s.isAtLatest, [selectedChatId]: false },
+        loadingMessages: false,
+      }));
+      fetchMissingUsers(msgs, get, set);
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err), loadingMessages: false });
+    }
+  },
+
+  loadLatestMessages: async () => {
+    const { selectedChatId } = get();
+    if (!selectedChatId) return;
+
+    set({ loadingMessages: true, error: '' });
+    try {
+      const { messages: msgs, hasMore } = await getMessages(selectedChatId);
+      const ordered = msgs.reverse();
+      set((s) => ({
+        messagesByChat: { ...s.messagesByChat, [selectedChatId]: ordered },
+        hasOlder: { ...s.hasOlder, [selectedChatId]: hasMore },
+        hasNewer: { ...s.hasNewer, [selectedChatId]: false },
+        isAtLatest: { ...s.isAtLatest, [selectedChatId]: true },
+        loadingMessages: false,
+      }));
+      fetchMissingUsers(ordered, get, set);
+    } catch (err) {
+      set({ error: err instanceof Error ? err.message : String(err), loadingMessages: false });
     }
   },
 
@@ -514,7 +615,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const ordered = msgs.reverse();
       set((s) => ({
         messagesByChat: { ...s.messagesByChat, [chatId]: ordered },
-        hasMoreMessages: { ...s.hasMoreMessages, [chatId]: hasMore },
+        hasOlder: { ...s.hasOlder, [chatId]: hasMore },
+        hasNewer: { ...s.hasNewer, [chatId]: false },
+        isAtLatest: { ...s.isAtLatest, [chatId]: true },
       }));
       fetchMissingUsers(ordered, get, set);
       markAsRead(chatId);
@@ -705,15 +808,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (chatMsgs) {
           const existingIdx = chatMsgs.findIndex((m) => m.id === msg.id);
           if (existingIdx !== -1) {
+            // Replace existing message (e.g. send succeeded update)
             const updated = [...chatMsgs];
             updated[existingIdx] = msg;
             newMessagesByChat = { ...s.messagesByChat, [chatId]: updated };
-          } else {
+          } else if (s.isAtLatest[chatId] !== false) {
+            // Only append new messages when at latest (or unknown/true)
             newMessagesByChat = {
               ...s.messagesByChat,
               [chatId]: [...chatMsgs, msg],
             };
           }
+          // When isAtLatest is false, skip appending — window is viewing old messages
         }
 
         // Clear matching pending message
@@ -1764,7 +1870,10 @@ export function _resetForTests() {
       loadingDialogs: true,
       loadingMessages: false,
       loadingOlderMessages: false,
-      hasMoreMessages: {},
+      hasOlder: {},
+      hasNewer: {},
+      isAtLatest: {},
+      loadingNewerMessages: false,
       error: '',
       searchQuery: '',
       searchMode: 'none',
