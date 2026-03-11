@@ -4,6 +4,7 @@ import type * as Td from 'tdlib-types';
 
 export type { UIChatContext } from './convert';
 export {
+  buildReplyPreview,
   enrichReplyPreviews,
   extractForwardName,
   extractInlineKeyboard,

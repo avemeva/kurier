@@ -11,6 +11,7 @@ import type {
   UIMessageItem,
   UIPendingMessage,
   UIReaction,
+  UIReplyPreview,
   UISearchResult,
   UITextEntity,
   UIUser,
@@ -143,6 +144,24 @@ function extractWebPreview(content: Td.MessageContent): UIWebPreview | null {
     siteName: lp.site_name,
     title: lp.title,
     description: lp.description?.text ?? '',
+  };
+}
+
+// --- Reply preview from raw Td message ---
+
+/** Build a UIReplyPreview from a raw TDLib message + user map. */
+export function buildReplyPreview(
+  target: Td.message,
+  users: Map<number, Td.user>,
+  quoteText: string,
+): UIReplyPreview {
+  return {
+    senderName: resolveSenderName(target.sender_id, users),
+    text: extractText(target.content),
+    mediaLabel: extractMediaLabel(target.content),
+    contentKind: toContentKind(target.content),
+    hasWebPreview: extractWebPreview(target.content) !== null,
+    quoteText,
   };
 }
 
@@ -324,6 +343,10 @@ export function toUIMessage(
     serviceText: extractServiceText(msg.content),
     inlineKeyboard: extractInlineKeyboard(msg),
     replyPreview: null, // Populated by enrichReplyPreviews after batch conversion
+    replyQuoteText:
+      msg.reply_to?._ === 'messageReplyToMessage' && msg.reply_to.quote
+        ? msg.reply_to.quote.text.text
+        : '',
     voiceWaveform: extractVoiceWaveform(msg.content),
     voiceDuration: extractVoiceDuration(msg.content),
     voiceFileSize: extractVoiceFileSize(msg.content),
@@ -349,6 +372,9 @@ export function enrichReplyPreviews(messages: UIMessage[]): UIMessage[] {
         senderName: target.senderName,
         text: target.text,
         mediaLabel: target.mediaLabel,
+        contentKind: target.contentKind,
+        hasWebPreview: target.webPreview !== null,
+        quoteText: m.replyQuoteText,
       },
     };
   });

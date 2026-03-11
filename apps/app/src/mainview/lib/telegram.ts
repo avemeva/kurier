@@ -959,3 +959,16 @@ export function extractMessagePreview(msg: Td.message | undefined): string {
 export function getSenderUserId(sender: Td.MessageSender): number {
   return sender._ === 'messageSenderUser' ? sender.user_id : 0;
 }
+
+/** Fetch a single message by chatId + messageId. */
+export async function fetchMessage(chatId: number, messageId: number): Promise<Td.message | null> {
+  try {
+    return await client.invoke({
+      _: 'getMessage',
+      chat_id: chatId,
+      message_id: messageId,
+    });
+  } catch {
+    return null;
+  }
+}

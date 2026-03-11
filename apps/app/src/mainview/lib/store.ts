@@ -6,10 +6,19 @@ import type {
   TelegramUpdateEvent,
   UIChat,
   UIMessageItem,
+  UIReplyPreview,
   UISearchResult,
   UIUser,
 } from '@/lib/types';
-import { toUIChat, toUIMessage, toUIPendingMessage, toUISearchResult, toUIUser } from '@/lib/types';
+import {
+  buildReplyPreview,
+  enrichReplyPreviews,
+  toUIChat,
+  toUIMessage,
+  toUIPendingMessage,
+  toUISearchResult,
+  toUIUser,
+} from '@/lib/types';
 import { formatLastSeen } from './format';
 import { log } from './log';
 import {
@@ -17,6 +26,7 @@ import {
   closeTdChat,
   downloadMedia,
   downloadThumbnail,
+  fetchMessage,
   getCustomEmojiUrl,
   getDialogs,
   getMe,
@@ -58,6 +68,7 @@ interface ChatState {
   profilePhotos: Record<number, string>;
   mediaUrls: Record<string, string | null>;
   thumbUrls: Record<string, string | null>;
+  replyPreviews: Record<string, UIReplyPreview | null>;
   customEmojiUrls: Record<string, string | null>;
   typingByChat: Record<number, Record<number, { action: Td.ChatAction; expiresAt: number }>>;
   userStatuses: Record<number, Td.UserStatus>;
@@ -111,6 +122,8 @@ interface ChatState {
   seedMedia: (urls: Record<string, string>) => void;
   loadCustomEmojiUrl: (documentId: string) => void;
   recognizeSpeech: (chatId: number, messageId: number) => void;
+  loadReplyThumb: (chatId: number, messageId: number) => void;
+  resolveReplyPreview: (chatId: number, messageId: number) => void;
   clearError: () => void;
 
   // Global search actions
@@ -196,6 +209,46 @@ function loadThumbnailForMessage(
   });
 }
 
+/** Download a thumbnail for a reply target message and write it into thumbUrls. */
+function loadReplyThumb(
+  chatId: number,
+  messageId: number,
+  set: (partial: Partial<ChatState> | ((s: ChatState) => Partial<ChatState>)) => void,
+): void {
+  const key = `${chatId}_${messageId}`;
+  if (thumbRequested.has(key)) return;
+  thumbRequested.add(key);
+  downloadThumbnail(chatId, messageId).then((url) => {
+    if (url) {
+      set((s) => ({ thumbUrls: { ...s.thumbUrls, [key]: url } }));
+    }
+  });
+}
+
+const replyPreviewRequested = new Set<string>();
+
+/** Fetch a reply target message from TDLib and cache the preview. */
+function resolveReplyPreview(
+  chatId: number,
+  messageId: number,
+  get: () => ChatState,
+  set: (partial: Partial<ChatState> | ((s: ChatState) => Partial<ChatState>)) => void,
+): void {
+  const key = `${chatId}_${messageId}`;
+  if (replyPreviewRequested.has(key)) return;
+  replyPreviewRequested.add(key);
+  fetchMessage(chatId, messageId).then((msg) => {
+    if (!msg) {
+      set((s) => ({ replyPreviews: { ...s.replyPreviews, [key]: null } }));
+      return;
+    }
+    const users = get().users;
+    const quoteText = ''; // Quote text is on the replying message, not the target
+    const preview = buildReplyPreview(msg, users, quoteText);
+    set((s) => ({ replyPreviews: { ...s.replyPreviews, [key]: preview } }));
+  });
+}
+
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const statusTimers = new Map<number, ReturnType<typeof setTimeout>>();
 const userFetchRequested = new Set<number>();
@@ -239,6 +292,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   profilePhotos: {},
   mediaUrls: {},
   thumbUrls: {},
+  replyPreviews: {},
   customEmojiUrls: {},
   typingByChat: {},
   userStatuses: {},
@@ -1064,6 +1118,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     tdRecognizeSpeech(chatId, messageId).catch(() => {});
   },
 
+  loadReplyThumb: (chatId, messageId) => loadReplyThumb(chatId, messageId, set),
+
+  resolveReplyPreview: (chatId, messageId) => resolveReplyPreview(chatId, messageId, get, set),
+
   clearMediaUrl: (chatId: number, messageId: number) => {
     const key = `${chatId}_${messageId}`;
     mediaRequested.delete(key);
@@ -1320,10 +1378,19 @@ let _prevMsgReal: Td.message[] | undefined;
 let _prevMsgPending: PendingMessage[] | undefined;
 let _prevMsgUsers: Map<number, Td.user> | undefined;
 let _prevMsgLastReadOutboxId: number | undefined;
+let _prevMsgReplyPreviews: Record<string, UIReplyPreview | null> | undefined;
 let _prevMsgResult: UIMessageItem[] = EMPTY_UI_MESSAGES;
 
 export function selectChatMessages(state: ChatState): UIMessageItem[] {
-  const { selectedChatId, messagesByChat, pendingByChat, users, chats, archivedChats } = state;
+  const {
+    selectedChatId,
+    messagesByChat,
+    pendingByChat,
+    users,
+    chats,
+    archivedChats,
+    replyPreviews,
+  } = state;
   if (!selectedChatId) return EMPTY_UI_MESSAGES;
 
   const rawChat =
@@ -1339,7 +1406,8 @@ export function selectChatMessages(state: ChatState): UIMessageItem[] {
     real === _prevMsgReal &&
     pending === _prevMsgPending &&
     users === _prevMsgUsers &&
-    lastReadOutboxId === _prevMsgLastReadOutboxId
+    lastReadOutboxId === _prevMsgLastReadOutboxId &&
+    replyPreviews === _prevMsgReplyPreviews
   ) {
     return _prevMsgResult;
   }
@@ -1348,10 +1416,32 @@ export function selectChatMessages(state: ChatState): UIMessageItem[] {
   _prevMsgPending = pending;
   _prevMsgUsers = users;
   _prevMsgLastReadOutboxId = lastReadOutboxId;
+  _prevMsgReplyPreviews = replyPreviews;
 
-  const uiMessages: UIMessageItem[] = real
-    ? real.map((msg) => toUIMessage(msg, users, lastReadOutboxId))
+  const converted = real
+    ? enrichReplyPreviews(real.map((msg) => toUIMessage(msg, users, lastReadOutboxId)))
     : [];
+
+  // Fill unresolved reply previews from the remote cache and trigger fetches
+  for (const m of converted) {
+    if (m.replyToMessageId === 0) continue;
+    if (m.replyPreview) {
+      // Already resolved from batch — preload thumbnail
+      loadReplyThumb(m.chatId, m.replyToMessageId, useChatStore.setState);
+      continue;
+    }
+    const key = `${m.chatId}_${m.replyToMessageId}`;
+    const cached = replyPreviews[key];
+    if (cached) {
+      m.replyPreview = { ...cached, quoteText: m.replyQuoteText || cached.quoteText };
+      loadReplyThumb(m.chatId, m.replyToMessageId, useChatStore.setState);
+    } else if (cached === undefined) {
+      // Not yet requested — trigger async fetch (fire-and-forget)
+      resolveReplyPreview(m.chatId, m.replyToMessageId, () => state, useChatStore.setState);
+    }
+  }
+
+  const uiMessages: UIMessageItem[] = converted;
   if (pending && pending.length > 0) {
     for (const p of pending) {
       uiMessages.push(toUIPendingMessage(p));

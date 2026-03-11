@@ -44,12 +44,14 @@ export function PureReplyHeader({
   mediaType,
   mediaUrl,
   isOutgoing,
+  isQuote,
 }: {
   senderName: string;
   text?: string;
   mediaType?: string;
   mediaUrl?: string;
   isOutgoing?: boolean;
+  isQuote?: boolean;
 }) {
   const label = text || mediaType || '';
 
@@ -62,7 +64,14 @@ export function PureReplyHeader({
     >
       <div className="min-w-0 flex-1">
         <p className="truncate text-[10px] font-semibold text-accent-blue">{senderName}</p>
-        <p className="truncate text-[11px] leading-[14px] text-text-secondary">{label}</p>
+        <p
+          className={cn(
+            'truncate text-[11px] leading-[14px] text-text-secondary',
+            isQuote && 'italic',
+          )}
+        >
+          {label}
+        </p>
       </div>
       {mediaUrl && hasVisualThumb(mediaType) && (
         <div className="relative size-8 shrink-0">

@@ -21,6 +21,7 @@ import type {
   StickerRenderState,
 } from '@/hooks/useMessage';
 import { useMessage } from '@/hooks/useMessage';
+import { useReplyThumb } from '@/hooks/useReplyThumb';
 import { useChatStore } from '@/lib/store';
 import type { UIReaction } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -167,6 +168,10 @@ function BubbleLayout({
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
 }) {
   const { msg, media, displayType, isMediaOnly } = state;
+  const replyThumbUrl = useReplyThumb(
+    msg.replyPreview ? msg.chatId : 0,
+    msg.replyPreview ? msg.replyToMessageId : 0,
+  );
   const ck = msg.contentKind;
   const isPhoto = ck === 'photo';
   const isVideo = ck === 'video' || ck === 'videoNote' || ck === 'animation';
@@ -196,15 +201,17 @@ function BubbleLayout({
       {msg.replyPreview ? (
         <PureReplyHeader
           senderName={msg.replyPreview.senderName}
-          text={msg.replyPreview.text}
+          text={msg.replyPreview.quoteText || msg.replyPreview.text}
           mediaType={msg.replyPreview.mediaLabel}
+          mediaUrl={replyThumbUrl ?? undefined}
           isOutgoing={msg.isOutgoing}
+          isQuote={!!msg.replyPreview.quoteText}
         />
       ) : (
         msg.replyToMessageId > 0 && (
           <PureReplyHeader
             senderName=""
-            text={`Reply to message #${msg.replyToMessageId}`}
+            text="Loading..."
             mediaType=""
             isOutgoing={msg.isOutgoing}
           />

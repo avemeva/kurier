@@ -55,6 +55,9 @@ export type UIReplyPreview = {
   senderName: string;
   text: string;
   mediaLabel: string;
+  contentKind: MessageContentKind;
+  hasWebPreview: boolean;
+  quoteText: string;
 };
 
 export type MessageContentKind =
@@ -96,6 +99,7 @@ export type UIMessage = {
   serviceText: string | null;
   inlineKeyboard: UIKeyboardRow[] | null;
   replyPreview: UIReplyPreview | null;
+  replyQuoteText: string;
   voiceWaveform: string | null;
   voiceDuration: number;
   voiceFileSize: number;
