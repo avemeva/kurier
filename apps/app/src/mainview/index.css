@@ -261,6 +261,11 @@
   * {
     @apply border-border;
   }
+  html,
+  body {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-family: "Geist", ui-sans-serif, system-ui, sans-serif;
