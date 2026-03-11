@@ -47,9 +47,12 @@ import {
   searchContacts,
   searchGlobal,
   searchInChat,
+  searchNextUnreadMention,
+  searchNextUnreadReaction,
   sendMessage,
   sendReaction,
   recognizeSpeech as tdRecognizeSpeech,
+  viewMessages,
 } from './telegram';
 
 // --- Types ---
@@ -155,6 +158,12 @@ interface ChatState {
   loadMoreChatResults: () => Promise<void>;
   chatSearchNext: () => void;
   chatSearchPrev: () => void;
+
+  // Scroll-to-message navigation
+  targetMessageId: number | null;
+  goToNextUnreadMention: () => Promise<void>;
+  goToNextUnreadReaction: () => Promise<void>;
+  clearTargetMessage: () => void;
 }
 
 // --- Helpers ---
@@ -1281,6 +1290,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
     }
 
+    if (event.type === 'chat_unread_reaction_count') {
+      set((s) => {
+        const update = (list: Td.chat[]) =>
+          list.map((c) =>
+            c.id === event.chat_id
+              ? { ...c, unread_reaction_count: event.unread_reaction_count }
+              : c,
+          );
+        return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
+      });
+    }
+
     if (event.type === 'message_is_pinned') {
       set((s) => {
         const msgs = s.messagesByChat[event.chat_id];
@@ -1579,6 +1600,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return { chatSearchCurrentIndex: prev };
     });
   },
+
+  // --- Scroll-to-message navigation ---
+
+  targetMessageId: null,
+
+  goToNextUnreadMention: async () => {
+    const { selectedChatId, messagesByChat } = get();
+    if (!selectedChatId) return;
+    try {
+      const msg = await searchNextUnreadMention(selectedChatId);
+      if (!msg) return;
+      const existing = messagesByChat[selectedChatId] ?? [];
+      const isLoaded = existing.some((m) => m.id === msg.id);
+      if (!isLoaded) {
+        await get().loadMessagesAround(msg.id);
+      }
+      set({ targetMessageId: msg.id });
+      // Mark the mention as read so TDLib decrements unread_mention_count
+      viewMessages(selectedChatId, [msg.id]).catch(() => {});
+    } catch (err) {
+      log.error('goToNextUnreadMention failed:', err);
+    }
+  },
+
+  goToNextUnreadReaction: async () => {
+    const { selectedChatId, messagesByChat } = get();
+    if (!selectedChatId) return;
+    try {
+      const msg = await searchNextUnreadReaction(selectedChatId);
+      if (!msg) return;
+      const existing = messagesByChat[selectedChatId] ?? [];
+      const isLoaded = existing.some((m) => m.id === msg.id);
+      if (!isLoaded) {
+        await get().loadMessagesAround(msg.id);
+      }
+      set({ targetMessageId: msg.id });
+      // Mark the reaction as read so TDLib decrements unread_reaction_count
+      viewMessages(selectedChatId, [msg.id]).catch(() => {});
+    } catch (err) {
+      log.error('goToNextUnreadReaction failed:', err);
+    }
+  },
+
+  clearTargetMessage: () => set({ targetMessageId: null }),
 }));
 
 // --- Selectors (memoized to return stable references) ---

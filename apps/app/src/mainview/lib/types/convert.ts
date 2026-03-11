@@ -535,6 +535,7 @@ export function toUIChat(chat: Td.chat, ctx: UIChatContext): UIChat {
     photoUrl: ctx.photoUrl,
     isMuted: chat.notification_settings.mute_for > 0,
     unreadMentionCount: chat.unread_mention_count,
+    unreadReactionCount: chat.unread_reaction_count,
     draftText,
     isBot: isPrivate && ctx.user?.type?._ === 'userTypeBot',
     isOnline: isPrivate && ctx.isOnline,

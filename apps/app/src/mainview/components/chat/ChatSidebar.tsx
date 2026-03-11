@@ -1,4 +1,5 @@
 import {
+  AtSign,
   Bookmark,
   Bot,
   Camera,
@@ -7,6 +8,7 @@ import {
   FileText,
   Film,
   Forward,
+  Heart,
   Loader2,
   Megaphone,
   Mic,
@@ -699,10 +701,25 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                         />
                       )}
                       <div className="flex shrink-0 items-center gap-1">
-                        {chat.isPinned && <Pin size={12} className="text-text-quaternary" />}
+                        {chat.isPinned &&
+                          chat.unreadMentionCount === 0 &&
+                          chat.unreadReactionCount === 0 &&
+                          chat.unreadCount === 0 && (
+                            <Pin size={12} className="text-text-quaternary" />
+                          )}
+                        {chat.unreadMentionCount > 0 && (
+                          <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-blue-9 px-1 text-[10px] font-medium leading-none text-white">
+                            <AtSign size={10} />
+                          </span>
+                        )}
                         {chat.unreadCount > 0 && (
                           <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-sand-8 px-1 text-xs font-medium leading-none text-white dark:bg-unread">
                             {chat.unreadCount}
+                          </span>
+                        )}
+                        {chat.unreadReactionCount > 0 && (
+                          <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-red-9 text-[10px] leading-none text-white">
+                            <Heart size={10} className="fill-current" />
                           </span>
                         )}
                       </div>

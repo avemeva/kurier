@@ -149,6 +149,7 @@ export type UIChat = {
   photoUrl: string | null;
   isMuted: boolean;
   unreadMentionCount: number;
+  unreadReactionCount: number;
   draftText: string | null;
   isBot: boolean;
   isOnline: boolean;

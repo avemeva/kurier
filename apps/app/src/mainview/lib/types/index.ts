@@ -148,6 +148,7 @@ export type TelegramUpdateEvent =
   | { type: 'connection_state'; state: Td.ConnectionState }
   | { type: 'chat_is_marked_as_unread'; chat_id: number; is_marked_as_unread: boolean }
   | { type: 'chat_unread_mention_count'; chat_id: number; unread_mention_count: number }
+  | { type: 'chat_unread_reaction_count'; chat_id: number; unread_reaction_count: number }
   | { type: 'message_is_pinned'; chat_id: number; message_id: number; is_pinned: boolean }
   | { type: 'chat_online_member_count'; chat_id: number; online_member_count: number };
 

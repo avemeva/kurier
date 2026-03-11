@@ -380,6 +380,15 @@ export async function markAsRead(chatId: number): Promise<void> {
   }
 }
 
+export async function viewMessages(chatId: number, messageIds: number[]): Promise<void> {
+  await client.invoke({
+    _: 'viewMessages',
+    chat_id: chatId,
+    message_ids: messageIds,
+    force_read: true,
+  });
+}
+
 // --- Me ---
 
 export async function getMe(): Promise<Td.user> {
@@ -869,6 +878,13 @@ async function translateUpdate(update: Td.Update): Promise<TelegramUpdateEvent |
         unread_mention_count: update.unread_mention_count,
       };
 
+    case 'updateChatUnreadReactionCount':
+      return {
+        type: 'chat_unread_reaction_count',
+        chat_id: update.chat_id,
+        unread_reaction_count: update.unread_reaction_count,
+      };
+
     case 'updateMessageIsPinned':
       return {
         type: 'message_is_pinned',
@@ -1085,6 +1101,38 @@ export function extractMessagePreview(msg: Td.message | undefined): string {
 
 export function getSenderUserId(sender: Td.MessageSender): number {
   return sender._ === 'messageSenderUser' ? sender.user_id : 0;
+}
+
+/** Search for the next unread mention in a chat. */
+export async function searchNextUnreadMention(chatId: number): Promise<Td.message | null> {
+  const result = await client.invoke({
+    _: 'searchChatMessages',
+    chat_id: chatId,
+    query: '',
+    from_message_id: 0,
+    offset: 0,
+    limit: 1,
+    sender_id: undefined,
+    filter: { _: 'searchMessagesFilterUnreadMention' },
+    topic_id: undefined,
+  });
+  return result.messages[0] ?? null;
+}
+
+/** Search for the next unread reaction in a chat. */
+export async function searchNextUnreadReaction(chatId: number): Promise<Td.message | null> {
+  const result = await client.invoke({
+    _: 'searchChatMessages',
+    chat_id: chatId,
+    query: '',
+    from_message_id: 0,
+    offset: 0,
+    limit: 1,
+    sender_id: undefined,
+    filter: { _: 'searchMessagesFilterUnreadReaction' },
+    topic_id: undefined,
+  });
+  return result.messages[0] ?? null;
 }
 
 /** Fetch a single message by chatId + messageId. */

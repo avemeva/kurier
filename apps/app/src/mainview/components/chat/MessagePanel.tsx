@@ -1,3 +1,4 @@
+import { AtSign, Heart } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 import { PureCornerButton, PureCornerButtonStack } from '@/components/ui/chat/CornerButtons';
 import { PureMessageInput } from '@/components/ui/chat/MessageInput';
@@ -53,6 +54,8 @@ export function MessagePanel() {
   const react = useChatStore((s) => s.react);
   const searchMode = useChatStore((s) => s.searchMode);
   const profilePhotos = useChatStore((s) => s.profilePhotos);
+  const goToNextUnreadMention = useChatStore((s) => s.goToNextUnreadMention);
+  const goToNextUnreadReaction = useChatStore((s) => s.goToNextUnreadReaction);
 
   useInfiniteScroll(scrollContainerRef, {
     onTop: loadOlderMessages,
@@ -211,11 +214,25 @@ export function MessagePanel() {
           </div>
           <div ref={messagesEndRef} />
         </div>
-        {!isAtLatest && (
-          <PureCornerButtonStack>
+        <PureCornerButtonStack>
+          {selectedChat.unreadReactionCount > 0 && (
+            <PureCornerButton
+              icon={<Heart size={18} className="text-text-secondary" />}
+              count={selectedChat.unreadReactionCount}
+              onClick={goToNextUnreadReaction}
+            />
+          )}
+          {selectedChat.unreadMentionCount > 0 && (
+            <PureCornerButton
+              icon={<AtSign size={18} className="text-accent-blue" />}
+              count={selectedChat.unreadMentionCount}
+              onClick={goToNextUnreadMention}
+            />
+          )}
+          {!isAtLatest && (
             <PureCornerButton icon={<ArrowDownIcon />} onClick={loadLatestMessages} />
-          </PureCornerButtonStack>
-        )}
+          )}
+        </PureCornerButtonStack>
       </div>
 
       {searchMode === 'chat' ? (
