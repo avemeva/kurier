@@ -10,3 +10,12 @@ Components have no knowledge of external data sources or transport protocols. Th
 | **Bubble** | Visual container for a message. Background, padding, border-radius, avatar. Accepts children. Knows nothing about what's inside it. |
 | **Message** | The integration point. Connects data (hooks, store) to UI. Decides what content goes inside the Bubble. Only component that touches business logic. |
 | **Panel** | The list. Scroll, fetch, grouping. Passes data down to Messages. Knows nothing about how a message looks. |
+
+## Skills
+
+When working on components, use these skills (mandatory — not optional):
+- `components-build` — composable component patterns, accessibility, styling, TypeScript props
+- `frontend-design` — high-quality, production-grade UI design
+- `web-design-guidelines` — Web Interface Guidelines compliance
+- `vercel-react-best-practices` — React performance optimization
+- `vercel-composition-patterns` — React composition patterns that scale
