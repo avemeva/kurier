@@ -128,7 +128,7 @@ Present the complete document. Ask the user:
 
 ## Output
 
-Write the final document to `claude-research/<topic-slug>.md`.
+Write the final document to `docs/research/<topic-slug>.md`.
 
 The document structure:
 
