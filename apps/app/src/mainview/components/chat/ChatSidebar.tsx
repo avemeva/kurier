@@ -109,7 +109,7 @@ function ChatPreviewLine({ chat, thumbUrl }: { chat: UIChat; thumbUrl: string | 
   return (
     <span
       data-testid="dialog-preview"
-      className="flex min-w-0 items-center gap-1.5 text-sm text-text-tertiary"
+      className="flex min-w-0 items-center gap-1.5 tg-text-chat text-text-tertiary"
     >
       {thumbUrl && (
         <img src={thumbUrl} alt="" className="size-5 shrink-0 rounded-[3px] object-cover" />
@@ -617,12 +617,12 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                 >
                   <div className="relative mt-0.5 shrink-0">
                     {chat.isSavedMessages ? (
-                      <SavedMessagesAvatar className="size-10" />
+                      <SavedMessagesAvatar className="size-12" />
                     ) : (
                       <UserAvatar
                         name={chat.title}
                         src={chat.photoUrl ?? undefined}
-                        className="size-10 text-sm"
+                        className="size-12 text-sm"
                       />
                     )}
                     {chat.isOnline && !chat.isSavedMessages && <PureOnlineDot />}
@@ -631,7 +631,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                     <div className="flex items-baseline justify-between gap-2">
                       <span
                         data-testid="dialog-name"
-                        className="flex items-center gap-1 truncate text-sm font-medium text-text-primary"
+                        className="flex items-center gap-1 truncate text-sm font-semibold text-text-primary"
                       >
                         {chat.kind === 'channel' && (
                           <Megaphone size={14} className="shrink-0 text-text-tertiary" />
