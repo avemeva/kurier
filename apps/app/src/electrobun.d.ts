@@ -4,7 +4,11 @@
  * Electrobun ships raw .ts source files instead of compiled .d.ts declarations.
  * TypeScript follows imports into those files and type-checks them with our
  * tsconfig, which fails on deprecated Node.js APIs in their code (rmdirSync).
- * We use tsconfig `paths` to redirect resolution here instead.
+ *
+ * This file is used via tsconfig `paths` to redirect type resolution for
+ * electrobun/bun, electrobun/view, and electrobun. The Bun.build() API used
+ * by electrobun's CLI does NOT follow tsconfig paths, so the real modules are
+ * bundled at build time while TypeScript sees these declarations.
  */
 
 // -- electrobun/bun --
@@ -77,3 +81,43 @@ export declare const Utils: {
   openPath(path: string): boolean;
   paths: Record<string, string>;
 };
+
+// -- electrobun/view --
+
+export declare class Electroview {
+  constructor(options: { rpc: RPCWithTransport });
+  static defineRPC<Schema extends ElectrobunRPCSchema>(config: {
+    handlers: {
+      requests?: Record<string, (...args: unknown[]) => unknown>;
+      messages?: Record<string, (...args: unknown[]) => void>;
+    };
+  }): RPCWithTransport;
+}
+
+// -- electrobun config --
+
+export interface ElectrobunConfig {
+  app: {
+    name: string;
+    identifier: string;
+    version: string;
+    description?: string;
+  };
+  build?: {
+    bun?: { entrypoint?: string; [key: string]: unknown };
+    copy?: Record<string, string>;
+    mac?: { bundleCEF?: boolean };
+    win?: { bundleCEF?: boolean };
+    linux?: { bundleCEF?: boolean };
+  };
+}
+
+// -- Window globals injected by Electrobun runtime --
+
+declare global {
+  interface Window {
+    __electrobunWebviewId?: number;
+    __electrobunWindowId?: number;
+    __electrobun?: unknown;
+  }
+}

@@ -13,7 +13,8 @@
     "paths": {
       "@/*": ["./src/mainview/*"],
       "electrobun/bun": ["./src/electrobun.d.ts"],
-      "electrobun": ["./src/electrobun-config.d.ts"]
+      "electrobun/view": ["./src/electrobun.d.ts"],
+      "electrobun": ["./src/electrobun.d.ts"]
     }
   },
   "include": ["src"],
