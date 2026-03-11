@@ -29,6 +29,16 @@ MAIN=$(git worktree list --porcelain | head -1 | sed 's/worktree //')
 cp "$MAIN/.env" .env
 ```
 
+## Quality Checks
+
+**Use `bun run`, not bare `bun test`** — bare `bun test` uses Bun's runner, but app tests use vitest.
+
+```sh
+bun run typecheck          # All packages
+bun run test               # All packages (vitest for app, bun:test for cli)
+bun run lint               # Biome
+```
+
 ## Dev Server (Worktree)
 
 ```sh
