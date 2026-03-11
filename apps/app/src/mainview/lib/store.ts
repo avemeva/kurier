@@ -21,12 +21,14 @@ import {
 } from '@/lib/types';
 import { formatLastSeen } from './format';
 import { log } from './log';
+import type { ChatInfoResult } from './telegram';
 import {
   clearMediaCache,
   closeTdChat,
   downloadMedia,
   downloadThumbnail,
   fetchMessage,
+  getChatInfo,
   getCustomEmojiUrl,
   getDialogs,
   getMe,
@@ -72,6 +74,8 @@ interface ChatState {
   customEmojiUrls: Record<string, string | null>;
   typingByChat: Record<number, Record<number, { action: Td.ChatAction; expiresAt: number }>>;
   userStatuses: Record<number, Td.UserStatus>;
+  chatInfoCache: Record<number, ChatInfoResult>;
+  chatOnlineCounts: Record<number, number>;
   myUserId: number;
   authState: Td.AuthorizationState | null;
   connectionState: Td.ConnectionState | null;
@@ -249,6 +253,12 @@ function resolveReplyPreview(
   });
 }
 
+/** Format a count with singular/plural label. "online" is special — no plural. */
+function formatCount(count: number, label: string): string {
+  if (label === 'online') return `${count.toLocaleString()} online`;
+  return `${count.toLocaleString()} ${label}${count !== 1 ? 's' : ''}`;
+}
+
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const statusTimers = new Map<number, ReturnType<typeof setTimeout>>();
 const userFetchRequested = new Set<number>();
@@ -296,6 +306,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   customEmojiUrls: {},
   typingByChat: {},
   userStatuses: {},
+  chatInfoCache: {},
+  chatOnlineCounts: {},
   myUserId: 0,
   authState: null,
   connectionState: null,
@@ -391,6 +403,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     if (previousChatId) closeTdChat(previousChatId).catch(() => {});
     set({ selectedChatId: chat.id });
     openTdChat(chat.id).catch(() => {});
+
+    // Fetch chat info (member count, subscriber count, bot active users)
+    if (!get().chatInfoCache[chat.id]) {
+      getChatInfo(chat).then((info) => {
+        if (info) {
+          set((s) => ({ chatInfoCache: { ...s.chatInfoCache, [chat.id]: info } }));
+        }
+      });
+    }
 
     // Clear unread count in chat list
     if (chat.unread_count > 0) {
@@ -881,6 +902,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       set((s) => ({
         userStatuses: { ...s.userStatuses, [userId]: status },
+      }));
+    }
+
+    if (event.type === 'chat_online_member_count') {
+      set((s) => ({
+        chatOnlineCounts: { ...s.chatOnlineCounts, [event.chat_id]: event.online_member_count },
       }));
     }
 
@@ -1498,6 +1525,8 @@ let _prevHeaderChatId: number | null = null;
 let _prevHeaderRawChat: Td.chat | null = null;
 let _prevHeaderTyping: Record<number, { action: Td.ChatAction; expiresAt: number }> | undefined;
 let _prevHeaderUserStatus: Td.UserStatus | undefined;
+let _prevHeaderChatInfo: ChatInfoResult | undefined;
+let _prevHeaderOnlineCount: number | undefined;
 let _prevHeaderResult: HeaderStatus = null;
 
 function computeHeaderStatus(state: ChatState): HeaderStatus {
@@ -1529,6 +1558,13 @@ function computeHeaderStatus(state: ChatState): HeaderStatus {
     return { type: 'typing', text };
   }
   if (isPrivate) {
+    const info = state.chatInfoCache[chatId];
+    if (info?.botActiveUsers != null) {
+      if (info.botActiveUsers > 0) {
+        return { type: 'label', text: formatCount(info.botActiveUsers, 'monthly user') };
+      }
+      return { type: 'label', text: 'bot' };
+    }
     const status = state.userStatuses[chatId];
     if (status?._ === 'userStatusOnline') return { type: 'online' };
     if (status?._ === 'userStatusOffline' && status.was_online) {
@@ -1542,8 +1578,25 @@ function computeHeaderStatus(state: ChatState): HeaderStatus {
       return { type: 'last_seen', text: 'last seen within a month' };
     return null;
   }
-  if (isChannel) return { type: 'label', text: 'Channel' };
-  if (isGroup) return { type: 'label', text: 'Group' };
+  if (isChannel) {
+    const info = state.chatInfoCache[chatId];
+    if (info?.memberCount) {
+      return { type: 'label', text: formatCount(info.memberCount, 'subscriber') };
+    }
+    return { type: 'label', text: 'channel' };
+  }
+  if (isGroup) {
+    const info = state.chatInfoCache[chatId];
+    const online = state.chatOnlineCounts[chatId];
+    if (info?.memberCount) {
+      const membersText = formatCount(info.memberCount, 'member');
+      if (online && online > 1) {
+        return { type: 'label', text: `${membersText}, ${formatCount(online, 'online')}` };
+      }
+      return { type: 'label', text: membersText };
+    }
+    return { type: 'label', text: 'group' };
+  }
   return null;
 }
 
@@ -1557,12 +1610,16 @@ export function selectHeaderStatus(state: ChatState): HeaderStatus {
   const chatId = rawChat?.id ?? null;
   const chatTyping = chatId ? state.typingByChat[chatId] : undefined;
   const userStatus = chatId ? state.userStatuses[chatId] : undefined;
+  const chatInfo = chatId ? state.chatInfoCache[chatId] : undefined;
+  const onlineCount = chatId ? state.chatOnlineCounts[chatId] : undefined;
 
   if (
     chatId === _prevHeaderChatId &&
     rawChat === _prevHeaderRawChat &&
     chatTyping === _prevHeaderTyping &&
-    userStatus === _prevHeaderUserStatus
+    userStatus === _prevHeaderUserStatus &&
+    chatInfo === _prevHeaderChatInfo &&
+    onlineCount === _prevHeaderOnlineCount
   ) {
     return _prevHeaderResult;
   }
@@ -1570,6 +1627,8 @@ export function selectHeaderStatus(state: ChatState): HeaderStatus {
   _prevHeaderRawChat = rawChat;
   _prevHeaderTyping = chatTyping;
   _prevHeaderUserStatus = userStatus;
+  _prevHeaderChatInfo = chatInfo;
+  _prevHeaderOnlineCount = onlineCount;
   _prevHeaderResult = computeHeaderStatus(state);
   return _prevHeaderResult;
 }
@@ -1679,6 +1738,8 @@ export function _resetForTests() {
   _prevHeaderRawChat = null;
   _prevHeaderTyping = undefined;
   _prevHeaderUserStatus = undefined;
+  _prevHeaderChatInfo = undefined;
+  _prevHeaderOnlineCount = undefined;
   _prevHeaderResult = null;
   _prevUIChatsRaw = [];
   _prevUIChatsPhotos = {};

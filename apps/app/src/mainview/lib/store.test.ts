@@ -39,6 +39,7 @@ vi.mock('./telegram', () => ({
   searchGlobal: vi.fn(),
   searchInChat: vi.fn(),
   getMe: vi.fn(() => Promise.resolve({ id: 42, first_name: 'Test' })),
+  getChatInfo: vi.fn(() => Promise.resolve(null)),
 }));
 
 import {
@@ -977,7 +978,7 @@ describe('selectHeaderStatus', () => {
     useChatStore.setState({ chats: [chat], selectedChatId: 42 });
     expect(selectHeaderStatus(useChatStore.getState())).toEqual({
       type: 'label',
-      text: 'Group',
+      text: 'group',
     });
   });
 
@@ -989,7 +990,7 @@ describe('selectHeaderStatus', () => {
     useChatStore.setState({ chats: [chat], selectedChatId: 42 });
     expect(selectHeaderStatus(useChatStore.getState())).toEqual({
       type: 'label',
-      text: 'Channel',
+      text: 'channel',
     });
   });
 });

@@ -530,6 +530,52 @@ export async function closeTdChat(chatId: number): Promise<void> {
   await client.invoke({ _: 'closeChat', chat_id: chatId });
 }
 
+// --- Chat info (member counts, bot active users) ---
+
+export type ChatInfoResult = {
+  memberCount: number;
+  isChannel: boolean;
+  botActiveUsers?: number;
+};
+
+export async function getChatInfo(chat: Td.chat): Promise<ChatInfoResult | null> {
+  try {
+    if (chat.type._ === 'chatTypeSupergroup') {
+      const info = await client.invoke({
+        _: 'getSupergroupFullInfo',
+        supergroup_id: chat.type.supergroup_id,
+      });
+      return {
+        memberCount: info.member_count,
+        isChannel: chat.type.is_channel,
+      };
+    }
+    if (chat.type._ === 'chatTypeBasicGroup') {
+      const info = await client.invoke({
+        _: 'getBasicGroupFullInfo',
+        basic_group_id: chat.type.basic_group_id,
+      });
+      return {
+        memberCount: info.members.length,
+        isChannel: false,
+      };
+    }
+    if (chat.type._ === 'chatTypePrivate') {
+      const user = await client.invoke({ _: 'getUser', user_id: chat.type.user_id });
+      if (user.type._ === 'userTypeBot') {
+        return {
+          memberCount: 0,
+          isChannel: false,
+          botActiveUsers: user.type.active_user_count,
+        };
+      }
+    }
+  } catch {
+    // Silently fail — header will show fallback labels
+  }
+  return null;
+}
+
 // --- Real-time updates via SSE ---
 
 let updatesStarted = false;
@@ -755,6 +801,13 @@ async function translateUpdate(update: Td.Update): Promise<TelegramUpdateEvent |
         chat_id: update.chat_id,
         message_id: update.message_id,
         is_pinned: update.is_pinned,
+      };
+
+    case 'updateChatOnlineMemberCount':
+      return {
+        type: 'chat_online_member_count',
+        chat_id: update.chat_id,
+        online_member_count: update.online_member_count,
       };
 
     default:

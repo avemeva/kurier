@@ -19,8 +19,24 @@ export function formatTime(timestamp: number): string {
 export function formatLastSeen(timestamp: number): string {
   const date = new Date(timestamp * 1000);
   const now = new Date();
-  if (date.toDateString() === now.toDateString()) {
-    return `last seen at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffSec < 60) return 'last seen just now';
+  if (diffSec < 3600) {
+    const mins = Math.floor(diffSec / 60);
+    return `last seen ${mins} minute${mins !== 1 ? 's' : ''} ago`;
   }
-  return `last seen ${formatTime(timestamp)}`;
+  if (diffSec < 43200) {
+    const hours = Math.floor(diffSec / 3600);
+    return `last seen ${hours} hour${hours !== 1 ? 's' : ''} ago`;
+  }
+  if (date.toDateString() === now.toDateString()) {
+    return `last seen today at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) {
+    return `last seen yesterday at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  return `last seen ${date.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
 }
