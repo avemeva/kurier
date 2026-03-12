@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { PureCornerButton, PureCornerButtonStack } from '@/components/ui/chat/CornerButtons';
 import { PureMessageInput } from '@/components/ui/chat/MessageInput';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { useStickToBottom } from '@/hooks/useStickToBottom';
 import { scrollToMessage } from '@/lib/scrollToMessage';
 import { selectChatMessages, selectSelectedChat, useChatStore } from '@/lib/store';
 import type { UIMessage, UIPendingMessage } from '@/lib/types';
@@ -30,8 +31,8 @@ const ArrowDownIcon = () => (
 );
 
 export function MessagePanel() {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const { scrollRef, scrollToBottom } = useStickToBottom();
 
   const selectedChat = useChatStore(selectSelectedChat);
   const messages = useChatStore(selectChatMessages);
@@ -57,6 +58,15 @@ export function MessagePanel() {
   const goToNextUnreadMention = useChatStore((s) => s.goToNextUnreadMention);
   const goToNextUnreadReaction = useChatStore((s) => s.goToNextUnreadReaction);
 
+  // Merge refs: useStickToBottom needs its callback ref, useInfiniteScroll needs a ref object
+  const combinedRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      scrollContainerRef.current = node;
+      scrollRef(node);
+    },
+    [scrollRef],
+  );
+
   useInfiniteScroll(scrollContainerRef, {
     onTop: loadOlderMessages,
     onBottom: loadNewerMessages,
@@ -64,19 +74,22 @@ export function MessagePanel() {
     hasNewer,
   });
 
-  // Scroll to bottom when we arrive at latest (initial load or loadLatestMessages)
-  const prevIsAtLatestRef = useRef<boolean | undefined>(undefined);
+  // Scroll to bottom on chat switch
+  const selectedChatId = selectedChat?.id;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scrollToBottom is stable
   useEffect(() => {
-    const wasAtLatest = prevIsAtLatestRef.current;
+    scrollToBottom();
+  }, [selectedChatId]);
+
+  // Scroll to bottom on "go to latest" (isAtLatest: false → true)
+  const prevIsAtLatestRef = useRef(isAtLatest);
+  useEffect(() => {
+    const was = prevIsAtLatestRef.current;
     prevIsAtLatestRef.current = isAtLatest;
-
-    if (!isAtLatest || messages.length === 0) return;
-
-    // Scroll to bottom on: initial render or transition to latest
-    if (wasAtLatest === undefined || wasAtLatest === false) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+    if (!was && isAtLatest) {
+      scrollToBottom();
     }
-  }, [isAtLatest, messages]);
+  }, [isAtLatest, scrollToBottom]);
 
   const handleReplyClick = useCallback(
     async (messageId: number) => {
@@ -169,7 +182,7 @@ export function MessagePanel() {
     <>
       <div className="relative flex-1">
         <div
-          ref={scrollContainerRef}
+          ref={combinedRef}
           data-testid="message-panel"
           className="absolute inset-0 overflow-y-auto px-4 py-3 scrollbar-subtle"
         >
@@ -219,7 +232,7 @@ export function MessagePanel() {
               );
             })}
           </div>
-          <div ref={messagesEndRef} />
+          <div />
         </div>
         <PureCornerButtonStack>
           {selectedChat.unreadReactionCount > 0 && (
