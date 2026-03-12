@@ -50,6 +50,22 @@ base('sidebar renders multiple dialog items', async () => {
   expect(count, 'Expected at least 5 dialogs').toBeGreaterThanOrEqual(5);
 });
 
+base('chat list can be scrolled', async () => {
+  const scrollContainer = page.locator('[data-testid="sidebar-scroll"]');
+
+  // Set scrollTop to 300px, then read it back. If scrolling works, it stays at 300.
+  // If the container has no overflow constraint, scrollTop snaps back to 0.
+  await scrollContainer.evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  const scrollTop = await scrollContainer.evaluate((el) => {
+    el.scrollTop = 300;
+    return el.scrollTop;
+  });
+
+  expect(scrollTop, 'Chat list should be scrollable').toBeGreaterThan(0);
+});
+
 base('each dialog item has an avatar', async () => {
   const firstDialog = page.locator('[data-testid="dialog-item"]').first();
   const avatar = firstDialog.locator('[data-testid="avatar-img"], [data-testid="dialog-item"] > *');

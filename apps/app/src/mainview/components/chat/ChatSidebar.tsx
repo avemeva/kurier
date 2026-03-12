@@ -493,7 +493,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
   }
 
   return (
-    <div className="flex w-full shrink-0 flex-col border-r border-border md:w-80">
+    <div className="flex h-full w-full flex-col border-r border-border md:w-80">
       {/* Header with search */}
       {isSearchActive ? (
         <div className="flex items-center gap-2 px-3 py-2.5">

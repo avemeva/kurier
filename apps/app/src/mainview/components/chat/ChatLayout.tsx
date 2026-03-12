@@ -24,7 +24,7 @@ export function ChatLayout({ onLogout }: { onLogout: () => void }) {
 
   return (
     <div data-testid="chat-layout" className="flex h-screen bg-background">
-      <div className={cn('md:block', selectedChatId ? 'hidden' : 'block')}>
+      <div className={cn('h-full overflow-hidden md:block', selectedChatId ? 'hidden' : 'block')}>
         <ChatSidebar onLogout={onLogout} />
       </div>
 
