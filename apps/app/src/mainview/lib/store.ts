@@ -26,13 +26,15 @@ import { formatLastSeen } from './format';
 import { log } from './log';
 import type { ChatInfoResult } from './telegram';
 import {
+  type CustomEmojiInfo,
   clearMediaCache,
   closeTdChat,
+  downloadFileById,
   downloadMedia,
   downloadThumbnail,
   fetchMessage,
   getChatInfo,
-  getCustomEmojiUrl,
+  getCustomEmojiInfo,
   getDialogs,
   getMe,
   getMessages,
@@ -77,10 +79,11 @@ interface ChatState {
   users: Map<number, Td.user>;
   profilePhotos: Record<number, string>;
   mediaUrls: Record<string, string | null>;
+  fileUrls: Record<string, string | null>;
   thumbUrls: Record<string, string | null>;
   replyPreviews: Record<string, UIReplyPreview | null>;
   pinnedPreviews: Record<string, string | null>;
-  customEmojiUrls: Record<string, string | null>;
+  customEmojiUrls: Record<string, CustomEmojiInfo>;
   typingByChat: Record<number, Record<number, { action: Td.ChatAction; expiresAt: number }>>;
   userStatuses: Record<number, Td.UserStatus>;
   chatInfoCache: Record<number, ChatInfoResult>;
@@ -139,6 +142,8 @@ interface ChatState {
   loadMedia: (chatId: number, messageId: number) => void;
   clearMediaUrl: (chatId: number, messageId: number) => void;
   seedMedia: (urls: Record<string, string>) => void;
+  loadFile: (fileId: number) => void;
+  clearFileUrl: (fileId: number) => void;
   loadCustomEmojiUrl: (documentId: string) => void;
   recognizeSpeech: (chatId: number, messageId: number) => void;
   loadReplyThumb: (chatId: number, messageId: number) => void;
@@ -178,6 +183,7 @@ function isChatPinned(chat: Td.chat): boolean {
 let tempIdCounter = 0;
 const photoRequested = new Set<number>();
 const mediaRequested = new Set<string>();
+const fileRequested = new Set<number>();
 const thumbRequested = new Set<string>();
 const customEmojiRequested = new Set<string>();
 
@@ -416,6 +422,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   users: new Map(),
   profilePhotos: {},
   mediaUrls: {},
+  fileUrls: {},
   thumbUrls: {},
   replyPreviews: {},
   pinnedPreviews: {},
@@ -1376,8 +1383,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadCustomEmojiUrl: (documentId: string) => {
     if (customEmojiRequested.has(documentId)) return;
     customEmojiRequested.add(documentId);
-    getCustomEmojiUrl(documentId).then((url) => {
-      set((s) => ({ customEmojiUrls: { ...s.customEmojiUrls, [documentId]: url } }));
+    getCustomEmojiInfo(documentId).then((info) => {
+      set((s) => ({ customEmojiUrls: { ...s.customEmojiUrls, [documentId]: info } }));
     });
   },
 
@@ -1401,6 +1408,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   seedMedia: (urls: Record<string, string>) => {
     set((s) => ({ mediaUrls: { ...s.mediaUrls, ...urls } }));
+  },
+
+  loadFile: (fileId: number) => {
+    if (fileRequested.has(fileId)) return;
+    fileRequested.add(fileId);
+    downloadFileById(fileId).then((url) => {
+      set((s) => ({ fileUrls: { ...s.fileUrls, [fileId]: url } }));
+    });
+  },
+
+  clearFileUrl: (fileId: number) => {
+    fileRequested.delete(fileId);
+    set((s) => {
+      const { [fileId]: _, ...rest } = s.fileUrls;
+      return { fileUrls: rest };
+    });
   },
 
   clearError: () => set({ error: '' }),
@@ -2075,6 +2098,7 @@ export function _resetForTests() {
   tempIdCounter = 0;
   photoRequested.clear();
   mediaRequested.clear();
+  fileRequested.clear();
   customEmojiRequested.clear();
   userFetchRequested.clear();
   for (const t of typingTimers.values()) clearTimeout(t);
@@ -2112,6 +2136,7 @@ export function _resetForTests() {
       users: new Map(),
       profilePhotos: {},
       mediaUrls: {},
+      fileUrls: {},
       thumbUrls: {},
       typingByChat: {},
       userStatuses: {},

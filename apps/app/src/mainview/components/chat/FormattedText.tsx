@@ -1,24 +1,28 @@
 import { useEffect, useState } from 'react';
+import { PureStickerView } from '@/components/ui/chat/StickerView';
 import { useChatStore } from '@/lib/store';
 import type { UITextEntity } from '@/lib/types';
 
 function CustomEmoji({ documentId, fallback }: { documentId: string; fallback: string }) {
-  const url = useChatStore((s) => s.customEmojiUrls[documentId] ?? null);
+  const info = useChatStore((s) => s.customEmojiUrls[documentId] ?? null);
   const loadCustomEmojiUrl = useChatStore((s) => s.loadCustomEmojiUrl);
 
   useEffect(() => {
     loadCustomEmojiUrl(documentId);
   }, [documentId, loadCustomEmojiUrl]);
 
-  if (!url) {
+  if (!info) {
     return <span className="inline-block align-text-bottom">{fallback}</span>;
   }
   return (
-    <img
-      src={url}
-      alt={fallback}
-      className="inline-block size-[1.2em] align-text-bottom object-contain"
-    />
+    <span className="inline-block size-[1.2em] align-text-bottom">
+      <PureStickerView
+        url={info.url}
+        format={info.format}
+        emoji={fallback}
+        className="size-full !max-w-none"
+      />
+    </span>
   );
 }
 

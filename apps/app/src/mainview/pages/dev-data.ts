@@ -105,6 +105,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 0,
     mediaHeight: 0,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // text_outgoing
   {
@@ -141,6 +143,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 0,
     mediaHeight: 0,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // text_with_entities + reactions
   {
@@ -184,6 +188,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 0,
     mediaHeight: 0,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // text_with_link_preview
   {
@@ -230,6 +236,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 0,
     mediaHeight: 0,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // photo_album (two photos, same album ID)
   {
@@ -266,6 +274,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1920,
     mediaHeight: 1080,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   {
     id: 755107889152,
@@ -301,6 +311,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1080,
     mediaHeight: 1350,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // photo_single (from supergroup)
   {
@@ -337,6 +349,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1280,
     mediaHeight: 960,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // video
   {
@@ -373,6 +387,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1920,
     mediaHeight: 1080,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // voice_incoming
   {
@@ -409,6 +425,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 0,
     mediaHeight: 0,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // voice_outgoing
   {
@@ -445,6 +463,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 0,
     mediaHeight: 0,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // video_note
   {
@@ -481,6 +501,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 0,
     mediaHeight: 0,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // sticker_incoming
   {
@@ -517,6 +539,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 0,
     mediaHeight: 0,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // animation (GIF)
   {
@@ -553,6 +577,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 480,
     mediaHeight: 480,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // forwarded text
   {
@@ -589,6 +615,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 0,
     mediaHeight: 0,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // reply
   {
@@ -625,6 +653,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 0,
     mediaHeight: 0,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // spoiler
   {
@@ -661,6 +691,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 0,
     mediaHeight: 0,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // ---------------------------------------------------------------------------
   // Media variant fixtures
@@ -700,6 +732,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1600,
     mediaHeight: 1200,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // photo_with_caption (framed bubble)
   {
@@ -736,6 +770,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1920,
     mediaHeight: 1080,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // portrait_photo (square cap test)
   {
@@ -772,6 +808,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1080,
     mediaHeight: 1920,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // photo_with_reply (framed bubble)
   {
@@ -815,6 +853,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1200,
     mediaHeight: 800,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // outgoing_standalone_photo
   {
@@ -851,6 +891,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1920,
     mediaHeight: 1080,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // 3-photo album (mixed ratios)
   {
@@ -887,6 +929,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1920,
     mediaHeight: 1080,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   {
     id: 100000007,
@@ -922,6 +966,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1080,
     mediaHeight: 1920,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   {
     id: 100000008,
@@ -957,6 +1003,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1200,
     mediaHeight: 1200,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   // 4-photo album (all landscape, outgoing)
   {
@@ -993,6 +1041,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1920,
     mediaHeight: 1080,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   {
     id: 100000010,
@@ -1028,6 +1078,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1920,
     mediaHeight: 1080,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   {
     id: 100000011,
@@ -1063,6 +1115,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1920,
     mediaHeight: 1080,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
   {
     id: 100000012,
@@ -1098,6 +1152,8 @@ export const MESSAGES: UIMessage[] = [
     mediaWidth: 1920,
     mediaHeight: 1080,
     minithumbnail: null,
+    stickerFormat: null,
+    stickerEmoji: '',
   },
 ];
 

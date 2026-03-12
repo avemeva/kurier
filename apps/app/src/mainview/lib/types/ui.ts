@@ -114,6 +114,8 @@ export type UIMessage = {
   mediaWidth: number;
   mediaHeight: number;
   minithumbnail: string | null;
+  stickerFormat: 'webp' | 'tgs' | 'webm' | null;
+  stickerEmoji: string;
 };
 
 export type UIPendingMessage = {

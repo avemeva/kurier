@@ -1,6 +1,11 @@
 import { render } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { UITextEntity } from '@/lib/types';
+
+vi.mock('lottie-web/build/player/lottie_light', () => ({
+  default: { loadAnimation: vi.fn(() => ({ destroy: vi.fn() })) },
+}));
+
 import { FormattedText } from './FormattedText';
 
 function entity(

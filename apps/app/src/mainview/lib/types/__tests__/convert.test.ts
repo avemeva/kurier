@@ -22,6 +22,8 @@ import {
   CHAT_HY_RID,
   CHAT_MARUSIA,
   CHAT_SUPERGROUP,
+  MSG_ANIMATED_EMOJI,
+  MSG_ANIMATED_EMOJI_NO_STICKER,
   MSG_ANIMATION,
   MSG_FORWARDED,
   MSG_PHOTO_ALBUM,
@@ -29,6 +31,8 @@ import {
   MSG_PHOTO_SINGLE,
   MSG_REPLY,
   MSG_STICKER_INCOMING,
+  MSG_STICKER_TGS,
+  MSG_STICKER_WEBM,
   MSG_TEXT_INCOMING,
   MSG_TEXT_OUTGOING,
   MSG_TEXT_WITH_ENTITIES,
@@ -120,6 +124,59 @@ describe('toUIMessage', () => {
     const ui = toUIMessage(MSG_STICKER_INCOMING, users, 0);
     expect(ui.contentKind).toBe('sticker');
     expect(ui.mediaLabel).toBe('⭐');
+  });
+
+  // AC1: messageAnimatedEmoji converts to sticker kind
+  it('converts animated emoji to sticker kind with tgs format', () => {
+    const ui = toUIMessage(MSG_ANIMATED_EMOJI, users, 0);
+    expect(ui.contentKind).toBe('sticker');
+    expect(ui.stickerFormat).toBe('tgs');
+    expect(ui.stickerEmoji).toBe('🐸');
+    expect(ui.mediaLabel).toBe('🐸');
+  });
+
+  it('converts animated emoji with null sticker', () => {
+    const ui = toUIMessage(MSG_ANIMATED_EMOJI_NO_STICKER, users, 0);
+    expect(ui.contentKind).toBe('sticker');
+    expect(ui.stickerFormat).toBeNull();
+    expect(ui.stickerEmoji).toBe('🎉');
+    expect(ui.mediaLabel).toBe('🎉');
+  });
+
+  // AC2: stickerFormat extracted for all formats
+  it('extracts stickerFormat webp from messageSticker', () => {
+    const ui = toUIMessage(MSG_STICKER_INCOMING, users, 0);
+    expect(ui.stickerFormat).toBe('webp');
+    expect(ui.stickerEmoji).toBe('⭐');
+  });
+
+  it('extracts stickerFormat tgs from messageSticker', () => {
+    const ui = toUIMessage(MSG_STICKER_TGS, users, 0);
+    expect(ui.stickerFormat).toBe('tgs');
+  });
+
+  it('extracts stickerFormat webm from messageSticker', () => {
+    const ui = toUIMessage(MSG_STICKER_WEBM, users, 0);
+    expect(ui.stickerFormat).toBe('webm');
+  });
+
+  // AC3: dimensions extracted
+  it('extracts sticker dimensions into mediaWidth/mediaHeight', () => {
+    const ui = toUIMessage(MSG_STICKER_INCOMING, users, 0);
+    expect(ui.mediaWidth).toBe(512);
+    expect(ui.mediaHeight).toBe(512);
+  });
+
+  it('extracts animated emoji dimensions into mediaWidth/mediaHeight', () => {
+    const ui = toUIMessage(MSG_ANIMATED_EMOJI, users, 0);
+    expect(ui.mediaWidth).toBe(512);
+    expect(ui.mediaHeight).toBe(512);
+  });
+
+  it('extracts animated emoji dimensions when sticker is null', () => {
+    const ui = toUIMessage(MSG_ANIMATED_EMOJI_NO_STICKER, users, 0);
+    expect(ui.mediaWidth).toBe(512);
+    expect(ui.mediaHeight).toBe(512);
   });
 
   it('converts animation (GIF)', () => {
@@ -576,6 +633,15 @@ describe('extractMessagePreview', () => {
 
   it('returns GIF for animation without caption', () => {
     expect(extractMessagePreview(MSG_ANIMATION)).toBe('GIF');
+  });
+
+  // AC5: sidebar preview
+  it('returns emoji for animated emoji preview', () => {
+    expect(extractMessagePreview(MSG_ANIMATED_EMOJI)).toBe('🐸');
+  });
+
+  it('returns emoji for animated emoji without sticker', () => {
+    expect(extractMessagePreview(MSG_ANIMATED_EMOJI_NO_STICKER)).toBe('🎉');
   });
 
   it('returns empty string for undefined message', () => {

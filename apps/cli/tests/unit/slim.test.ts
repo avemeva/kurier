@@ -1012,6 +1012,37 @@ describe('slimContent', () => {
     expect(content.type).toBe('messageChatChangeTitle');
     expect((content as Rec).title).toBe('New Title');
   });
+
+  test('messageAnimatedEmoji: outputs type and emoji', () => {
+    const content = slimContentVia({
+      _: 'messageAnimatedEmoji',
+      animated_emoji: {
+        _: 'animatedEmoji',
+        sticker: {
+          _: 'sticker',
+          id: '1',
+          set_id: '1',
+          width: 512,
+          height: 512,
+          emoji: '🐸',
+          format: { _: 'stickerFormatTgs' },
+          full_type: { _: 'stickerFullTypeRegular', premium_animation: undefined },
+          thumbnail: undefined,
+          sticker: makeFile(),
+        },
+        sticker_width: 512,
+        sticker_height: 512,
+        fitzpatrick_type: 0,
+        sound: undefined,
+      },
+      emoji: '🐸',
+    } satisfies Td.messageAnimatedEmoji);
+
+    expect(content.type).toBe('animatedemoji');
+    const c = content as Rec;
+    expect(c.emoji).toBe('🐸');
+    expect(Object.keys(c).sort()).toEqual(['emoji', 'type']);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1086,6 +1117,22 @@ describe('extractPreview', () => {
       }),
     });
     expect(extractPreview(msg, 50)).toBe(`${'x'.repeat(50)}...`);
+  });
+
+  test('returns emoji for messageAnimatedEmoji', () => {
+    const msg = makeMessage({
+      content: {
+        _: 'messageAnimatedEmoji',
+        animated_emoji: {
+          _: 'animatedEmoji',
+          sticker_width: 512,
+          sticker_height: 512,
+          fitzpatrick_type: 0,
+        },
+        emoji: '🐸',
+      } as unknown as Td.messageAnimatedEmoji,
+    });
+    expect(extractPreview(msg)).toBe('🐸');
   });
 
   test('returns undefined for unknown content types', () => {

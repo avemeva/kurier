@@ -9,6 +9,7 @@ import { PurePhotoView } from '@/components/ui/chat/PhotoView';
 import { PureReactionBar, PureReactionPicker } from '@/components/ui/chat/ReactionBar';
 import { PureReplyHeader } from '@/components/ui/chat/ReplyHeader';
 import { PureServiceMessage } from '@/components/ui/chat/ServiceMessage';
+import { PureStickerView } from '@/components/ui/chat/StickerView';
 import { PureVideoView } from '@/components/ui/chat/VideoView';
 import { PureVoiceView } from '@/components/ui/chat/VoiceView';
 import type {
@@ -134,7 +135,7 @@ function StickerLayout({
   state: StickerRenderState;
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
 }) {
-  const { msg, media, displayWidth, displayHeight } = state;
+  const { msg, media } = state;
   const hasReactions = msg.reactions.length > 0;
 
   return (
@@ -148,11 +149,11 @@ function StickerLayout({
       hasReactions={hasReactions}
     >
       <PureReactionPicker onReact={(e, c) => onReact(msg.id, e, c)} />
-      <PurePhotoView
+      <PureStickerView
         url={media.url}
+        format={msg.stickerFormat}
+        emoji={msg.stickerEmoji}
         loading={media.loading}
-        width={displayWidth}
-        height={displayHeight}
         onRetry={media.retry}
       />
       {hasReactions && (

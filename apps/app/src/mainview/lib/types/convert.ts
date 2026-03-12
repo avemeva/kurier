@@ -35,6 +35,7 @@ const CONTENT_KIND_MAP: Record<string, MessageContentKind> = {
   messageLocation: 'location',
   messageVenue: 'venue',
   messageDice: 'dice',
+  messageAnimatedEmoji: 'sticker',
 };
 
 function toContentKind(content: Td.MessageContent): MessageContentKind {
@@ -85,6 +86,8 @@ export function extractMediaLabel(content: Td.MessageContent): string {
     case 'messageVenue':
       return 'Venue';
     case 'messageDice':
+      return content.emoji;
+    case 'messageAnimatedEmoji':
       return content.emoji;
     default:
       return '';
@@ -144,6 +147,7 @@ function extractMediaWidth(content: Td.MessageContent): number {
   if (content._ === 'messageVideo') return content.video.width;
   if (content._ === 'messageAnimation') return content.animation.width;
   if (content._ === 'messageSticker') return content.sticker.width;
+  if (content._ === 'messageAnimatedEmoji') return content.animated_emoji.sticker_width;
   return 0;
 }
 
@@ -155,6 +159,7 @@ function extractMediaHeight(content: Td.MessageContent): number {
   if (content._ === 'messageVideo') return content.video.height;
   if (content._ === 'messageAnimation') return content.animation.height;
   if (content._ === 'messageSticker') return content.sticker.height;
+  if (content._ === 'messageAnimatedEmoji') return content.animated_emoji.sticker_height;
   return 0;
 }
 
@@ -163,6 +168,44 @@ function extractMinithumbnail(content: Td.MessageContent): string | null {
   if (content._ === 'messageVideo') return content.video.minithumbnail?.data ?? null;
   if (content._ === 'messageAnimation') return content.animation.minithumbnail?.data ?? null;
   return null;
+}
+
+// --- Sticker metadata ---
+
+function extractStickerFormat(content: Td.MessageContent): 'webp' | 'tgs' | 'webm' | null {
+  if (content._ === 'messageSticker') {
+    switch (content.sticker.format._) {
+      case 'stickerFormatWebp':
+        return 'webp';
+      case 'stickerFormatTgs':
+        return 'tgs';
+      case 'stickerFormatWebm':
+        return 'webm';
+      default:
+        return null;
+    }
+  }
+  if (content._ === 'messageAnimatedEmoji') {
+    const sticker = content.animated_emoji.sticker;
+    if (!sticker) return null;
+    switch (sticker.format._) {
+      case 'stickerFormatWebp':
+        return 'webp';
+      case 'stickerFormatTgs':
+        return 'tgs';
+      case 'stickerFormatWebm':
+        return 'webm';
+      default:
+        return null;
+    }
+  }
+  return null;
+}
+
+function extractStickerEmoji(content: Td.MessageContent): string {
+  if (content._ === 'messageSticker') return content.sticker.emoji ?? '';
+  if (content._ === 'messageAnimatedEmoji') return content.emoji;
+  return '';
 }
 
 // --- Web preview ---
@@ -449,6 +492,8 @@ export function toUIMessage(
     mediaWidth: extractMediaWidth(msg.content),
     mediaHeight: extractMediaHeight(msg.content),
     minithumbnail: extractMinithumbnail(msg.content),
+    stickerFormat: extractStickerFormat(msg.content),
+    stickerEmoji: extractStickerEmoji(msg.content),
   };
 }
 

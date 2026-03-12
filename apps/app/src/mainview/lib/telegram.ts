@@ -510,6 +510,8 @@ function getFileFromContent(content: Td.MessageContent): Td.file | null {
       return content.audio.audio;
     case 'messageSticker':
       return content.sticker.sticker;
+    case 'messageAnimatedEmoji':
+      return content.animated_emoji.sticker?.sticker ?? null;
     default:
       return null;
   }
@@ -530,6 +532,8 @@ function getThumbnailFile(content: Td.MessageContent): Td.file | null {
       return content.video_note.thumbnail?.file ?? null;
     case 'messageSticker':
       return content.sticker.thumbnail?.file ?? null;
+    case 'messageAnimatedEmoji':
+      return content.animated_emoji.sticker?.thumbnail?.file ?? null;
     case 'messageText': {
       // Link preview with photo/thumbnail
       const lp = content.link_preview;
@@ -591,14 +595,83 @@ export function downloadThumbnail(chatId: number, messageId: number): Promise<st
   return promise;
 }
 
-const customEmojiCache = new Map<string, Promise<string | null>>();
+const fileUrlCache = new Map<string, Promise<string | null>>();
 
-export function getCustomEmojiUrl(documentId: string): Promise<string | null> {
+export function downloadFileById(fileId: number): Promise<string | null> {
+  const key = `file_${fileId}`;
+  const cached = fileUrlCache.get(key);
+  if (cached) return cached;
+  const promise = (async (): Promise<string | null> => {
+    try {
+      const downloaded = await client.invoke({
+        _: 'downloadFile',
+        file_id: fileId,
+        priority: 1,
+        offset: 0,
+        limit: 0,
+        synchronous: true,
+      });
+
+      if (downloaded.local.is_downloading_completed && downloaded.local.path) {
+        const match = downloaded.local.path.match(/(?:media_cache|tdlib_db)\/(.+)$/);
+        if (match) return `/api/media/${match[1]}`;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  })();
+  fileUrlCache.set(key, promise);
+  return promise;
+}
+
+const customEmojiCache = new Map<string, Promise<CustomEmojiInfo>>();
+
+export type CustomEmojiInfo = { url: string; format: 'webp' | 'tgs' | 'webm' } | null;
+
+function stickerFormatToString(format: Td.StickerFormat): 'webp' | 'tgs' | 'webm' {
+  switch (format._) {
+    case 'stickerFormatTgs':
+      return 'tgs';
+    case 'stickerFormatWebm':
+      return 'webm';
+    default:
+      return 'webp';
+  }
+}
+
+export function getCustomEmojiInfo(documentId: string): Promise<CustomEmojiInfo> {
   const cached = customEmojiCache.get(documentId);
   if (cached) return cached;
-  // Custom emoji download is not yet supported via daemon — return null
-  // TODO: add custom emoji download command to daemon
-  const promise = Promise.resolve(null as string | null);
+  const promise = (async (): Promise<CustomEmojiInfo> => {
+    try {
+      const result = await client.invoke({
+        _: 'getCustomEmojiStickers',
+        custom_emoji_ids: [documentId],
+      });
+      const sticker = result.stickers[0];
+      if (!sticker) return null;
+
+      const format = stickerFormatToString(sticker.format);
+
+      const downloaded = await client.invoke({
+        _: 'downloadFile',
+        file_id: sticker.sticker.id,
+        priority: 1,
+        offset: 0,
+        limit: 0,
+        synchronous: true,
+      });
+
+      if (downloaded.local.is_downloading_completed && downloaded.local.path) {
+        const match = downloaded.local.path.match(/(?:media_cache|tdlib_db)\/(.+)$/);
+        if (match) return { url: `/api/media/${match[1]}`, format };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  })();
   customEmojiCache.set(documentId, promise);
   return promise;
 }
@@ -909,6 +982,7 @@ export async function logout() {
   client.close();
   mediaUrlCache.clear();
   profilePhotoCache.clear();
+  fileUrlCache.clear();
   customEmojiCache.clear();
   updatesStarted = false;
   updateListeners.clear();

@@ -136,6 +136,9 @@ export function extractPreview(m: Td.message, maxLength = 150): string | undefin
     case 'messageSticker':
       text = c.sticker.emoji;
       break;
+    case 'messageAnimatedEmoji':
+      text = c.emoji;
+      break;
     default:
       text = undefined;
   }
@@ -369,6 +372,8 @@ function slimContent(c: Td.MessageContent): SlimContent {
     }
     case 'messageSticker':
       return { type: 'messageSticker', emoji: c.sticker.emoji };
+    case 'messageAnimatedEmoji':
+      return { type: 'animatedemoji', emoji: c.emoji };
     case 'messageLocation':
       return { type: 'messageLocation', location: c.location };
     case 'messageContact':
