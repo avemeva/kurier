@@ -37,6 +37,7 @@ cp "$MAIN/.env" .env
 bun run typecheck          # All packages
 bun run test               # All packages (vitest for app, bun:test for cli)
 bun run lint               # Biome
+bun run lint:fix           # Biome auto-fix
 ```
 
 After big UI or store/data changes, run Playwright e2e (needs dev server + daemon running):
