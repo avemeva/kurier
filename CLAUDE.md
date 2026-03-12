@@ -39,6 +39,11 @@ bun run test               # All packages (vitest for app, bun:test for cli)
 bun run lint               # Biome
 ```
 
+After big UI or store/data changes, run Playwright e2e (needs dev server + daemon running):
+```sh
+cd apps/app && bun run test:e2e       # All Playwright projects (app, dev, perf)
+```
+
 ## Dev Server (Worktree)
 
 ```sh

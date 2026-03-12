@@ -490,6 +490,13 @@ test('voice messages show pre-loaded duration', async () => {
 
 for (let chatIdx = 0; chatIdx < 5; chatIdx++) {
   test(`chat ${chatIdx + 1}: no layout shift after messages render`, async () => {
+    // Reload to clear cached messages from prior tests (scroll-up tests load extra
+    // messages whose media hasn't loaded yet, causing false CLS positives)
+    const url =
+      process.env.BASE_URL || test.info().project.use.baseURL || 'http://tg.localhost:1355';
+    await page.goto(url);
+    await waitForApp(page);
+
     const dialogs = page.locator('[data-testid="dialog-item"]');
     const count = await dialogs.count();
     if (chatIdx >= count) {
