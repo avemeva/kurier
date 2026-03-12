@@ -183,7 +183,7 @@ export function MessagePanel() {
           {!loadingMessages && messages.length === 0 && (
             <p className="py-8 text-center text-sm text-text-tertiary">No messages</p>
           )}
-          <div className="max-w-[720px] space-y-1">
+          <div className="mx-auto max-w-[720px] space-y-1">
             {grouped.map((group, index) => {
               const input =
                 group.type === 'album'
@@ -195,7 +195,7 @@ export function MessagePanel() {
                 <div
                   key={getKey(group)}
                   id={`msg-${getKey(group)}`}
-                  className={cn('flex', isOut ? 'justify-end' : 'justify-start')}
+                  className={cn('flex', isOut ? 'sm:justify-end' : 'justify-start')}
                 >
                   <Message
                     input={input}

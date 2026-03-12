@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useChatStore } from '@/lib/store';
+import { cn } from '@/lib/utils';
 import { ChatHeader } from './ChatHeader';
 import { ChatSidebar } from './ChatSidebar';
 import { ComposeSearchTopBar, useChatSearchKeyboard } from './ComposeSearch';
@@ -10,6 +11,7 @@ export function ChatLayout({ onLogout }: { onLogout: () => void }) {
   const error = useChatStore((s) => s.error);
   const clearError = useChatStore((s) => s.clearError);
   const searchMode = useChatStore((s) => s.searchMode);
+  const selectedChatId = useChatStore((s) => s.selectedChatId);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs once on mount
   useEffect(() => {
@@ -22,9 +24,11 @@ export function ChatLayout({ onLogout }: { onLogout: () => void }) {
 
   return (
     <div data-testid="chat-layout" className="flex h-screen bg-background">
-      <ChatSidebar onLogout={onLogout} />
+      <div className={cn('md:block', selectedChatId ? 'hidden' : 'block')}>
+        <ChatSidebar onLogout={onLogout} />
+      </div>
 
-      <div className="flex flex-1 flex-col">
+      <div className={cn('flex-1 flex-col', selectedChatId ? 'flex' : 'hidden md:flex')}>
         {isChatSearch ? <ComposeSearchTopBar /> : <ChatHeader />}
         <MessagePanel />
       </div>

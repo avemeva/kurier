@@ -1,4 +1,4 @@
-import { Bookmark, Search, Star } from 'lucide-react';
+import { ArrowLeft, Bookmark, Search, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PureStatusText } from '@/components/ui/chat/StatusText';
 import { UserAvatar } from '@/components/ui/user-avatar';
@@ -17,6 +17,15 @@ export function ChatHeader() {
 
   return (
     <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background/80 px-4 py-3 backdrop-blur-sm">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className="md:hidden"
+        onClick={() => useChatStore.setState({ selectedChatId: null })}
+        aria-label="Back to chats"
+      >
+        <ArrowLeft size={18} />
+      </Button>
       {selectedChat.isSavedMessages ? (
         <div className="flex size-8 items-center justify-center rounded-full bg-accent-blue text-white">
           <Bookmark size={16} className="fill-current" />

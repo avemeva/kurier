@@ -140,7 +140,7 @@ function SearchMessageRow({
     <button
       type="button"
       onClick={onClick}
-      className="mx-2 flex w-full items-start gap-3 rounded-lg px-4 py-3 text-left transition-colors hover:bg-accent"
+      className="flex w-full items-start gap-3 rounded-lg px-4 py-3 text-left transition-colors hover:bg-accent"
     >
       <div className="relative mt-0.5 shrink-0">
         <UserAvatar
@@ -179,7 +179,7 @@ function PeerResultRow({
     <button
       type="button"
       onClick={onClick}
-      className="mx-2 flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-colors hover:bg-accent"
+      className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-colors hover:bg-accent"
     >
       <div className="relative shrink-0">
         <UserAvatar name={peer.name} src={profilePhoto} className="size-10 text-sm" />
@@ -248,7 +248,7 @@ function SearchResults({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto scrollbar-subtle">
+    <div className="flex-1 overflow-y-auto px-2 scrollbar-subtle">
       {localMatches.length > 0 && (
         <>
           <SectionBar label="Chats" />
@@ -257,7 +257,7 @@ function SearchResults({
               key={chat.id}
               type="button"
               onClick={() => onSelectChat(chat.id)}
-              className="mx-2 flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-colors hover:bg-accent"
+              className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-colors hover:bg-accent"
             >
               <div className="relative shrink-0">
                 <UserAvatar
@@ -489,7 +489,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
   }
 
   return (
-    <div className="flex w-80 shrink-0 flex-col border-r border-border">
+    <div className="flex w-full shrink-0 flex-col border-r border-border md:w-80">
       {/* Header with search */}
       {isSearchActive ? (
         <div className="flex items-center gap-2 px-3 py-2.5">
@@ -594,7 +594,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
 
           <div
             data-testid="sidebar-scroll"
-            className="flex-1 overflow-y-auto scrollbar-subtle"
+            className="flex-1 overflow-y-auto px-2 scrollbar-subtle"
             onScroll={handleSidebarScroll}
           >
             {loadingDialogs && (
@@ -611,7 +611,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                   type="button"
                   onClick={() => handleSelectChat(chat.id)}
                   className={cn(
-                    'mx-2 flex w-full items-start gap-3 rounded-lg px-4 py-2 text-left transition-colors hover:bg-accent',
+                    'flex w-full items-start gap-3 rounded-lg px-4 py-2 text-left transition-colors hover:bg-accent',
                     selectedChatId === chat.id && 'bg-message-own hover:bg-message-own-hover',
                   )}
                 >
@@ -631,7 +631,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                     <div className="flex items-baseline justify-between gap-2">
                       <span
                         data-testid="dialog-name"
-                        className="flex items-center gap-1 truncate text-sm font-semibold text-text-primary"
+                        className="flex min-w-0 items-center gap-1 text-sm font-semibold text-text-primary"
                       >
                         {chat.kind === 'channel' && (
                           <Megaphone size={14} className="shrink-0 text-text-tertiary" />
@@ -640,7 +640,9 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                           <Users size={14} className="shrink-0 text-text-tertiary" />
                         )}
                         {chat.isBot && <Bot size={14} className="shrink-0 text-text-tertiary" />}
-                        {chat.isSavedMessages ? 'Saved Messages' : chat.title}
+                        <span className="truncate">
+                          {chat.isSavedMessages ? 'Saved Messages' : chat.title}
+                        </span>
                         {chat.user?.emojiStatusId ? (
                           <EmojiStatusBadge documentId={chat.user.emojiStatusId} />
                         ) : (
