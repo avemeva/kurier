@@ -311,10 +311,21 @@ function fetchMissingUsers(
   Promise.all(missing.map((uid) => getUser(uid).catch(() => null))).then((results) => {
     set((s) => {
       const next = new Map(s.users);
+      let nextStatuses = s.userStatuses;
+      let statusChanged = false;
       for (const user of results) {
-        if (user) next.set(user.id, user);
+        if (user) {
+          next.set(user.id, user);
+          if (user.status && !nextStatuses[user.id]) {
+            if (!statusChanged) {
+              nextStatuses = { ...nextStatuses };
+              statusChanged = true;
+            }
+            nextStatuses[user.id] = user.status;
+          }
+        }
       }
-      return { users: next };
+      return statusChanged ? { users: next, userStatuses: nextStatuses } : { users: next };
     });
   });
 }
@@ -815,7 +826,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set((s) => {
         const next = new Map(s.users);
         next.set(event.user.id, event.user);
-        return { users: next };
+        const statusUpdate =
+          event.user.status && !s.userStatuses[event.user.id]
+            ? { userStatuses: { ...s.userStatuses, [event.user.id]: event.user.status } }
+            : {};
+        return { users: next, ...statusUpdate };
       });
     }
 
