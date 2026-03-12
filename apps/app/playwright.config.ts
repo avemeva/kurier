@@ -49,7 +49,7 @@ export default defineConfig({
     {
       name: 'dev',
       testMatch: 'e2e/dev-page.test.ts',
-      use: { baseURL: 'http://localhost:5173', browserName: 'chromium', headless: true },
+      use: { baseURL: detectBaseURL(), browserName: 'chromium', headless: true },
     },
   ],
 });

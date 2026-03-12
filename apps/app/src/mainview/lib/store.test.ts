@@ -48,7 +48,9 @@ vi.mock('./telegram', () => ({
   clearMediaCache: vi.fn(),
   fetchMessage: vi.fn(() => Promise.resolve(null)),
   loadMoreDialogs: vi.fn(),
-  getCustomEmojiUrl: vi.fn(() => Promise.resolve(null)),
+  getCustomEmojiInfo: vi.fn(
+    (): Promise<{ url: string; format: 'webp' | 'tgs' | 'webm' } | null> => Promise.resolve(null),
+  ),
   recognizeSpeech: vi.fn(() => Promise.resolve()),
 }));
 
@@ -69,7 +71,7 @@ import {
   downloadMedia,
   downloadThumbnail,
   fetchMessage,
-  getCustomEmojiUrl,
+  getCustomEmojiInfo,
   getDialogs,
   getMessages,
   getMessagesAroundMessage,
@@ -3129,19 +3131,20 @@ describe('openChat chatInfo fetching', () => {
 // --- loadCustomEmojiUrl ---
 
 describe('loadCustomEmojiUrl', () => {
-  it('calls getCustomEmojiUrl and stores result', async () => {
-    vi.mocked(getCustomEmojiUrl).mockResolvedValueOnce('/emoji.webp');
+  it('calls getCustomEmojiInfo and stores result', async () => {
+    const info = { url: '/emoji.webp', format: 'webp' as const };
+    vi.mocked(getCustomEmojiInfo).mockResolvedValueOnce(info);
     useChatStore.getState().loadCustomEmojiUrl('doc123');
     await vi.waitFor(() => {
-      expect(useChatStore.getState().customEmojiUrls.doc123).toBe('/emoji.webp');
+      expect(useChatStore.getState().customEmojiUrls.doc123).toEqual(info);
     });
   });
 
   it('deduplicates requests', () => {
-    vi.mocked(getCustomEmojiUrl).mockResolvedValue(null);
+    vi.mocked(getCustomEmojiInfo).mockResolvedValue(null);
     useChatStore.getState().loadCustomEmojiUrl('doc123');
     useChatStore.getState().loadCustomEmojiUrl('doc123');
-    expect(getCustomEmojiUrl).toHaveBeenCalledTimes(1);
+    expect(getCustomEmojiInfo).toHaveBeenCalledTimes(1);
   });
 });
 

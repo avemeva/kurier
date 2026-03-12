@@ -1,143 +1,33 @@
-import { type BrowserContext, test as base, chromium, expect, type Page } from '@playwright/test';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Wait for the app to reach a usable state after navigation.
- * Returns "dialogs" | "auth" | "loading" (stuck on loading screen, daemon unresponsive).
- */
-async function waitForApp(page: Page): Promise<'dialogs' | 'auth' | 'loading'> {
-  try {
-    return await Promise.any([
-      page
-        .waitForSelector('[data-testid="dialog-item"]', { timeout: 20_000 })
-        .then(() => 'dialogs' as const),
-      page.waitForSelector('input[type="tel"]', { timeout: 20_000 }).then(() => 'auth' as const),
-    ]);
-  } catch {
-    return 'loading';
-  }
-}
-
-/** Format ms as human-friendly string. */
-function fmt(ms: number): string {
-  return ms >= 1000 ? `${(ms / 1000).toFixed(2)}s` : `${ms}ms`;
-}
-
-/** Print a check/cross line with metric value vs budget. */
-function report(label: string, value: number | string, budget?: string) {
-  const line = budget ? `  ${label}: ${value} (budget: ${budget})` : `  ${label}: ${value}`;
-  console.log(line);
-}
-
-/** Extract Core Web Vitals and resource stats via Performance API. */
-async function extractWebVitals(page: Page) {
-  return page.evaluate(() => {
-    return new Promise<{
-      fcp: number | null;
-      lcp: number | null;
-      cls: number;
-      longTaskCount: number;
-      longTaskTotalMs: number;
-      resourceCount: number;
-      transferSizeKb: number;
-      topResources: { name: string; duration: number; size: number }[];
-    }>((resolve) => {
-      // Give LCP a moment to finalize
-      setTimeout(() => {
-        let fcp: number | null = null;
-        let lcp: number | null = null;
-        let cls = 0;
-
-        for (const entry of performance.getEntriesByType('paint')) {
-          if (entry.name === 'first-contentful-paint') fcp = entry.startTime;
-        }
-
-        try {
-          const entries = performance.getEntriesByType('largest-contentful-paint' as string);
-          if (entries.length > 0) lcp = entries[entries.length - 1].startTime;
-        } catch {}
-
-        try {
-          for (const entry of performance.getEntriesByType('layout-shift' as string)) {
-            const ls = entry as PerformanceEntry & { hadRecentInput: boolean; value: number };
-            if (!ls.hadRecentInput) cls += ls.value;
-          }
-        } catch {}
-
-        let longTaskCount = 0;
-        let longTaskTotalMs = 0;
-        try {
-          const entries = performance.getEntriesByType('longtask' as string);
-          longTaskCount = entries.length;
-          for (const e of entries) longTaskTotalMs += e.duration;
-        } catch {}
-
-        const resourceEntries = performance.getEntriesByType(
-          'resource',
-        ) as PerformanceResourceTiming[];
-        let transferSizeKb = 0;
-        const resources: { name: string; duration: number; size: number }[] = [];
-        for (const e of resourceEntries) {
-          transferSizeKb += e.transferSize;
-          resources.push({
-            name: e.name.split('/').pop() ?? e.name,
-            duration: Math.round(e.duration),
-            size: e.transferSize,
-          });
-        }
-        resources.sort((a, b) => b.duration - a.duration);
-
-        resolve({
-          fcp: fcp ? Math.round(fcp) : null,
-          lcp: lcp ? Math.round(lcp) : null,
-          cls: Math.round(cls * 1000) / 1000,
-          longTaskCount,
-          longTaskTotalMs: Math.round(longTaskTotalMs),
-          resourceCount: resourceEntries.length,
-          transferSizeKb: Math.round(transferSizeKb / 1024),
-          topResources: resources.slice(0, 5),
-        });
-      }, 500);
-    });
-  });
-}
+import type { Page } from '@playwright/test';
+import { expect, extractWebVitals, fmt, report, perfTest as test, waitForApp } from '../fixtures';
 
 // ---------------------------------------------------------------------------
 // Tests — single navigation, all assertions against same page load
 // ---------------------------------------------------------------------------
 
-base.describe('UI Performance', () => {
-  let browser: ReturnType<typeof chromium.launch> extends Promise<infer T> ? T : never;
-  let context: BrowserContext;
-  let page: Page;
+let page: Page;
 
-  base.beforeAll(async () => {
-    browser = await chromium.launch({ headless: true });
-    context = await browser.newContext();
-    page = await context.newPage();
+test.describe('UI Performance', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test.beforeAll(async ({ perfPage }) => {
+    page = perfPage;
   });
 
-  base.afterAll(async () => {
-    await browser?.close();
-  });
-
-  base('user sees the chat list after opening the app', async () => {
+  test('user sees the chat list after opening the app', async () => {
     const start = Date.now();
 
     await page.goto(
-      process.env.BASE_URL || base.info().project.use.baseURL || 'http://localhost:1355',
+      process.env.BASE_URL || test.info().project.use.baseURL || 'http://localhost:1355',
     );
     const result = await waitForApp(page);
 
     if (result === 'auth') {
-      base.skip(true, 'App is on auth screen — no session available');
+      test.skip(true, 'App is on auth screen — no session available');
       return;
     }
     if (result === 'loading') {
-      base.skip(true, 'Dialogs did not load — daemon may be unresponsive');
+      test.skip(true, 'Dialogs did not load — daemon may be unresponsive');
       return;
     }
 
@@ -151,10 +41,10 @@ base.describe('UI Performance', () => {
     expect(elapsed, `Took ${fmt(elapsed)} — user would be staring at a spinner`).toBeLessThan(5000);
   });
 
-  base('user sees messages after clicking a chat', async () => {
+  test('user sees messages after clicking a chat', async () => {
     const dialogCount = await page.locator('[data-testid="dialog-item"]').count();
     if (dialogCount === 0) {
-      base.skip(true, 'No dialogs loaded — skipping message test');
+      test.skip(true, 'No dialogs loaded — skipping message test');
       return;
     }
 
@@ -172,7 +62,7 @@ base.describe('UI Performance', () => {
     expect(elapsed, `Took ${fmt(elapsed)} — chat felt unresponsive`).toBeLessThan(3000);
   });
 
-  base('page does not have layout jank or slow paints', async () => {
+  test('page does not have layout jank or slow paints', async () => {
     const vitals = await extractWebVitals(page);
 
     console.log('\n  Does the page paint quickly and stay stable?');

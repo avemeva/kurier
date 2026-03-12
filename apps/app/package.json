@@ -8,6 +8,7 @@
     "hmr": "portless $([ -f \"$(git rev-parse --show-toplevel)/.git\" ] && basename \"$(git rev-parse --show-toplevel)\" || echo tg) vite",
     "build": "vite build && electrobun build",
     "test": "vitest run",
+    "test:e2e": "bunx playwright test --project app",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

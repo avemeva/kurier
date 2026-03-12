@@ -1,56 +1,46 @@
-import { type BrowserContext, test as base, chromium, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { expect, appTest as test, waitForApp } from '../fixtures';
 
 // ---------------------------------------------------------------------------
-// Shared setup — single browser, single page, one navigation
+// Shared state — single browser context, single page, one navigation
+// Worker-scoped fixtures provide the browser; we create context in beforeAll.
+// All tests run serially (workers: 1 in config) and share the same page.
 // ---------------------------------------------------------------------------
 
-let browser: ReturnType<typeof chromium.launch> extends Promise<infer T> ? T : never;
-let context: BrowserContext;
 let page: Page;
 
-base.beforeAll(async () => {
-  browser = await chromium.launch({ headless: true });
-  context = await browser.newContext();
-  page = await context.newPage();
+test.describe.configure({ mode: 'serial' });
 
-  const url = process.env.BASE_URL || base.info().project.use.baseURL || 'http://tg.localhost:1355';
+test.beforeAll(async ({ appPage }) => {
+  page = appPage;
+
+  const url = process.env.BASE_URL || test.info().project.use.baseURL || 'http://tg.localhost:1355';
   await page.goto(url);
 
   // Wait for app to be ready (dialogs or auth)
-  try {
-    await Promise.any([
-      page.waitForSelector('[data-testid="dialog-item"]', { timeout: 20_000 }),
-      page.waitForSelector('input[type="tel"]', { timeout: 20_000 }),
-    ]);
-  } catch {
-    // stuck on loading
-  }
-});
-
-base.afterAll(async () => {
-  await browser?.close();
+  await waitForApp(page);
 });
 
 // ---------------------------------------------------------------------------
 // Layout
 // ---------------------------------------------------------------------------
 
-base('chat layout renders with sidebar and main area', async () => {
+test('chat layout renders with sidebar and main area', async () => {
   const layout = page.locator('[data-testid="chat-layout"]');
   await expect(layout).toBeVisible();
 });
 
-base('sidebar shows "Chats" heading', async () => {
+test('sidebar shows "Chats" heading', async () => {
   await expect(page.locator('[data-testid="sidebar-heading"]')).toBeVisible();
 });
 
-base('sidebar renders multiple dialog items', async () => {
+test('sidebar renders multiple dialog items', async () => {
   const dialogs = page.locator('[data-testid="dialog-item"]');
   const count = await dialogs.count();
   expect(count, 'Expected at least 5 dialogs').toBeGreaterThanOrEqual(5);
 });
 
-base('chat list can be scrolled', async () => {
+test('chat list can be scrolled', async () => {
   const scrollContainer = page.locator('[data-testid="sidebar-scroll"]');
 
   // Set scrollTop to 300px, then read it back. If scrolling works, it stays at 300.
@@ -66,13 +56,13 @@ base('chat list can be scrolled', async () => {
   expect(scrollTop, 'Chat list should be scrollable').toBeGreaterThan(0);
 });
 
-base('each dialog item has an avatar', async () => {
+test('each dialog item has an avatar', async () => {
   const firstDialog = page.locator('[data-testid="dialog-item"]').first();
   const avatar = firstDialog.locator('[data-testid="avatar-img"], [data-testid="dialog-item"] > *');
   await expect(avatar.first()).toBeVisible();
 });
 
-base('each dialog item shows chat name', async () => {
+test('each dialog item shows chat name', async () => {
   const firstDialog = page.locator('[data-testid="dialog-item"]').first();
   const name = firstDialog.locator('[data-testid="dialog-name"]');
   await expect(name).toBeVisible();
@@ -80,7 +70,7 @@ base('each dialog item shows chat name', async () => {
   expect(text?.length).toBeGreaterThan(0);
 });
 
-base('dialog items show last message preview', async () => {
+test('dialog items show last message preview', async () => {
   const previews = page.locator('[data-testid="dialog-item"] [data-testid="dialog-preview"]');
   const count = await previews.count();
   expect(count, 'Expected at least some dialogs with message previews').toBeGreaterThan(0);
@@ -90,20 +80,20 @@ base('dialog items show last message preview', async () => {
 // Chat selection & messages
 // ---------------------------------------------------------------------------
 
-base('clicking a dialog opens the chat', async () => {
+test('clicking a dialog opens the chat', async () => {
   await page.locator('[data-testid="dialog-item"]').first().click();
   const header = page.locator('[data-testid="chat-title"]');
   await expect(header).toBeVisible({ timeout: 5_000 });
 });
 
-base('chat header shows chat title', async () => {
+test('chat header shows chat title', async () => {
   const title = page.locator('[data-testid="chat-title"]');
   await expect(title).toBeVisible();
   const text = await title.textContent();
   expect(text?.length).toBeGreaterThan(0);
 });
 
-base('message panel renders message bubbles after selecting a chat', async () => {
+test('message panel renders message bubbles after selecting a chat', async () => {
   // Click through dialogs until we find one with messages
   const dialogs = page.locator('[data-testid="dialog-item"]');
   const count = await dialogs.count();
@@ -123,13 +113,13 @@ base('message panel renders message bubbles after selecting a chat', async () =>
   expect(found, 'No chat with message bubbles found in first 5 dialogs').toBe(true);
 });
 
-base('messages have timestamps', async () => {
+test('messages have timestamps', async () => {
   const times = page.locator('[data-testid="message-bubble"] [data-testid="message-time"]');
   const count = await times.count();
   expect(count, 'Expected messages to have timestamps').toBeGreaterThan(0);
 });
 
-base('message input is visible when a chat is open', async () => {
+test('message input is visible when a chat is open', async () => {
   const textarea = page.locator('[data-testid="message-input"]');
   // Not all chats have an input (channels don't), so try to find one
   const dialogs = page.locator('[data-testid="dialog-item"]');
@@ -137,18 +127,22 @@ base('message input is visible when a chat is open', async () => {
 
   for (let i = 0; i < Math.min(count, 5); i++) {
     await dialogs.nth(i).click();
-    await page.waitForTimeout(500);
-    if (await textarea.isVisible()) return;
+    try {
+      await textarea.waitFor({ state: 'visible', timeout: 3_000 });
+      return;
+    } catch {
+      // try next dialog
+    }
   }
 
   // If no dialog has input, skip — might be all channels
-  base.skip(true, 'No chat with message input found in first 5 dialogs');
+  test.skip(true, 'No chat with message input found in first 5 dialogs');
 });
 
-base('send button exists when input is visible', async () => {
+test('send button exists when input is visible', async () => {
   const textarea = page.locator('[data-testid="message-input"]');
   if (!(await textarea.isVisible())) {
-    base.skip(true, 'No message input visible');
+    test.skip(true, 'No message input visible');
     return;
   }
   const sendBtn = page.locator('[data-testid="send-button"]');
@@ -159,26 +153,28 @@ base('send button exists when input is visible', async () => {
 // Sidebar interactions
 // ---------------------------------------------------------------------------
 
-base('clicking a different dialog switches the chat', async () => {
+test('clicking a different dialog switches the chat', async () => {
   const dialogs = page.locator('[data-testid="dialog-item"]');
   const count = await dialogs.count();
   if (count < 2) {
-    base.skip(true, 'Need at least 2 dialogs to test switching');
+    test.skip(true, 'Need at least 2 dialogs to test switching');
     return;
   }
 
   await dialogs.first().click();
-  await page.waitForTimeout(500);
-  const firstTitle = await page.locator('[data-testid="chat-title"]').textContent();
+  const titleLocator = page.locator('[data-testid="chat-title"]');
+  await expect(titleLocator).toBeVisible({ timeout: 5_000 });
+  const firstTitle = await titleLocator.textContent();
 
   await dialogs.nth(1).click();
-  await page.waitForTimeout(500);
-  const secondTitle = await page.locator('[data-testid="chat-title"]').textContent();
+  // Wait for the title to change from the first chat's title
+  await expect(titleLocator).not.toHaveText(firstTitle ?? '', { timeout: 5_000 });
+  const secondTitle = await titleLocator.textContent();
 
   expect(secondTitle).not.toBe(firstTitle);
 });
 
-base('sidebar search input appears when search is activated', async () => {
+test('sidebar search input appears when search is activated', async () => {
   const searchBtn = page.locator('[data-testid="search-button"]');
   await searchBtn.click();
 
@@ -188,7 +184,7 @@ base('sidebar search input appears when search is activated', async () => {
   await searchInput.press('Escape');
 });
 
-base('search input clears and closes on Escape', async () => {
+test('search input clears and closes on Escape', async () => {
   const searchBtn = page.locator('[data-testid="search-button"]');
   await searchBtn.click();
 
@@ -196,7 +192,6 @@ base('search input clears and closes on Escape', async () => {
   await expect(searchInput).toBeVisible({ timeout: 3_000 });
 
   await searchInput.fill('test query');
-  await page.waitForTimeout(200);
   await searchInput.press('Escape');
 
   // Search input should be gone, heading should be back
@@ -207,14 +202,14 @@ base('search input clears and closes on Escape', async () => {
 // Scroll & content
 // ---------------------------------------------------------------------------
 
-base('sidebar is scrollable with many dialogs', async () => {
+test('sidebar is scrollable with many dialogs', async () => {
   const sidebar = page.locator('[data-testid="sidebar-scroll"]');
   const scrollHeight = await sidebar.evaluate((el) => el.scrollHeight);
   const clientHeight = await sidebar.evaluate((el) => el.clientHeight);
   expect(scrollHeight).toBeGreaterThanOrEqual(clientHeight);
 });
 
-base('scrolling sidebar to bottom loads more chats', async () => {
+test('scrolling sidebar to bottom loads more chats', async () => {
   const sidebar = page.locator('[data-testid="sidebar-scroll"]');
   const initialCount = await page.locator('[data-testid="dialog-item"]').count();
 
@@ -234,7 +229,7 @@ base('scrolling sidebar to bottom loads more chats', async () => {
     // If no more chats loaded, the account may have ≤100 chats — skip
     const afterCount = await page.locator('[data-testid="dialog-item"]').count();
     if (afterCount === initialCount) {
-      base.skip(true, `Only ${initialCount} chats available (no more to load)`);
+      test.skip(true, `Only ${initialCount} chats available (no more to load)`);
       return;
     }
   }
@@ -244,9 +239,8 @@ base('scrolling sidebar to bottom loads more chats', async () => {
   expect(afterCount).toBeGreaterThan(initialCount);
 });
 
-base('message panel is present when a chat is selected', async () => {
+test('message panel is present when a chat is selected', async () => {
   await page.locator('[data-testid="dialog-item"]').first().click();
-  await page.waitForTimeout(500);
 
   const panel = page.locator('[data-testid="message-panel"]');
   await expect(panel).toBeVisible({ timeout: 5_000 });
@@ -256,7 +250,7 @@ base('message panel is present when a chat is selected', async () => {
 // Auto-scroll to bottom on chat open
 // ---------------------------------------------------------------------------
 
-base('opening a chat scrolls to latest messages', async () => {
+test('opening a chat scrolls to latest messages', async () => {
   const dialogs = page.locator('[data-testid="dialog-item"]');
   const panel = page.locator('[data-testid="message-panel"]');
   const count = await dialogs.count();
@@ -289,7 +283,7 @@ base('opening a chat scrolls to latest messages', async () => {
   // Ensure a chat switch happens by first navigating to the last dialog,
   // since previous tests may have left dialog 0 selected.
   await dialogs.nth(Math.min(count - 1, 5)).click();
-  await page.waitForTimeout(300);
+  await page.waitForSelector('[data-testid="message-bubble"]', { timeout: 3_000 }).catch(() => {});
 
   // Find first scrollable chat (fetch path — guaranteed to be a chat switch)
   let firstScrollable = -1;
@@ -305,7 +299,9 @@ base('opening a chat scrolls to latest messages', async () => {
   const other = firstScrollable === 0 ? 1 : 0;
   if (other < count) {
     await dialogs.nth(other).click();
-    await page.waitForTimeout(300);
+    await page
+      .waitForSelector('[data-testid="message-bubble"]', { timeout: 3_000 })
+      .catch(() => {});
     await openAndAssertScrolled(firstScrollable);
   }
 });
@@ -314,21 +310,21 @@ base('opening a chat scrolls to latest messages', async () => {
 // Visual structure
 // ---------------------------------------------------------------------------
 
-base('outgoing messages have outgoing data attribute', async () => {
+test('outgoing messages have outgoing data attribute', async () => {
   const outgoing = page.locator('[data-testid="message-bubble"][data-is-outgoing="true"]');
   const count = await outgoing.count();
   if (count === 0) {
-    base.skip(true, 'No outgoing messages in current chat');
+    test.skip(true, 'No outgoing messages in current chat');
     return;
   }
   await expect(outgoing.first()).toBeVisible();
 });
 
-base('incoming messages have incoming data attribute', async () => {
+test('incoming messages have incoming data attribute', async () => {
   const incoming = page.locator('[data-testid="message-bubble"][data-is-outgoing="false"]');
   const count = await incoming.count();
   if (count === 0) {
-    base.skip(true, 'No incoming messages in current chat');
+    test.skip(true, 'No incoming messages in current chat');
     return;
   }
   await expect(incoming.first()).toBeVisible();
@@ -339,11 +335,11 @@ base('incoming messages have incoming data attribute', async () => {
 // ---------------------------------------------------------------------------
 
 for (let chatIdx = 0; chatIdx < 5; chatIdx++) {
-  base(`chat ${chatIdx + 1}: does not auto-load, loads on scroll-up`, async () => {
+  test(`chat ${chatIdx + 1}: does not auto-load, loads on scroll-up`, async () => {
     const dialogs = page.locator('[data-testid="dialog-item"]');
     const count = await dialogs.count();
     if (chatIdx >= count) {
-      base.skip(true, `Only ${count} dialogs available`);
+      test.skip(true, `Only ${count} dialogs available`);
       return;
     }
 
@@ -351,7 +347,7 @@ for (let chatIdx = 0; chatIdx < 5; chatIdx++) {
     try {
       await page.waitForSelector('[data-testid="message-bubble"]', { timeout: 5_000 });
     } catch {
-      base.skip(true, `Chat ${chatIdx + 1} has no messages`);
+      test.skip(true, `Chat ${chatIdx + 1} has no messages`);
       return;
     }
 
@@ -363,28 +359,46 @@ for (let chatIdx = 0; chatIdx < 5; chatIdx++) {
     const isScrollable = await panel.evaluate((el) => el.scrollHeight > el.clientHeight);
     if (!isScrollable) {
       console.log(`  ${chatTitle}: ${initialCount} messages (not scrollable, skipping)`);
-      base.skip(true, `${chatTitle} has too few messages to scroll`);
+      test.skip(true, `${chatTitle} has too few messages to scroll`);
       return;
     }
 
     // Verify: sitting at bottom does NOT auto-load
-    await page.waitForTimeout(1500);
+    // Wait and poll to check count stays stable over 1.5s
+    await page
+      .waitForFunction(
+        (prev) => document.querySelectorAll('[data-testid="message-bubble"]').length > prev,
+        initialCount,
+        { timeout: 1_500 },
+      )
+      .then(() => true)
+      .catch(() => false);
+
     const afterIdle = await page.locator('[data-testid="message-bubble"]').count();
     expect(afterIdle, `${chatTitle}: should NOT auto-load`).toBe(initialCount);
 
     // Scroll up with mouse wheel to trigger loading
     const panelBox = await panel.boundingBox();
     if (!panelBox) {
-      base.skip(true, 'Panel not visible');
+      test.skip(true, 'Panel not visible');
       return;
     }
     // Scroll to bottom first to arm the trigger
     await page.mouse.move(panelBox.x + panelBox.width / 2, panelBox.y + panelBox.height / 2);
     await page.mouse.wheel(0, 10000);
-    await page.waitForTimeout(300);
     // Now scroll up aggressively
     await page.mouse.wheel(0, -100000);
-    await page.waitForTimeout(3000);
+
+    // Wait for more messages to appear (up to 5s)
+    try {
+      await page.waitForFunction(
+        (prev) => document.querySelectorAll('[data-testid="message-bubble"]').length > prev,
+        initialCount,
+        { timeout: 5_000 },
+      );
+    } catch {
+      // May not have more history
+    }
 
     const afterScroll = await page.locator('[data-testid="message-bubble"]').count();
     console.log(`  ${chatTitle}: ${initialCount} → ${afterScroll} messages`);
@@ -397,7 +411,7 @@ for (let chatIdx = 0; chatIdx < 5; chatIdx++) {
 // Avatar photos
 // ---------------------------------------------------------------------------
 
-base('at least some dialog avatars load as images', async () => {
+test('at least some dialog avatars load as images', async () => {
   const dialogs = page.locator('[data-testid="dialog-item"]');
   const count = await dialogs.count();
 
@@ -419,14 +433,21 @@ base('at least some dialog avatars load as images', async () => {
 // Voice messages
 // ---------------------------------------------------------------------------
 
-base('voice messages render waveform bars', async () => {
+test('voice messages render waveform bars', async () => {
   const dialogs = page.locator('[data-testid="dialog-item"]');
   const count = await dialogs.count();
 
   // Search through chats to find one with voice messages
   for (let i = 0; i < Math.min(count, 10); i++) {
     await dialogs.nth(i).click();
-    await page.waitForTimeout(500);
+    try {
+      await page
+        .locator('[data-testid="voice-message"]')
+        .first()
+        .waitFor({ state: 'visible', timeout: 2_000 });
+    } catch {
+      continue;
+    }
 
     const voiceMessages = page.locator('[data-testid="voice-message"]');
     if ((await voiceMessages.count()) > 0) {
@@ -446,13 +467,13 @@ base('voice messages render waveform bars', async () => {
     }
   }
 
-  base.skip(true, 'No chat with voice messages found in first 10 dialogs');
+  test.skip(true, 'No chat with voice messages found in first 10 dialogs');
 });
 
-base('voice messages show pre-loaded duration', async () => {
+test('voice messages show pre-loaded duration', async () => {
   const voiceMessages = page.locator('[data-testid="voice-message"]');
   if ((await voiceMessages.count()) === 0) {
-    base.skip(true, 'No voice messages in current view');
+    test.skip(true, 'No voice messages in current view');
     return;
   }
 
@@ -468,11 +489,11 @@ base('voice messages show pre-loaded duration', async () => {
 // ---------------------------------------------------------------------------
 
 for (let chatIdx = 0; chatIdx < 5; chatIdx++) {
-  base(`chat ${chatIdx + 1}: no layout shift after messages render`, async () => {
+  test(`chat ${chatIdx + 1}: no layout shift after messages render`, async () => {
     const dialogs = page.locator('[data-testid="dialog-item"]');
     const count = await dialogs.count();
     if (chatIdx >= count) {
-      base.skip(true, `Only ${count} dialogs available`);
+      test.skip(true, `Only ${count} dialogs available`);
       return;
     }
 
@@ -480,7 +501,7 @@ for (let chatIdx = 0; chatIdx < 5; chatIdx++) {
     try {
       await page.waitForSelector('[data-testid="message-bubble"]', { timeout: 5_000 });
     } catch {
-      base.skip(true, `Chat ${chatIdx + 1} has no messages`);
+      test.skip(true, `Chat ${chatIdx + 1} has no messages`);
       return;
     }
 
@@ -489,15 +510,34 @@ for (let chatIdx = 0; chatIdx < 5; chatIdx++) {
     // Skip non-scrollable chats (too few messages — trivially no shift)
     const isScrollable = await panel.evaluate((el) => el.scrollHeight > el.clientHeight);
     if (!isScrollable) {
-      base.skip(true, `Chat ${chatIdx + 1} is not scrollable`);
+      test.skip(true, `Chat ${chatIdx + 1} is not scrollable`);
       return;
     }
 
     // Record scrollHeight after initial render
     const initialScrollHeight = await panel.evaluate((el) => el.scrollHeight);
 
-    // Wait 2s for async media loads (images, videos, stickers)
-    await page.waitForTimeout(2000);
+    // Wait for scrollHeight to stabilize (poll every 200ms, stable for 1s, max 3s)
+    await page
+      .waitForFunction(
+        ({ sel, stableMs }) => {
+          const el = document.querySelector(sel);
+          if (!el) return false;
+          const key = '__clsStable';
+          const w = window as unknown as Record<string, unknown>;
+          const prev = w[key] as { height: number; since: number } | undefined;
+          const now = Date.now();
+          const h = el.scrollHeight;
+          if (!prev || prev.height !== h) {
+            w[key] = { height: h, since: now };
+            return false;
+          }
+          return now - prev.since >= stableMs;
+        },
+        { sel: '[data-testid="message-panel"]', stableMs: 1000 },
+        { timeout: 3_000 },
+      )
+      .catch(() => {});
 
     const finalScrollHeight = await panel.evaluate((el) => el.scrollHeight);
     const chatTitle = await page.locator('[data-testid="chat-title"]').textContent();
@@ -515,25 +555,27 @@ for (let chatIdx = 0; chatIdx < 5; chatIdx++) {
 // Error checks
 // ---------------------------------------------------------------------------
 
-base('no console errors during interaction', async () => {
-  const errors: string[] = [];
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') errors.push(msg.text());
-  });
-
+test('no console errors during interaction', async ({ errors: fixtureErrors }) => {
+  // Interact to trigger any latent errors
   await page.locator('[data-testid="dialog-item"]').first().click();
-  await page.waitForTimeout(1000);
+  await page
+    .locator('[data-testid="chat-title"]')
+    .waitFor({ state: 'visible', timeout: 5_000 })
+    .catch(() => {});
 
-  const realErrors = errors.filter((e) => !e.includes('net::') && !e.includes('Failed to fetch'));
+  const realErrors = fixtureErrors.filter(
+    (e) => !e.includes('net::') && !e.includes('Failed to fetch'),
+  );
   expect(realErrors, `Console errors: ${realErrors.join(', ')}`).toHaveLength(0);
 });
 
-base('no uncaught JS exceptions', async () => {
-  const exceptions: string[] = [];
-  page.on('pageerror', (err) => exceptions.push(err.message));
-
+test('no uncaught JS exceptions', async ({ exceptions: fixtureExceptions }) => {
+  // Interact to trigger any latent errors
   await page.locator('[data-testid="dialog-item"]').nth(0).click();
-  await page.waitForTimeout(1000);
+  await page
+    .locator('[data-testid="chat-title"]')
+    .waitFor({ state: 'visible', timeout: 5_000 })
+    .catch(() => {});
 
-  expect(exceptions, `Uncaught exceptions: ${exceptions.join(', ')}`).toHaveLength(0);
+  expect(fixtureExceptions, `Uncaught exceptions: ${fixtureExceptions.join(', ')}`).toHaveLength(0);
 });
