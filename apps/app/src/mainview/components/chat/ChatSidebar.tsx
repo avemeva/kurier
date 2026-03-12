@@ -36,7 +36,7 @@ function SavedMessagesAvatar({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'flex items-center justify-center rounded-full bg-accent-blue text-white',
+        'flex items-center justify-center rounded-full bg-accent-brand text-white',
         className,
       )}
     >
@@ -62,7 +62,7 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
     <>
       {parts.map((part, i) =>
         regex.test(part) ? (
-          <span key={`${i}-${part}`} className="font-semibold text-accent-blue">
+          <span key={`${i}-${part}`} className="font-semibold text-accent-brand">
             {part}
           </span>
         ) : (
@@ -100,7 +100,7 @@ function ChatPreviewLine({ chat, thumbUrl }: { chat: UIChat; thumbUrl: string | 
         className="flex min-w-0 items-center gap-1.5 text-sm text-text-tertiary"
       >
         <span className="truncate">
-          <span className="text-red-500">Draft: </span>
+          <span className="text-draft">Draft: </span>
           {chat.draftText}
         </span>
       </span>
@@ -509,11 +509,12 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
               onKeyDown={handleSearchKeyDown}
               data-testid="search-input"
               placeholder="Search"
-              className="h-[35px] w-full rounded-full border border-border bg-bg-secondary pl-9 pr-9 text-sm text-text-primary placeholder:text-text-tertiary focus:border-accent-blue focus:outline-none"
+              className="h-[35px] w-full rounded-full border border-border bg-bg-secondary pl-9 pr-9 text-sm text-text-primary placeholder:text-text-tertiary focus:border-accent-brand focus:outline-none"
             />
             {searchQuery && (
               <button
                 type="button"
+                aria-label="Clear search"
                 onClick={() => handleSearchInputChange('')}
                 className="absolute right-2.5 rounded-full p-0.5 text-text-tertiary hover:text-text-secondary"
               >
@@ -523,8 +524,9 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
           </div>
           <button
             type="button"
+            aria-label="Close search"
             onClick={handleCloseSearch}
-            className="shrink-0 rounded-md p-1.5 text-text-tertiary hover:bg-accent hover:text-text-secondary"
+            className="shrink-0 rounded-md p-1.5 text-text-tertiary transition-colors hover:bg-accent hover:text-text-secondary"
           >
             <X size={18} />
           </button>
@@ -539,7 +541,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
               data-testid="search-button"
               type="button"
               onClick={openGlobalSearch}
-              className="rounded-md p-1.5 text-text-tertiary hover:bg-accent hover:text-text-secondary"
+              className="rounded-md p-1.5 text-text-tertiary transition-colors hover:bg-accent hover:text-text-secondary"
               title="Search"
             >
               <Search size={16} />
@@ -577,7 +579,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                 className={cn(
                   'flex-1 py-2 text-xs font-medium transition-colors',
                   tab === 'all'
-                    ? 'border-b-2 border-accent-blue text-accent-blue'
+                    ? 'border-b-2 border-accent-brand text-accent-brand'
                     : 'text-text-tertiary hover:text-text-secondary',
                 )}
               >
@@ -589,7 +591,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                 className={cn(
                   'flex-1 py-2 text-xs font-medium transition-colors',
                   tab === 'archive'
-                    ? 'border-b-2 border-accent-blue text-accent-blue'
+                    ? 'border-b-2 border-accent-brand text-accent-brand'
                     : 'text-text-tertiary hover:text-text-secondary',
                 )}
               >
@@ -713,7 +715,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                           </span>
                         )}
                         {chat.unreadCount > 0 && (
-                          <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-sand-8 px-1 text-xs font-medium leading-none text-white dark:bg-unread">
+                          <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-badge-muted px-1 text-xs font-medium leading-none text-white dark:bg-unread">
                             {chat.unreadCount}
                           </span>
                         )}

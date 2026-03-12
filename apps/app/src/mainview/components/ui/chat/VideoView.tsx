@@ -10,7 +10,7 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function VideoPlayer({ url }: { url: string }) {
+function VideoPlayer({ url, className }: { url: string; className?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -164,6 +164,7 @@ function VideoPlayer({ url }: { url: string }) {
       className={cn(
         'group relative overflow-hidden rounded bg-black',
         isFullscreen ? 'flex items-center justify-center' : 'max-h-80 max-w-full',
+        className,
       )}
       onMouseMove={revealControls}
       onMouseLeave={() => {
@@ -281,6 +282,7 @@ export function PureVideoView({
   isGif,
   cover,
   onRetry,
+  className,
 }: {
   url: string | null;
   loading?: boolean;
@@ -288,6 +290,7 @@ export function PureVideoView({
   isGif?: boolean;
   cover?: boolean;
   onRetry?: () => void;
+  className?: string;
 }) {
   if (loading) {
     return (
@@ -299,6 +302,7 @@ export function PureVideoView({
             : cover
               ? 'h-full w-full'
               : 'aspect-video w-full max-w-xs rounded-lg',
+          className,
         )}
       />
     );
@@ -317,26 +321,41 @@ export function PureVideoView({
               ? 'h-full w-full'
               : 'aspect-video w-full max-w-xs rounded',
           onRetry && 'cursor-pointer transition-colors hover:bg-accent/80',
+          className,
         )}
       />
     );
   }
   if (isCircle) {
     return (
-      <div className="size-[200px] overflow-hidden rounded-full">
+      <div className={cn('size-[200px] overflow-hidden rounded-full', className)}>
         <video src={url} className="h-full w-full object-cover" autoPlay muted loop playsInline />
       </div>
     );
   }
   if (cover) {
     return (
-      <video src={url} className="h-full w-full object-cover" autoPlay muted loop playsInline />
+      <video
+        src={url}
+        className={cn('h-full w-full object-cover', className)}
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
     );
   }
   if (isGif) {
     return (
-      <video src={url} className="max-h-80 max-w-full rounded" autoPlay muted loop playsInline />
+      <video
+        src={url}
+        className={cn('max-h-80 max-w-full rounded', className)}
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
     );
   }
-  return <VideoPlayer url={url} />;
+  return <VideoPlayer url={url} className={className} />;
 }

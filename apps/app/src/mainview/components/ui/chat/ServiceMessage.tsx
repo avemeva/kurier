@@ -1,10 +1,20 @@
-export function PureServiceMessage({ text, onClick }: { text: string; onClick?: () => void }) {
+import { cn } from '@/lib/utils';
+
+export function PureServiceMessage({
+  text,
+  onClick,
+  className,
+}: {
+  text: string;
+  onClick?: () => void;
+  className?: string;
+}) {
   if (onClick) {
     return (
-      <div className="flex justify-center py-1">
+      <div className={cn('flex justify-center py-1', className)}>
         <button
           type="button"
-          className="rounded-full border border-border bg-accent/80 px-3 py-0.5 text-xs text-text-tertiary cursor-pointer hover:bg-accent"
+          className="cursor-pointer rounded-full border border-border bg-accent/80 px-3 py-0.5 text-xs text-text-tertiary hover:bg-accent"
           onClick={onClick}
         >
           {text}
@@ -13,7 +23,7 @@ export function PureServiceMessage({ text, onClick }: { text: string; onClick?: 
     );
   }
   return (
-    <div className="flex justify-center py-1">
+    <div className={cn('flex justify-center py-1', className)}>
       <span className="rounded-full border border-border bg-accent/80 px-3 py-0.5 text-xs text-text-tertiary">
         {text}
       </span>

@@ -1,11 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "tw-glass";
 @import "tw-shimmer";
 
 /* Radix color imports — kept for backward compatibility during migration */
-@import "@radix-ui/colors/gray.css";
-@import "@radix-ui/colors/gray-dark.css";
 @import "@radix-ui/colors/sand.css";
 @import "@radix-ui/colors/sand-dark.css";
 @import "@radix-ui/colors/blue.css";
@@ -14,8 +11,6 @@
 @import "@radix-ui/colors/red-dark.css";
 @import "@radix-ui/colors/plum.css";
 @import "@radix-ui/colors/plum-dark.css";
-@import "@radix-ui/colors/lime.css";
-@import "@radix-ui/colors/lime-dark.css";
 @import "@radix-ui/colors/green.css";
 @import "@radix-ui/colors/green-dark.css";
 
@@ -60,31 +55,10 @@
   font-display: swap;
 }
 
-/* Keep FiraCode for backward compat (DevPage etc.) */
-@font-face {
-  font-family: "FiraCode Nerd Font";
-  src: url("./fonts/FiraCodeNerdFont-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "FiraCode Nerd Font";
-  src: url("./fonts/FiraCodeNerdFont-Medium.woff2") format("woff2");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "FiraCode Nerd Font";
-  src: url("./fonts/FiraCodeNerdFont-Bold.woff2") format("woff2");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
 :root {
   --radius: 0.625rem;
+  --bubble-r-sm: 4px;
+  --bubble-r-lg: 12px;
 
   /* Surfaces */
   --background: oklch(1 0 0);
@@ -118,17 +92,21 @@
   /* Telegram-specific */
   --message-own: oklch(0.93 0.02 250);
   --message-own-hover: oklch(0.9 0.03 250);
-  --message-own-foreground: oklch(0.205 0 0);
   --message-peer: oklch(0.97 0 0);
-  --message-peer-foreground: oklch(0.205 0 0);
   --online: oklch(0.723 0.191 149.579);
   --unread: oklch(0.546 0.245 262.881);
-  --accent-blue: oklch(0.546 0.245 263);
-  --accent-blue-subtle: oklch(0.93 0.02 250);
+  --accent-brand: oklch(0.546 0.245 263);
+  --accent-brand-subtle: oklch(0.93 0.02 250);
   --forward: oklch(0.723 0.191 149);
   --code-bg: oklch(0.95 0 0);
-  --spoiler: oklch(0.65 0 0);
   --error-text: oklch(0.55 0.2 25);
+  --avatar-1: oklch(0.55 0.2 260);
+  --avatar-2: oklch(0.55 0.2 320);
+  --avatar-3: oklch(0.65 0.2 150);
+  --avatar-4: oklch(0.6 0.2 25);
+  --avatar-5: oklch(0.6 0.05 80);
+  --draft: oklch(0.577 0.245 27.325);
+  --badge-muted: oklch(0.588 0 0);
 }
 
 .dark {
@@ -154,17 +132,21 @@
 
   --message-own: oklch(0.25 0.03 250);
   --message-own-hover: oklch(0.28 0.04 250);
-  --message-own-foreground: oklch(0.985 0 0);
   --message-peer: oklch(0.269 0 0);
-  --message-peer-foreground: oklch(0.985 0 0);
   --online: oklch(0.723 0.191 149.579);
   --unread: oklch(0.488 0.243 264.376);
-  --accent-blue: oklch(0.488 0.243 264);
-  --accent-blue-subtle: oklch(0.25 0.03 250);
+  --accent-brand: oklch(0.488 0.243 264);
+  --accent-brand-subtle: oklch(0.25 0.03 250);
   --forward: oklch(0.723 0.191 149);
   --code-bg: oklch(0.22 0 0);
-  --spoiler: oklch(0.4 0 0);
   --error-text: oklch(0.75 0.15 22);
+  --avatar-1: oklch(0.55 0.2 260);
+  --avatar-2: oklch(0.55 0.2 320);
+  --avatar-3: oklch(0.65 0.2 150);
+  --avatar-4: oklch(0.6 0.2 25);
+  --avatar-5: oklch(0.6 0.05 80);
+  --draft: oklch(0.704 0.191 22.216);
+  --badge-muted: oklch(0.45 0 0);
 }
 
 @theme inline {
@@ -195,16 +177,13 @@
   /* Telegram semantic colors */
   --color-message-own: var(--message-own);
   --color-message-own-hover: var(--message-own-hover);
-  --color-message-own-foreground: var(--message-own-foreground);
   --color-message-peer: var(--message-peer);
-  --color-message-peer-foreground: var(--message-peer-foreground);
   --color-online: var(--online);
   --color-unread: var(--unread);
-  --color-accent-blue: var(--accent-blue);
-  --color-accent-blue-subtle: var(--accent-blue-subtle);
+  --color-accent-brand: var(--accent-brand);
+  --color-accent-brand-subtle: var(--accent-brand-subtle);
   --color-forward: var(--forward);
   --color-code-bg: var(--code-bg);
-  --color-spoiler: var(--spoiler);
   --color-error-text: var(--error-text);
 
   /* Radix color scales — kept for backward compatibility */
@@ -221,19 +200,6 @@
   --color-sand-11: var(--sand-11);
   --color-sand-12: var(--sand-12);
 
-  --color-gray-1: var(--gray-1);
-  --color-gray-2: var(--gray-2);
-  --color-gray-3: var(--gray-3);
-  --color-gray-4: var(--gray-4);
-  --color-gray-5: var(--gray-5);
-  --color-gray-6: var(--gray-6);
-  --color-gray-7: var(--gray-7);
-  --color-gray-8: var(--gray-8);
-  --color-gray-9: var(--gray-9);
-  --color-gray-10: var(--gray-10);
-  --color-gray-11: var(--gray-11);
-  --color-gray-12: var(--gray-12);
-
   --color-blue-1: var(--blue-1);
   --color-blue-2: var(--blue-2);
   --color-blue-3: var(--blue-3);
@@ -247,21 +213,25 @@
   --color-blue-11: var(--blue-11);
   --color-blue-12: var(--blue-12);
 
-  --color-red-3: var(--red-3);
   --color-red-9: var(--red-9);
   --color-red-11: var(--red-11);
-  --color-red-12: var(--red-12);
 
   --color-plum-9: var(--plum-9);
 
   --color-green-9: var(--green-9);
-  --color-green-10: var(--green-10);
-  --color-green-11: var(--green-11);
 
-  --color-text-primary: var(--sand-12);
-  --color-text-secondary: var(--sand-11);
-  --color-text-tertiary: var(--sand-10);
-  --color-text-quaternary: var(--sand-9);
+  --color-avatar-1: var(--avatar-1);
+  --color-avatar-2: var(--avatar-2);
+  --color-avatar-3: var(--avatar-3);
+  --color-avatar-4: var(--avatar-4);
+  --color-avatar-5: var(--avatar-5);
+  --color-draft: var(--draft);
+  --color-badge-muted: var(--badge-muted);
+
+  --color-text-primary: oklch(0.15 0.005 75);
+  --color-text-secondary: oklch(0.44 0.01 75);
+  --color-text-tertiary: oklch(0.55 0.01 75);
+  --color-text-quaternary: oklch(0.65 0.005 75);
 
   /* Radius */
   --radius-sm: calc(var(--radius) - 4px);
@@ -299,20 +269,6 @@
 }
 
 /* Scrollbar utilities */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-}
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: var(--sand-6);
-  border-radius: 3px;
-}
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background-color: var(--sand-8);
-}
-
 .scrollbar-subtle {
   scrollbar-width: thin;
 }
@@ -330,41 +286,7 @@
   background-color: oklch(0.58 0 0 / 0.35);
 }
 
-/* Premium shadow */
-.shadow-crisp-edge {
-  box-shadow:
-    0px 1px 0px -1px oklch(0 0 0 / 0.1),
-    0px 1px 1px -1px oklch(0 0 0 / 0.1),
-    0px 1px 2px -1px oklch(0 0 0 / 0.1),
-    0px 2px 4px -2px oklch(0 0 0 / 0.1),
-    0px 3px 6px -3px oklch(0 0 0 / 0.1);
-}
-
 /* Keyframes */
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fade-blur-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-    filter: blur(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-    filter: blur(0);
-  }
-}
-
 @keyframes collapsible-down {
   from {
     height: 0;
@@ -384,10 +306,6 @@
 }
 
 /* Animation utilities */
-.animate-fade-blur-in {
-  animation: fade-blur-in 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
 .animate-collapsible-down {
   animation: collapsible-down 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -419,7 +337,7 @@
 @keyframes message-highlight {
   0%,
   50% {
-    background-color: var(--color-accent-blue-subtle, rgba(59, 130, 246, 0.15));
+    background-color: var(--color-accent-brand-subtle, rgba(59, 130, 246, 0.15));
   }
   100% {
     background-color: transparent;

@@ -1,434 +1,355 @@
-# Design System: Premium Telegram Client
+# Design System
 
-> Extracted from [assistant-ui](https://github.com/assistant-ui/assistant-ui) and [tool-ui](https://github.com/assistant-ui/tool-ui) — the gold standard for AI chat interfaces built on Radix/shadcn. Adapted for a **premium, minimalistic Telegram client** targeting developers, PMs, and power users.
+> Living document — reflects the actual state of the codebase, not aspirations.
+> Last verified: 2026-03-12
 
-## Philosophy
+## Architecture
 
-- **Monochrome-first** with selective color accents (blue for owned messages, green for online, red for destructive)
-- **Monospace identity** — FiraCode Nerd Font everywhere (our differentiator)
-- **OKLCH color space** — perceptually uniform, better dark mode
-- **Semantic tokens only** — no hardcoded colors in components
-- **Motion is restrained** — 150-300ms for UI, expo-out easing
-- **Shadows are minimal** — `shadow-xs` or `shadow-sm`, never heavy
-- **Dark mode native** — semi-transparent white borders (`oklch(1 0 0 / 10%)`) instead of solid dark grays
+Single CSS file (`src/mainview/index.css`) is the source of truth for all design tokens, fonts, custom utilities, and keyframes. No `tailwind.config.ts` — Tailwind v4 CSS-first configuration via `@theme inline`.
 
-## Reference Repos
-
-| Repo | Path | Focus |
-|---|---|---|
-| **tool-ui** | `/Users/andrey/Projects/tool-ui` | Component styling, animations, gradient borders, custom utilities |
-| **assistant-ui** | `/Users/andrey/Projects/assistant-ui` | Chat primitives, composer, thread layout, glassmorphism, shimmer |
-
-### Key Files to Reference
-
-**tool-ui styling:**
-- `app/styles/shadcn-theme.css` — OKLCH color tokens, radius system
-- `app/styles/custom-utilities.css` — gradient borders, shadow-crisp-edge, scrollbar, animations
-- `app/styles/globals.css` — import chain, base layer
-- `components/tool-ui/approval-card/` — card styling pattern
-- `components/tool-ui/terminal/` — code/terminal container pattern
-- `components/tool-ui/shared/action-buttons.tsx` — responsive action buttons with container queries
-
-**assistant-ui styling:**
-- `apps/docs/styles/globals.css` — canonical theme
-- `packages/tw-glass/src/index.css` — glassmorphism plugin (SVG displacement)
-- `packages/tw-shimmer/src/index.css` — shimmer animation plugin
-- `packages/ui/src/components/assistant-ui/thread.tsx` — chat thread layout
-- `packages/ui/src/components/assistant-ui/markdown-text.tsx` — markdown rendering
-- `packages/ui/src/components/assistant-ui/reasoning.tsx` — collapsible with shimmer
-
----
+| Layer | Technology |
+|---|---|
+| Tokens | OKLCH CSS variables in `:root` / `.dark`, bridged to Tailwind via `@theme inline` |
+| Styling | Tailwind v4 utility classes + `cn()` (clsx + tailwind-merge) |
+| Variants | `class-variance-authority` (Button, Badge) |
+| Primitives | shadcn/ui pattern — `React.ComponentProps<>`, `data-slot`, `asChild` via Radix Slot |
+| Theme | Zustand store + `.dark` class / `data-theme` on `<html>` |
+| Icons | `lucide-react` direct imports |
+| Animations | CSS keyframes + `tw-animate-css` + `tw-shimmer` |
 
 ## Color System
 
-### Current Problem
-We use `@radix-ui/colors` (sand, gray, blue, red, plum, lime, green) which is fine but we reference raw scale numbers (`sand-3`, `blue-9`) directly in components. This creates tight coupling and makes theme switching impossible.
+All tokens use OKLCH color space. Components use semantic Tailwind classes (`bg-background`, `text-foreground`, `bg-message-own`), never raw values.
 
-### Target: OKLCH Semantic Tokens
+### Semantic Tokens
 
-All components MUST use semantic tokens. Direct Radix color references (`sand-3`, `blue-9`) should be migrated to semantic alternatives.
+**Surfaces:**
 
-```css
-:root {
-  --radius: 0.625rem;
+| Token | Light | Dark |
+|---|---|---|
+| `--background` | `oklch(1 0 0)` white | `oklch(0.145 0 0)` near-black |
+| `--foreground` | `oklch(0.145 0 0)` | `oklch(0.985 0 0)` |
+| `--card` | `oklch(1 0 0)` | `oklch(0.205 0 0)` |
+| `--muted` | `oklch(0.97 0 0)` | `oklch(0.269 0 0)` |
+| `--muted-foreground` | `oklch(0.556 0 0)` | `oklch(0.708 0 0)` |
 
-  /* Surfaces */
-  --background: oklch(1 0 0);           /* app background */
-  --foreground: oklch(0.145 0 0);       /* primary text */
-  --card: oklch(1 0 0);                 /* card surface */
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+**Interactive:**
 
-  /* Interactive */
-  --primary: oklch(0.205 0 0);          /* primary buttons */
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);         /* secondary surfaces */
-  --secondary-foreground: oklch(0.205 0 0);
+| Token | Light | Dark |
+|---|---|---|
+| `--primary` | `oklch(0.205 0 0)` | `oklch(0.922 0 0)` |
+| `--secondary` | `oklch(0.97 0 0)` | `oklch(0.269 0 0)` |
+| `--destructive` | `oklch(0.577 0.245 27.325)` | `oklch(0.704 0.191 22.216)` |
 
-  /* Neutral */
-  --muted: oklch(0.97 0 0);            /* muted backgrounds */
-  --muted-foreground: oklch(0.556 0 0); /* secondary text */
-  --accent: oklch(0.97 0 0);           /* hover states */
-  --accent-foreground: oklch(0.205 0 0);
+**Chrome:**
 
-  /* Status */
-  --destructive: oklch(0.577 0.245 27.325);
+| Token | Light | Dark |
+|---|---|---|
+| `--border` | `oklch(0.922 0 0)` | `oklch(1 0 0 / 10%)` semi-transparent white |
+| `--input` | `oklch(0.922 0 0)` | `oklch(1 0 0 / 15%)` |
+| `--ring` | `oklch(0.708 0 0)` | `oklch(0.556 0 0)` |
 
-  /* Chrome */
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+**Telegram-specific:**
 
-  /* Telegram-specific */
-  --message-own: oklch(0.93 0.02 250);       /* own message bubble (subtle blue tint) */
-  --message-own-foreground: oklch(0.205 0 0);
-  --message-peer: oklch(0.97 0 0);           /* peer message bubble */
-  --message-peer-foreground: oklch(0.205 0 0);
-  --online: oklch(0.723 0.191 149.579);      /* online indicator */
-  --unread: oklch(0.546 0.245 262.881);      /* unread badge */
-}
+| Token | Purpose | Light | Dark |
+|---|---|---|---|
+| `--message-own` | Own message bubble | `oklch(0.93 0.02 250)` blue tint | `oklch(0.25 0.03 250)` |
+| `--message-own-hover` | Own message hover | `oklch(0.9 0.03 250)` | `oklch(0.28 0.04 250)` |
+| `--message-peer` | Peer message bubble | `oklch(0.97 0 0)` | `oklch(0.269 0 0)` |
+| `--online` | Online indicator | `oklch(0.723 0.191 149.579)` green | same |
+| `--unread` | Unread badge | `oklch(0.546 0.245 262.881)` blue | `oklch(0.488 0.243 264.376)` |
+| `--accent-blue` | Accent (rename candidate — color in name) | `oklch(0.546 0.245 263)` | `oklch(0.488 0.243 264)` |
+| `--accent-blue-subtle` | Accent subtle (rename candidate) | `oklch(0.93 0.02 250)` | `oklch(0.25 0.03 250)` |
+| `--forward` | Forward indicator | `oklch(0.723 0.191 149)` green | same |
+| `--code-bg` | Code block bg | `oklch(0.95 0 0)` | `oklch(0.22 0 0)` |
+| `--error-text` | Error text | `oklch(0.55 0.2 25)` | `oklch(0.75 0.15 22)` |
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);        /* KEY: semi-transparent white borders */
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+**Text hierarchy (aliases to Radix sand scale — migration target):**
 
-  --message-own: oklch(0.25 0.03 250);
-  --message-own-foreground: oklch(0.985 0 0);
-  --message-peer: oklch(0.269 0 0);
-  --message-peer-foreground: oklch(0.985 0 0);
-  --online: oklch(0.723 0.191 149.579);
-  --unread: oklch(0.488 0.243 264.376);
-}
-```
+| Token | Maps to | Usage count |
+|---|---|---|
+| `--color-text-primary` | `var(--sand-12)` | ~20 |
+| `--color-text-secondary` | `var(--sand-11)` | ~8 |
+| `--color-text-tertiary` | `var(--sand-10)` | ~30 |
+| `--color-text-quaternary` | `var(--sand-9)` | scattered |
 
-### Theme Switcher
+### Legacy: Radix Color Scales
 
-Add theme switching via `data-theme` attribute on `<html>`:
-```css
-@custom-variant dark (&:is(.dark *, [data-theme="dark"], [data-theme="dark"] *));
-```
+`@radix-ui/colors` is still imported for backward compatibility. Current state:
 
-Implementation:
-- Store theme preference in `localStorage`
-- Toggle with keyboard shortcut (Cmd+Shift+T) and UI button
-- Support: `light`, `dark`, `system`
-- Use View Transition API for smooth theme transitions (see tool-ui `theme-transition.css`)
+| Scale | Status |
+|---|---|
+| `sand` / `sand-dark` | Used — powers `text-text-*` aliases, plus 2 raw refs in production (`avatar.tsx`, `ChatSidebar.tsx`) |
+| `blue` / `blue-dark` | Used — raw refs in `avatar.tsx` only |
+| `red` / `red-dark` | Partially used — `avatar.tsx` only |
+| `plum` / `plum-dark` | Used — `avatar.tsx` only |
+| `green` / `green-dark` | Partially used — `avatar.tsx` only |
+| `gray` / `gray-dark` | **Dead** — zero references |
+| `lime` / `lime-dark` | **Dead** — zero references |
 
----
+Raw Radix color usage in production code is limited to **2 files**: `avatar.tsx` (color palette) and `ChatSidebar.tsx` (1 muted badge, 1 `text-red-500` draft label).
+
+### Color Audit Summary
+
+| Category | Count | Status |
+|---|---|---|
+| Semantic tokens (theme-aware) | 64 unique | Good |
+| Raw Radix palette in production | 7 instances in 2 files | Migrate to semantic tokens |
+| Raw Radix palette in dev/demo pages | ~22 instances in 3 files | Acceptable |
+| Hardcoded `text-white`/`bg-black` on overlays | ~15 instances | Justified (known-dark surfaces) |
+| Raw `oklch()`/`rgb()`/`#hex` in TSX | 0 | Clean |
 
 ## Typography
 
-Keep FiraCode Nerd Font. The monospace identity is our brand.
+| Family | Role | Tailwind |
+|---|---|---|
+| **Open Sans** (400, 600) | Primary UI font, body text, messages | `--font-sans` (default) |
+| **Geist Mono** (variable 100-900) | Code blocks, monospace elements | `font-mono` |
+
+Body font is set on `<body>` in the CSS base layer. No component explicitly applies `font-sans` — everything inherits.
+
+**Type scale:**
 
 | Role | Size | Weight | Class |
 |---|---|---|---|
 | Sidebar title | 14px | 700 | `text-sm font-bold` |
 | Chat title | 14px | 500 | `text-sm font-medium` |
-| Body text (messages) | 13px | 400 | `text-[13px] leading-[18px]` |
+| Body (messages) | 13px | 400 | `.tg-text-chat` (custom class: `font-size: 13px; line-height: 18px`) |
 | Timestamps | 10px | 400 | `text-[10px]` |
 | UI labels | 14px | 500 | `text-sm font-medium` |
 | Secondary text | 12px | 400 | `text-xs text-muted-foreground` |
 
----
+Two custom pixel sizes (13px, 10px) exist because Tailwind's scale has no 13px step. These are product decisions, not scale gaps.
 
-## Radius System
+## Radius
 
-```
---radius:     0.625rem  (10px base)
---radius-sm:  6px   (small badges, inline elements)
---radius-md:  8px   (buttons, inputs)
---radius-lg:  10px  (cards, containers)
---radius-xl:  14px  (large cards)
---radius-2xl: 18px  (message bubbles, composer)
---radius-3xl: 22px  (viewport footer curve)
-```
+| Token | Value | Usage |
+|---|---|---|
+| `--radius` | 10px | Base |
+| `--radius-sm` | 6px | Small badges, inline |
+| `--radius-md` | 8px | Buttons, inputs |
+| `--radius-lg` | 10px | Cards, dialog rows, sidebar items |
+| `--radius-xl` | 14px | Large cards |
+| `--radius-2xl` | 18px | Message bubbles, composer |
+| `--radius-3xl` | 22px | — |
+| `--radius-4xl` | 28px | — |
 
-| Element | Radius |
-|---|---|
-| Message bubbles | `rounded-2xl` (18px) |
-| Composer input | `rounded-2xl` (18px) |
-| Cards/containers | `rounded-xl` (14px) |
-| Buttons (default) | `rounded-md` (8px) |
-| Action buttons (pills) | `rounded-full` |
-| Unread badge | `rounded-full` |
-| Dialog rows | `rounded-lg` (10px) |
-
----
+Message bubble radius is computed dynamically in `Bubble.tsx` via `bubbleRadius()` — returns `4px` (grouped) or `12px` (standalone) per corner, applied as inline `style`.
 
 ## Shadows
 
-Minimal. Reference: tool-ui uses `shadow-xs` everywhere.
+Minimal. Tailwind defaults only.
 
-| Use Case | Shadow |
+| Use case | Shadow |
 |---|---|
-| Cards | `shadow-xs` |
-| Popovers/Dropdowns | `shadow-md` |
-| Floating action bars | `shadow-sm` + `border` |
-| Error toasts | `shadow-md` |
-| Everything else | none |
+| Popovers, tooltips, dialogs | `shadow-md` |
+| Everything else | none or `shadow-xs` |
 
-### Premium Shadow (from tool-ui)
-For special elevated cards:
-```css
-.shadow-crisp-edge {
-  box-shadow:
-    0px 1px 0px -1px oklch(0 0 0 / 0.1),
-    0px 1px 1px -1px oklch(0 0 0 / 0.1),
-    0px 1px 2px -1px oklch(0 0 0 / 0.1),
-    0px 2px 4px -2px oklch(0 0 0 / 0.1),
-    0px 3px 6px -3px oklch(0 0 0 / 0.1);
-  /* + inset highlight via ::after */
-}
-```
+## Z-Index
 
----
+Two tiers currently in use:
 
-## Animation System
+| Value | Usage |
+|---|---|
+| `z-10` | Sticky headers, corner buttons, reaction bars |
+| `z-50` | Dialogs, popovers, tooltips, error toasts |
 
-### Easing
-- **Standard (UI)**: `ease-out` or `cubic-bezier(0.16, 1, 0.3, 1)` (expo-out)
-- **Bouncy entrance**: `cubic-bezier(0.62, -0.05, 0.71, 1.15)`
-- **Never**: linear (except infinite loops like shimmer)
+## Animation
 
-### Durations
-- Micro-interactions: `150ms`
-- Message entrance: `150ms`
-- Collapsible expand/collapse: `200ms`
-- Welcome screen stagger: `200ms` base + `75ms` delay
-- Theme transition: `600ms`
+| Easing | Value | When |
+|---|---|---|
+| Expo-out | `cubic-bezier(0.16, 1, 0.3, 1)` | UI transitions, custom keyframes |
+| Default | Tailwind `ease-out` | Simple hover/color transitions |
 
-### Standard Animations (from tool-ui/assistant-ui)
+| Duration | Usage |
+|---|---|
+| `duration-75` | Voice waveform bar color |
+| `duration-100` | Video scrubber |
+| `duration-150` | Message entrance, assistant-ui elements |
+| `duration-200` | Spoiler reveal, dialog entrance, most transitions |
 
-```css
-/* Message entrance */
-fade-in slide-in-from-bottom-1 animate-in duration-150
+**Plugins:**
 
-/* Card entrance (approval/receipt) */
-motion-safe:animate-in motion-safe:fade-in motion-safe:blur-in-sm motion-safe:zoom-in-95 motion-safe:duration-300
+| Plugin | Status |
+|---|---|
+| `tw-animate-css` | Used — dialog/popover/tooltip enter/exit |
+| `tw-shimmer` | Used — `MessagePanel.tsx`, `tool-fallback.tsx` loading states |
+| `tw-glass` | **Dead** — imported but never used in any component |
 
-/* Fade up (subtle) */
-@keyframes fade-up {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+## Theme Switching
 
-/* Fade blur in (premium feel) */
-@keyframes fade-blur-in {
-  from { opacity: 0; transform: translateY(4px); filter: blur(4px); }
-  to { opacity: 1; transform: translateY(0); filter: blur(0); }
-}
+Zustand store (`lib/theme.ts`), not React Context. Three modes: `light`, `dark`, `system`.
 
-/* Collapsible */
-@keyframes collapsible-down {
-  from { height: 0; }
-  to { height: var(--radix-collapsible-content-height); }
-}
-```
-
-### Always Use `motion-safe:` Prefix
-Respect `prefers-reduced-motion`. All animations must be wrapped in `motion-safe:`.
-
----
+- Persists to `localStorage` under key `"theme"`
+- Toggles `.dark` class + `data-theme` attribute on `<html>`
+- Uses View Transition API for smooth switch (0.4s expo-out)
+- Keyboard shortcut: `Cmd+Shift+T`
+- Flash prevention: inline script in `index.html` reads `localStorage` before React mounts
 
 ## Component Patterns
 
-### Message Bubble
+### Two tiers
 
-**Current:** `max-w-[55%] rounded-lg px-3 py-1.5 bg-blue-3 | bg-sand-3`
-**Target:** `max-w-[55%] rounded-2xl px-4 py-2.5 bg-message-own | bg-message-peer`
-
-Reference: assistant-ui user message bubble is `rounded-2xl bg-muted px-4 py-2.5`
-
-### Sidebar Dialog Row
-
-**Target pattern (from assistant-ui thread-list):**
-```
-h-16 flex items-center gap-3 px-4 rounded-lg transition-colors
-hover:bg-accent
-data-active:bg-accent
-```
-- Add `rounded-lg` for rounded selection highlight (not full-bleed)
-- Add entrance animation for new dialogs
-
-### Composer Input
-
-**Target (from assistant-ui):**
-```
-rounded-2xl border border-input bg-background px-1 pt-2
-transition-shadow
-has-[textarea:focus-visible]:border-ring
-has-[textarea:focus-visible]:ring-2
-has-[textarea:focus-visible]:ring-ring/20
-```
-- Outer container gets the border and focus ring
-- Inner textarea: `bg-transparent outline-none resize-none`
-- Send button: `size-8 rounded-full` (circle)
-
-### Chat Header
-
-**Target:**
-- Subtle bottom border: `border-b border-border`
-- Backdrop blur for scroll-under: `backdrop-blur-sm bg-background/80`
-- Status text: `text-muted-foreground text-xs`
-
-### Scrollbar
-
-**Target (from tool-ui):**
-```css
-.scrollbar-subtle {
-  scrollbar-width: thin;
-  &::-webkit-scrollbar { width: 6px; }
-  &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb {
-    background-color: oklch(0.58 0 0 / 0.2);
-    border-radius: 3px;
-  }
-  &::-webkit-scrollbar-thumb:hover {
-    background-color: oklch(0.58 0 0 / 0.35);
-  }
-}
-```
-
-### Gradient Fade (Collapsed Content)
-
-For any expandable/collapsible content:
-```
-from-background absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t to-transparent pointer-events-none
-```
-
----
-
-## Focus States (Universal)
-
-All interactive elements:
-```
-focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]
-```
-
-Error/invalid:
-```
-aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive
-```
-
-Disabled:
-```
-disabled:pointer-events-none disabled:opacity-50
-```
-
----
-
-## Packages to Install
-
-```
-tw-glass          — glassmorphism effects (SVG displacement + blur)
-tw-shimmer        — shimmer text/background animation
-tw-animate-css    — animation utilities (already have)
-```
-
-### tw-glass Usage (Premium Effects)
-For composer area, floating panels, header blur:
-```html
-<div class="glass glass-surface glass-strength-10">
-  <!-- frosted glass panel -->
-</div>
-```
-
-### tw-shimmer Usage
-For streaming/loading states:
-```html
-<span class="shimmer">Thinking...</span>         <!-- text shimmer -->
-<div class="shimmer shimmer-bg">Loading</div>     <!-- background shimmer -->
-```
-
----
-
-## Skills to Use During Implementation
-
-| Skill | Use For |
-|---|---|
-| `frontend-design` | Creating distinctive, production-grade interfaces |
-| `vercel-react-best-practices` | React/Next.js performance optimization |
-| `vercel-composition-patterns` | Component architecture and composition |
-| `agentation` | Dev toolbar for visual feedback |
-
----
-
-## Tailwind v4 Upgrade
-
-Current: `"tailwindcss": "4"` (resolves to 4.0.x)
-Target: `"tailwindcss": "^4.2.1"` (matches assistant-ui/tool-ui)
-
-### Tailwind v4.1+ Performance Improvements
-- **Oxide engine**: Native Rust-based scanner (2-5x faster builds)
-- **@property support**: Proper CSS custom property types
-- **Container queries**: Built-in `@container` support without plugin
-- **has() selector**: Native CSS `:has()` (used for composer focus ring pattern)
-
----
-
-## Migration Checklist
-
-### Phase 1: Foundation
-1. Upgrade Tailwind to `^4.2.1`
-2. Install `tw-glass` and `tw-shimmer`
-3. Migrate color system from Radix scales to OKLCH semantic tokens
-4. Add `--message-own`, `--message-peer`, `--online`, `--unread` tokens
-5. Add dark mode with `data-theme` attribute support
-6. Add theme switcher (light/dark/system) with View Transition API
-7. Update base layer (`@layer base`) to match tool-ui pattern
-
-### Phase 2: Core Components
-8. Update Button — add `homeCTA` variant (rounded-full pill)
-9. Update MessageBubble — `rounded-2xl`, semantic colors, entrance animation
-10. Update Composer — container border + inner transparent textarea, circle send button
-11. Update ChatSidebar — rounded dialog rows, better hover/active states
-12. Update ChatHeader — backdrop blur, cleaner typography
-13. Add scrollbar-subtle utility
-14. Add gradient fade for expandable content
-
-### Phase 3: Polish
-15. Add `shadow-crisp-edge` utility for elevated cards
-16. Add gradient border utilities from tool-ui
-17. Add shimmer for loading states (typing indicator, message loading)
-18. Add glass effects for floating panels (command palette, popovers)
-19. Add motion-safe entrance animations to messages
-20. Add container queries for responsive action layouts
-
-### Phase 4: Theme System
-21. Implement theme provider with localStorage persistence
-22. Add Cmd+Shift+T shortcut for theme toggle
-23. Add View Transition API for smooth theme switch
-24. Test all components in both light and dark mode
-
----
-
-## Component Migration Map
-
-| Component | Current Issues | Target |
+| Tier | Location | Pattern |
 |---|---|---|
-| `MessageBubble` | Raw `bg-blue-3`/`bg-sand-3`, `rounded-lg` | Semantic `bg-message-own`/`bg-message-peer`, `rounded-2xl`, entrance animation |
-| `ChatSidebar` | Raw `border-sand-6`, no row rounding | Semantic `border-border`, `rounded-lg` rows, `hover:bg-accent` |
-| `ChatHeader` | Raw `border-sand-6`, no blur | `border-border`, `backdrop-blur-sm bg-background/80` |
-| `MessageInput` | Raw `border-sand-6 bg-sand-2`, basic focus | Container pattern with ring, `rounded-2xl`, circle send |
-| `ChatLayout` | Raw `bg-background` only | Theme-aware, error toast upgrade |
-| Dialog tabs | Raw `border-blue-9 text-blue-11` | Semantic active state, better animation |
-| Unread badge | Raw `bg-blue-9` | `bg-unread rounded-full`, better sizing |
-| Error toast | Raw `bg-red-3 text-red-11` | `bg-destructive/10 text-destructive border border-destructive`, `rounded-lg` |
-| Scrollbar | Basic `.scrollbar-thin` | Premium `.scrollbar-subtle` with warm-tinted transparent colors |
+| **Primitives** | `components/ui/` | shadcn — `React.ComponentProps<>`, `cn()`, `data-slot`, `asChild`, CVA |
+| **Domain** | `components/ui/chat/` | `Pure*` prefix — explicit typed props, no store, no side effects |
+
+### Integration layer
+
+| Component | Role |
+|---|---|
+| `Message.tsx` | Connects store to Pure components |
+| `MessagePanel.tsx` | List/scroll, passes data to Messages |
+| `ChatSidebar.tsx` | Sidebar with store connection |
+| `ChatHeader.tsx` | Header with store connection |
+
+### Conventions
+
+- `cn()` for class merging everywhere
+- No barrel exports — direct file imports
+- `data-slot` on shadcn primitives (not on Pure components)
+- `asChild` via Radix `Slot.Root` on Button, Badge
+
+---
+
+# Production Readiness Audit
+
+## Dead Code to Remove
+
+### CSS (`index.css`)
+
+| Item | Lines | Notes |
+|---|---|---|
+| `.scrollbar-thin` | class + pseudo-element rules | Unused — `.scrollbar-subtle` is the one in use |
+| `.shadow-crisp-edge` | class + rules | Never referenced |
+| `.animate-fade-blur-in` | class | Never referenced |
+| `@keyframes fade-up` | keyframe block | No class uses it |
+| `@keyframes fade-blur-in` | keyframe block | Only consumed by dead `.animate-fade-blur-in` |
+| `FiraCode Nerd Font` | 3 `@font-face` declarations | Never applied — Open Sans is the actual UI font |
+| `@import "@radix-ui/colors/gray.css"` + `gray-dark.css` | imports | Zero references to any `gray-N` class |
+| `@import "@radix-ui/colors/lime.css"` + `lime-dark.css` | imports | Zero references to any `lime-N` class |
+| `@import "tw-glass"` | import | `glass` class never used |
+| `--color-gray-1` through `--color-gray-12` | theme tokens | Dead with gray import |
+| `--message-own-foreground` / `--message-peer-foreground` | CSS vars + theme tokens | Defined but never referenced |
+| `--spoiler` | CSS var + theme token | Defined but never referenced (FormattedText uses inline logic) |
+| `--color-red-3`, `--color-red-12` | theme tokens | Registered, never used |
+| `--color-green-10`, `--color-green-11` | theme tokens | Registered, never used |
+
+## Styling Inconsistencies
+
+### P1 — Fix now
+
+| Issue | Location | Problem | Fix |
+|---|---|---|---|
+| Mixed light/dark token strategy | `ChatSidebar.tsx:704` | `bg-sand-8 dark:bg-unread` — raw Radix in light, semantic in dark | Use semantic token for both modes |
+| Bubble radius bypasses Tailwind | `Bubble.tsx:70` | Inline `style` with hardcoded `4px`/`12px` | Define as CSS vars or Tailwind arbitrary values |
+| Missing transitions on hover elements | `ChatSidebar.tsx:525,540` | `hover:bg-accent` without `transition-colors`, while adjacent identical elements have it | Add `transition-colors` |
+| Mixed px/rem in same element | `Message.tsx:253,402,538` | `h-[18px]` with `w-[5.5rem]` on same element | Pick one unit system |
+| Raw Radix in avatar palette | `avatar.tsx:4-8` | `bg-blue-9`, `bg-plum-9`, etc. | Create semantic avatar color tokens |
+
+### P2 — Standardize
+
+| Issue | Location | Problem |
+|---|---|---|
+| Functional tokens with color in name | `index.css` | `--accent-blue`, `--accent-blue-subtle` — should be `--accent`, `--accent-subtle` since the hue may change |
+| 3 hover-opacity levels for same element type | `VoiceView.tsx:318,359`, `attachment.tsx:147` | `hover:opacity-80`, `hover:opacity-90`, `hover:opacity-75` |
+| Arbitrary rounded values | `MessageTime.tsx:67-68`, `attachment.tsx:147`, `ChatSidebar.tsx:119` | `rounded-[10px]`, `rounded-[14px]`, `rounded-[3px]` — should map to scale |
+| Inconsistent hover backgrounds | Many files | `hover:bg-accent` vs `hover:bg-accent/50` vs `hover:bg-accent/80` for similar elements |
+| Non-standard sizes | `VoiceView.tsx:318` | `size-[42px]` — 42px is between Tailwind's 40px and 44px steps |
+| `PhotoView` inline filter | `PhotoView.tsx:60,90` | `style={{ filter: 'blur(20px)' }}` could be `blur-[20px]` |
+| Input radius inconsistency | Multiple | Search input `rounded-full`, compose `rounded-lg`, generic Input `rounded-md` |
+
+### P3 — Normalize later
+
+| Issue | Location |
+|---|---|
+| Two Radix import styles | `scroll-area.tsx`, `phone-input.tsx` use `@radix-ui/react-*`; everything else uses unified `radix-ui` |
+| `forwardRef` legacy | `scroll-area.tsx`, `phone-input.tsx`, `tooltip-icon-button.tsx` — 4 components still use `forwardRef` |
+| `data-slot` missing on older shadcn | `avatar.tsx`, `command.tsx`, `popover.tsx`, `scroll-area.tsx` |
+| Boolean prop naming split | `isOutgoing`/`isCircle`/`isGif` vs bare `loading`/`cover`/`sending`/`edited` |
+
+## Accessibility
+
+### P1 — Keyboard + screen reader blockers
+
+| Issue | Location |
+|---|---|
+| Icon-only buttons without `aria-label` | `CornerButtons.tsx`, `MessageInput.tsx` send button, `ChatSidebar.tsx` clear/close search buttons, `ReactionBar.tsx` "+" trigger |
+| `PureCornerButton` doesn't spread `...props` | Callers cannot add `aria-label` even if they wanted to |
+| Tab interface without ARIA roles | `ChatSidebar.tsx:572-595` — no `role="tab"`, `aria-selected`, `tablist` |
+| Chat list missing accessible names | `ChatSidebar.tsx:612-711` — button per chat, no `aria-label` |
+| `SpoilerText` no `aria-expanded` | `FormattedText.tsx` — toggle button with no state communicated |
+| Form inputs without `<label>` | `AuthScreen.tsx` — phone and code inputs use placeholder only |
+
+### P2 — Motion and contrast
+
+| Issue | Scope |
+|---|---|
+| Zero `motion-safe:` prefixes | ~30+ animations play regardless of `prefers-reduced-motion`. Only 1 instance of `motion-reduce:animate-none` exists in the entire codebase. |
+| `text-text-quaternary` contrast | Maps to `sand-9` (~`#8D8D86`) — likely fails WCAG AA (4.5:1) for small text on white |
+| Opacity-based text on variable backgrounds | `MessageTime.tsx:42` (`text-white/70`), `VideoView.tsx:222` (`text-white/60`) — contrast depends on underlying content |
+
+### P3 — Nice to have
+
+| Issue | Location |
+|---|---|
+| Missing focus-visible on raw buttons | `ChatSidebar.tsx` (search, tabs, chat list), `ReactionBar.tsx`, `CornerButtons.tsx`, `ChatLayout.tsx` dismiss |
+| Chat list keyboard navigation | No arrow-key nav — requires tabbing through every chat item |
+| Reaction picker keyboard support | No Escape to close, no arrow-key navigation |
+| No large-screen adaptation | No `lg:` or `xl:` breakpoints — chat stretches infinitely on wide displays |
+
+## Component Architecture
+
+### Purity violations
+
+| Component | Location | Issue |
+|---|---|---|
+| `ThemeSwitcher` | `ui/theme-switcher.tsx` | Lives in `ui/` but imports from `useThemeStore` — should take theme/onToggle as props |
+| `MediaLayout`, `BubbleLayout`, `AlbumLayout` | `chat/Message.tsx` | Reach into `useChatStore` for `profilePhotos`/`thumbUrls` instead of receiving via props from `Message` |
+| `FormattedText > CustomEmoji` | `chat/FormattedText.tsx` | Inner sub-component imports `useChatStore` — hidden store dependency inside an otherwise pure component |
+
+### Pure components not accepting className
+
+All `Pure*` components except `PureBubble` reject `className`. This is a deliberate pattern (single-purpose atoms), not a bug — but it limits reuse if the same visual is needed with different spacing/sizing in different contexts.
+
+## Recommended Token Additions
+
+### Z-index scale
+
+```css
+--z-sticky: 10;
+--z-dropdown: 20;
+--z-overlay: 40;
+--z-modal: 50;
+```
+
+### Duration tokens
+
+```css
+--duration-fast: 150ms;
+--duration-normal: 200ms;
+--duration-slow: 300ms;
+--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+```
+
+### Avatar color palette (to replace raw Radix)
+
+Names are functional (slot-based), not color-based — the actual hues can change without renaming tokens.
+
+```css
+--avatar-1: oklch(0.55 0.2 260);
+--avatar-2: oklch(0.55 0.2 320);
+--avatar-3: oklch(0.65 0.2 150);
+--avatar-4: oklch(0.6 0.2 25);
+--avatar-5: oklch(0.6 0.05 80);
+```
+
+### Text hierarchy (standalone OKLCH, drop Radix aliases)
+
+```css
+--color-text-primary: oklch(0.15 0.01 75);
+--color-text-secondary: oklch(0.44 0.01 75);
+--color-text-tertiary: oklch(0.55 0.01 75);
+--color-text-quaternary: oklch(0.65 0.01 75);  /* ensure 4.5:1 contrast on white */
+```

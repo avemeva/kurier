@@ -1,20 +1,27 @@
 import type { HeaderStatus } from '@/lib/store';
+import { cn } from '@/lib/utils';
 import { PureTypingIndicator } from './TypingIndicator';
 
-export function PureStatusText({ status }: { status: HeaderStatus }) {
+export function PureStatusText({
+  status,
+  className,
+}: {
+  status: HeaderStatus;
+  className?: string;
+}) {
   if (!status) return null;
 
   if (status.type === 'typing') {
     return (
-      <p className="text-xs">
+      <p className={cn('text-xs', className)}>
         <PureTypingIndicator text={status.text} />
       </p>
     );
   }
 
   if (status.type === 'online') {
-    return <p className="text-xs text-accent-blue">online</p>;
+    return <p className={cn('text-xs text-accent-brand', className)}>online</p>;
   }
 
-  return <p className="text-xs text-text-quaternary">{status.text}</p>;
+  return <p className={cn('text-xs text-text-quaternary', className)}>{status.text}</p>;
 }

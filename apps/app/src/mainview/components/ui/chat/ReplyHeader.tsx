@@ -45,6 +45,7 @@ export function PureReplyHeader({
   mediaUrl,
   isOutgoing,
   onClick,
+  className,
 }: {
   senderName: string;
   text?: string;
@@ -52,6 +53,7 @@ export function PureReplyHeader({
   mediaUrl?: string;
   isOutgoing?: boolean;
   onClick?: () => void;
+  className?: string;
 }) {
   const label = text || mediaType || '';
   const Tag = onClick ? 'button' : 'div';
@@ -60,14 +62,15 @@ export function PureReplyHeader({
     <Tag
       type={onClick ? 'button' : undefined}
       className={cn(
-        'mb-1 flex w-full min-w-0 gap-2 overflow-hidden rounded border-l-2 border-accent-blue px-2 py-1 text-left',
-        isOutgoing ? 'bg-accent-blue-subtle' : 'bg-code-bg',
+        'mb-1 flex w-full min-w-0 gap-2 overflow-hidden rounded border-l-2 border-accent-brand px-2 py-1 text-left',
+        isOutgoing ? 'bg-accent-brand-subtle' : 'bg-code-bg',
         onClick && 'cursor-pointer',
+        className,
       )}
       onClick={onClick}
     >
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-semibold text-accent-blue">{senderName}</p>
+        <p className="truncate text-xs font-semibold text-accent-brand">{senderName}</p>
         <p className="truncate text-xs text-text-secondary">{label}</p>
       </div>
       {mediaUrl && hasVisualThumb(mediaType) && (

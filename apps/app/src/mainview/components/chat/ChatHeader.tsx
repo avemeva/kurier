@@ -27,7 +27,7 @@ export function ChatHeader() {
         <ArrowLeft size={18} />
       </Button>
       {selectedChat.isSavedMessages ? (
-        <div className="flex size-8 items-center justify-center rounded-full bg-accent-blue text-white">
+        <div className="flex size-8 items-center justify-center rounded-full bg-accent-brand text-white">
           <Bookmark size={16} className="fill-current" />
         </div>
       ) : (

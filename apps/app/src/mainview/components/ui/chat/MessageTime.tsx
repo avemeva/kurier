@@ -11,6 +11,7 @@ export interface MessageTimeProps {
   sending?: boolean;
   views?: number;
   displayType?: InfoDisplayType;
+  className?: string;
 }
 
 function formatViews(n: number): string {
@@ -27,6 +28,7 @@ export function PureMessageTime({
   sending = false,
   views,
   displayType = 'default',
+  className,
 }: MessageTimeProps) {
   const timeStr = date
     ? new Date(date * 1000).toLocaleTimeString([], {
@@ -38,7 +40,7 @@ export function PureMessageTime({
   const isOverlay = displayType === 'image' || displayType === 'background';
 
   /* ── Icon color ── */
-  const iconColor = isOverlay ? 'text-white' : 'text-accent-blue';
+  const iconColor = isOverlay ? 'text-white' : 'text-accent-brand';
   const unreadIconColor = isOverlay ? 'text-white/70' : 'text-text-quaternary';
 
   /* ── Read receipt / sending icon ── */
@@ -56,7 +58,7 @@ export function PureMessageTime({
   const textColor =
     displayType === 'default'
       ? out
-        ? 'text-accent-blue/70'
+        ? 'text-accent-brand/70'
         : 'text-text-quaternary'
       : 'text-white';
 
@@ -66,6 +68,7 @@ export function PureMessageTime({
     textColor,
     displayType === 'image' && 'rounded-[10px] bg-black/40 px-1.5 py-0.5',
     displayType === 'background' && 'rounded-[10px] bg-black/40 px-1.5 py-0.5',
+    className,
   );
 
   return (

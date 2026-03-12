@@ -109,7 +109,7 @@ function PendingLayout({
       <PureBubble isOutgoing={true} groupPosition={groupPosition} showAvatar={false}>
         <p className="whitespace-pre-wrap break-words tg-text-chat text-text-primary">
           {state.text}
-          <span className="float-right h-[18px] w-12" aria-hidden="true" />
+          <span className="float-right h-[1.125rem] w-12" aria-hidden="true" />
         </p>
         <span className="absolute bottom-1 right-2">
           <PureMessageTime
@@ -199,7 +199,7 @@ function MediaLayout({
       <PureReactionPicker onReact={(e, c) => onReact(msg.id, e, c)} />
       {bubbleVariant === 'framed' && state.showSenderName && (
         <div className="px-3 pt-1.5">
-          <p className="mb-0.5 text-xs font-medium text-accent-blue">{msg.senderName}</p>
+          <p className="mb-0.5 text-xs font-medium text-accent-brand">{msg.senderName}</p>
         </div>
       )}
       {bubbleVariant === 'framed' && msg.forwardFromName && (
@@ -255,7 +255,7 @@ function MediaLayout({
           <p className="whitespace-pre-wrap break-words tg-text-chat text-text-primary">
             <FormattedText text={msg.text} entities={msg.entities} />
             <span
-              className={cn('float-right h-[18px]', msg.editDate > 0 ? 'w-[5.5rem]' : 'w-12')}
+              className={cn('float-right h-[1.125rem]', msg.editDate > 0 ? 'w-[5.5rem]' : 'w-12')}
               aria-hidden="true"
             />
           </p>
@@ -339,7 +339,7 @@ function BubbleLayout({
     >
       <PureReactionPicker onReact={(e, c) => onReact(msg.id, e, c)} />
       {state.showSenderName && (
-        <p className="mb-0.5 text-xs font-medium text-accent-blue">{msg.senderName}</p>
+        <p className="mb-0.5 text-xs font-medium text-accent-brand">{msg.senderName}</p>
       )}
       {msg.forwardFromName && (
         <PureForwardHeader
@@ -404,7 +404,7 @@ function BubbleLayout({
         >
           <FormattedText text={msg.text} entities={msg.entities} />
           <span
-            className={cn('float-right h-[18px]', msg.editDate > 0 ? 'w-[5.5rem]' : 'w-12')}
+            className={cn('float-right h-[1.125rem]', msg.editDate > 0 ? 'w-[5.5rem]' : 'w-12')}
             aria-hidden="true"
           />
         </p>
@@ -501,7 +501,7 @@ function AlbumLayout({
       <PureReactionPicker onReact={(e, c) => onReact(first.id, e, c)} />
       {bubbleVariant === 'framed' && state.showSenderName && (
         <div className="px-3 pt-1.5">
-          <p className="mb-0.5 text-xs font-medium text-accent-blue">{first.senderName}</p>
+          <p className="mb-0.5 text-xs font-medium text-accent-brand">{first.senderName}</p>
         </div>
       )}
       {bubbleVariant === 'framed' && first.forwardFromName && (
@@ -540,7 +540,7 @@ function AlbumLayout({
           <p className="whitespace-pre-wrap break-words tg-text-chat text-text-primary">
             <FormattedText text={first.text} entities={first.entities} />
             <span
-              className={cn('float-right h-[18px]', first.editDate > 0 ? 'w-[5.5rem]' : 'w-12')}
+              className={cn('float-right h-[1.125rem]', first.editDate > 0 ? 'w-[5.5rem]' : 'w-12')}
               aria-hidden="true"
             />
           </p>

@@ -8,6 +8,7 @@ export function PurePhotoView({
   width,
   height,
   minithumbnail,
+  className,
 }: {
   url: string | null;
   loading?: boolean;
@@ -16,13 +17,14 @@ export function PurePhotoView({
   width?: number;
   height?: number;
   minithumbnail?: string | null;
+  className?: string;
 }) {
   const hasDimensions = width != null && height != null;
 
   // Cover mode takes priority — unchanged behavior
   if (cover) {
     if (loading) {
-      return <div className="h-full w-full animate-pulse bg-muted" />;
+      return <div className={cn('h-full w-full animate-pulse bg-muted', className)} />;
     }
     if (!url) {
       const Container = onRetry ? 'button' : 'div';
@@ -33,11 +35,12 @@ export function PurePhotoView({
           className={cn(
             'h-full w-full bg-accent',
             onRetry && 'cursor-pointer transition-colors hover:bg-accent/80',
+            className,
           )}
         />
       );
     }
-    return <img src={url} className="h-full w-full object-cover" alt="" />;
+    return <img src={url} className={cn('h-full w-full object-cover', className)} alt="" />;
   }
 
   // Metadata-driven path: explicit width/height from photo dimensions
@@ -53,17 +56,16 @@ export function PurePhotoView({
     if (loading) {
       if (minithumbnail) {
         return (
-          <div style={sizeStyle} className="relative overflow-hidden">
+          <div style={sizeStyle} className={cn('relative overflow-hidden', className)}>
             <img
               src={`data:image/jpeg;base64,${minithumbnail}`}
-              className="h-full w-full object-cover"
-              style={{ filter: 'blur(20px)', transform: 'scale(1.1)' }}
+              className="h-full w-full object-cover blur-[20px] scale-110"
               alt=""
             />
           </div>
         );
       }
-      return <div style={sizeStyle} className="animate-pulse bg-muted" />;
+      return <div style={sizeStyle} className={cn('animate-pulse bg-muted', className)} />;
     }
     if (!url) {
       const Container = onRetry ? 'button' : 'div';
@@ -75,6 +77,7 @@ export function PurePhotoView({
           className={cn(
             'bg-accent',
             onRetry && 'cursor-pointer transition-colors hover:bg-accent/80',
+            className,
           )}
         />
       );
@@ -83,11 +86,10 @@ export function PurePhotoView({
     // Falls back to the full image if no minithumbnail available.
     const blurSrc = minithumbnail ? `data:image/jpeg;base64,${minithumbnail}` : url;
     return (
-      <div style={sizeStyle} className="relative overflow-hidden">
+      <div style={sizeStyle} className={cn('relative overflow-hidden', className)}>
         <img
           src={blurSrc}
-          className="absolute inset-0 h-full w-full object-cover"
-          style={{ filter: 'blur(20px)', transform: 'scale(1.1)' }}
+          className="absolute inset-0 h-full w-full object-cover blur-[20px] scale-110"
           alt=""
         />
         <div className="relative flex h-full w-full items-center justify-center">
@@ -99,7 +101,11 @@ export function PurePhotoView({
 
   // Fallback path: no dimensions provided — original behavior
   if (loading) {
-    return <div className="aspect-video w-full max-w-xs animate-pulse rounded-lg bg-muted" />;
+    return (
+      <div
+        className={cn('aspect-video w-full max-w-xs animate-pulse rounded-lg bg-muted', className)}
+      />
+    );
   }
   if (!url) {
     const Container = onRetry ? 'button' : 'div';
@@ -110,9 +116,10 @@ export function PurePhotoView({
         className={cn(
           'aspect-video w-full max-w-xs rounded bg-accent',
           onRetry && 'cursor-pointer transition-colors hover:bg-accent/80',
+          className,
         )}
       />
     );
   }
-  return <img src={url} className="max-h-80 max-w-full rounded" alt="" />;
+  return <img src={url} className={cn('max-h-80 max-w-full rounded', className)} alt="" />;
 }

@@ -1,3 +1,5 @@
+import { cn } from '@/lib/utils';
+
 export type WebPreview = {
   url: string;
   siteName: string;
@@ -25,7 +27,13 @@ function TextContent({ preview }: { preview: WebPreview }) {
   );
 }
 
-export function PureLinkPreviewCard({ preview }: { preview: WebPreview }) {
+export function PureLinkPreviewCard({
+  preview,
+  className,
+}: {
+  preview: WebPreview;
+  className?: string;
+}) {
   if (!preview.title && !preview.description) return null;
   const thumbSrc =
     preview.thumbUrl ??
@@ -38,7 +46,7 @@ export function PureLinkPreviewCard({ preview }: { preview: WebPreview }) {
         href={preview.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-1 block border-l-2 border-accent-blue pl-2.5"
+        className={cn('mt-1 block border-l-2 border-accent-brand pl-2.5', className)}
       >
         <TextContent preview={preview} />
         <img src={thumbSrc} alt="" className="mt-1.5 w-full rounded-lg object-cover" />
@@ -51,7 +59,7 @@ export function PureLinkPreviewCard({ preview }: { preview: WebPreview }) {
       href={preview.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="mt-1 flex gap-2.5 border-l-2 border-accent-blue pl-2.5"
+      className={cn('mt-1 flex gap-2.5 border-l-2 border-accent-brand pl-2.5', className)}
     >
       <div className="min-w-0 flex-1">
         <TextContent preview={preview} />

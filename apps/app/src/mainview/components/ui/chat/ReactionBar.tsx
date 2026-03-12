@@ -12,12 +12,14 @@ export const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢'];
 export function PureReactionBar({
   reactions,
   onReact,
+  className,
 }: {
   reactions: ReactionInfo[];
   onReact: (emoticon: string, chosen: boolean) => void;
+  className?: string;
 }) {
   return (
-    <div className="mt-1 flex flex-wrap gap-1">
+    <div className={cn('mt-1 flex flex-wrap gap-1', className)}>
       {reactions.map((r) => (
         <button
           key={r.emoticon}
@@ -26,7 +28,7 @@ export function PureReactionBar({
           className={cn(
             'flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 leading-none transition-colors',
             r.chosen
-              ? 'border-accent-blue/40 bg-accent-blue/15 text-accent-blue'
+              ? 'border-accent-brand/40 bg-accent-brand/15 text-accent-brand'
               : 'border-border/50 bg-accent/60 text-text-secondary hover:bg-accent/80',
           )}
         >
@@ -40,8 +42,10 @@ export function PureReactionBar({
 
 export function PureReactionPicker({
   onReact,
+  className,
 }: {
   onReact: (emoticon: string, chosen: boolean) => void;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   if (!open) {
@@ -49,14 +53,22 @@ export function PureReactionPicker({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="absolute -right-1 -top-3 hidden rounded-full bg-card px-1 py-0.5 text-xs shadow group-hover/bubble:block"
+        className={cn(
+          'absolute -right-1 -top-3 hidden rounded-full bg-card px-1 py-0.5 text-xs shadow group-hover/bubble:block',
+          className,
+        )}
       >
         +
       </button>
     );
   }
   return (
-    <div className="absolute -top-8 right-0 z-10 flex gap-0.5 rounded-full bg-popover px-1 py-0.5 shadow-md">
+    <div
+      className={cn(
+        'absolute -top-8 right-0 z-10 flex gap-0.5 rounded-full bg-popover px-1 py-0.5 shadow-md',
+        className,
+      )}
+    >
       {QUICK_REACTIONS.map((e) => (
         <button
           key={e}

@@ -38,7 +38,6 @@
         "tailwind-merge": "^3.5.0",
         "tailwindcss": "^4.2.1",
         "tw-animate-css": "^1.4.0",
-        "tw-glass": "*",
         "tw-shimmer": "*",
         "zustand": "^5.0.11",
       },
@@ -1119,8 +1118,6 @@
     "tslib": ["tslib@2.8.1", "", {}, "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="],
 
     "tw-animate-css": ["tw-animate-css@1.4.0", "", {}, "sha512-7bziOlRqH0hJx80h/3mbicLW7o8qLsH5+RaLR2t+OHM3D0JlWGODQKQ4cxbK7WlvmUxpcj6Kgu6EKqjrGFe3QQ=="],
-
-    "tw-glass": ["tw-glass@0.0.2", "", { "peerDependencies": { "tailwindcss": ">=4.0.0-0" } }, "sha512-LjTVm82yH0eX/n1sgK/eNdcSs4/PNhsDORkYh5hRJUqprqPUz//GTlt0ybBSOjAAtxTmbd/f6tOKtgraCXpWeQ=="],
 
     "tw-shimmer": ["tw-shimmer@0.4.7", "", { "peerDependencies": { "tailwindcss": ">=4.0.0-0" } }, "sha512-tVSEFXzznHEOOuSSovoINU2Urbiw62ma07NKG7KU/wVXH/hd05napyffOIdWg/WHEeWlVxyFuurISPKT+Cu4Vw=="],
 

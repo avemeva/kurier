@@ -1,5 +1,6 @@
 import { ChevronUp, Loader2, Mic, Pause, Play } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { cn } from '@/lib/utils';
 
 /** Match tdesktop: kWaveformSamplesCount=100, msgWaveformBar=2, msgWaveformSkip=1, min=3, max=17 */
 const WAVEFORM_SAMPLES = 100;
@@ -140,6 +141,7 @@ export function PureVoiceView({
   speechStatus = 'none',
   speechText = '',
   onTranscribe,
+  className,
 }: {
   url: string | null;
   loading?: boolean;
@@ -150,6 +152,7 @@ export function PureVoiceView({
   speechStatus?: 'none' | 'pending' | 'done' | 'error';
   speechText?: string;
   onTranscribe?: () => void;
+  className?: string;
 }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -298,7 +301,12 @@ export function PureVoiceView({
 
   if (loading) {
     return (
-      <div className="flex h-10 w-48 animate-pulse items-center gap-2 rounded-full bg-accent px-3">
+      <div
+        className={cn(
+          'flex h-10 w-48 animate-pulse items-center gap-2 rounded-full bg-accent px-3',
+          className,
+        )}
+      >
         <Mic size={16} className="shrink-0 text-text-quaternary" />
         <div className="h-1 flex-1 rounded bg-border" />
       </div>
@@ -309,7 +317,7 @@ export function PureVoiceView({
     const allPlaceholderBars = generateBars('unavailable');
     const placeholderBars = barCount > 0 ? sampleBars(allPlaceholderBars, barCount) : [];
     return (
-      <div className="flex w-full min-w-[200px] items-center gap-2 py-1">
+      <div className={cn('flex w-full min-w-[200px] items-center gap-2 py-1', className)}>
         {/* Play button — clickable for retry, otherwise just a muted circle */}
         {onRetry ? (
           <button
@@ -346,7 +354,7 @@ export function PureVoiceView({
   }
 
   return (
-    <div data-testid="voice-message" className="w-[280px] py-1">
+    <div data-testid="voice-message" className={cn('w-[280px] py-1', className)}>
       {/* biome-ignore lint/a11y/useMediaCaption: Telegram voice messages don't have captions */}
       <audio ref={audioRef} src={url} preload="metadata" />
 
@@ -356,7 +364,7 @@ export function PureVoiceView({
         <button
           type="button"
           onClick={togglePlay}
-          className="mt-0.5 flex size-[42px] shrink-0 items-center justify-center rounded-full bg-accent-blue text-white transition-opacity hover:opacity-90"
+          className="mt-0.5 flex size-[42px] shrink-0 items-center justify-center rounded-full bg-accent-brand text-white transition-opacity hover:opacity-90"
           aria-label={playing ? 'Pause' : 'Play'}
         >
           {playing ? (
@@ -389,7 +397,7 @@ export function PureVoiceView({
                   <div
                     key={`bar-${i}-${height}`}
                     className={`w-[2px] rounded-full transition-colors duration-75 ${
-                      filled ? 'bg-accent-blue' : 'bg-muted-foreground/40'
+                      filled ? 'bg-accent-brand' : 'bg-muted-foreground/40'
                     }`}
                     style={{ height: `${height}px` }}
                   />
@@ -405,8 +413,8 @@ export function PureVoiceView({
                 disabled={isTranscribing}
                 className={`flex shrink-0 items-center justify-center rounded transition-opacity hover:opacity-80 ${
                   hasTranscription
-                    ? 'size-6 bg-accent-blue text-white'
-                    : 'bg-accent-blue/10 px-1 py-0.5 text-accent-blue'
+                    ? 'size-6 bg-accent-brand text-white'
+                    : 'bg-accent-brand/10 px-1 py-0.5 text-accent-brand'
                 } ${isTranscribing ? 'cursor-default opacity-70' : ''}`}
                 aria-label={
                   isTranscribing

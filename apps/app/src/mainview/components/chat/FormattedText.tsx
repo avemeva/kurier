@@ -97,7 +97,7 @@ export function FormattedText({ text, entities }: { text: string; entities: UITe
             href={entityType === 'email' ? `mailto:${slice}` : slice}
             target="_blank"
             rel="noopener noreferrer"
-            className="break-all text-accent-blue underline"
+            className="break-all text-accent-brand underline"
           >
             {slice}
           </a>,
@@ -110,7 +110,7 @@ export function FormattedText({ text, entities }: { text: string; entities: UITe
             href={entity.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-accent-blue underline"
+            className="text-accent-brand underline"
           >
             {slice}
           </a>,
@@ -126,7 +126,7 @@ export function FormattedText({ text, entities }: { text: string; entities: UITe
       case 'hashtag':
       case 'botCommand':
         parts.push(
-          <span key={key} className="text-accent-blue">
+          <span key={key} className="text-accent-brand">
             {slice}
           </span>,
         );

@@ -1,11 +1,11 @@
 import { cn } from '@/lib/utils';
 
 const COLORS = [
-  'bg-blue-9 text-white',
-  'bg-plum-9 text-white',
-  'bg-green-9 text-white',
-  'bg-red-9 text-white',
-  'bg-sand-9 text-white',
+  'bg-avatar-1 text-white',
+  'bg-avatar-2 text-white',
+  'bg-avatar-3 text-white',
+  'bg-avatar-4 text-white',
+  'bg-avatar-5 text-white',
 ];
 
 function Avatar({
