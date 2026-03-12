@@ -413,6 +413,8 @@ function BubbleLayout({
             description: msg.webPreview.description,
             minithumbnail: msg.webPreview.minithumbnail,
             thumbUrl: linkPreviewThumbUrl,
+            showLargeMedia: msg.webPreview.showLargeMedia,
+            showMediaAboveDescription: msg.webPreview.showMediaAboveDescription,
           }}
         />
       )}

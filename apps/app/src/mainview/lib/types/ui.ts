@@ -47,6 +47,8 @@ export type UIWebPreview = {
   title: string;
   description: string;
   minithumbnail: string | null;
+  showLargeMedia: boolean;
+  showMediaAboveDescription: boolean;
 };
 
 export type UIKeyboardButton = { text: string; url?: string };

@@ -195,6 +195,8 @@ function extractWebPreview(content: Td.MessageContent): UIWebPreview | null {
     title: lp.title,
     description: lp.description?.text ?? '',
     minithumbnail,
+    showLargeMedia: lp.show_large_media,
+    showMediaAboveDescription: lp.show_media_above_description,
   };
 }
 
