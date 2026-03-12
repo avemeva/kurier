@@ -193,12 +193,19 @@ export function MessagePanel() {
                   ? ({ kind: 'album', messages: group.messages } as const)
                   : ({ kind: 'single', message: group.message } as const);
               const isOut = getIsOutgoing(group);
+              const isService =
+                group.type === 'single' &&
+                !('isPending' in group.message) &&
+                !!(group.message as UIMessage).serviceText;
 
               return (
                 <div
                   key={getKey(group)}
                   id={`msg-${getKey(group)}`}
-                  className={cn('flex', isOut ? 'sm:justify-end' : 'justify-start')}
+                  className={cn(
+                    'flex',
+                    isService ? 'justify-center' : isOut ? 'sm:justify-end' : 'justify-start',
+                  )}
                 >
                   <Message
                     input={input}

@@ -102,6 +102,7 @@ export type UIMessage = {
   forwardFromPhotoId: number;
   forwardDate: number;
   serviceText: string | null;
+  servicePinnedMessageId: number;
   inlineKeyboard: UIKeyboardRow[] | null;
   replyPreview: UIReplyPreview | null;
   replyQuoteText: string;

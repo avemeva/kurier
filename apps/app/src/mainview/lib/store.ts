@@ -14,6 +14,8 @@ import type {
 import {
   buildReplyPreview,
   enrichReplyPreviews,
+  extractMediaLabel,
+  extractText,
   toUIChat,
   toUIMessage,
   toUIPendingMessage,
@@ -77,6 +79,7 @@ interface ChatState {
   mediaUrls: Record<string, string | null>;
   thumbUrls: Record<string, string | null>;
   replyPreviews: Record<string, UIReplyPreview | null>;
+  pinnedPreviews: Record<string, string | null>;
   customEmojiUrls: Record<string, string | null>;
   typingByChat: Record<number, Record<number, { action: Td.ChatAction; expiresAt: number }>>;
   userStatuses: Record<number, Td.UserStatus>;
@@ -271,6 +274,38 @@ function resolveReplyPreview(
   });
 }
 
+const pinnedPreviewRequested = new Set<string>();
+
+function resolvePinnedPreview(
+  chatId: number,
+  messageId: number,
+  _get: () => ChatState,
+  set: (partial: Partial<ChatState> | ((s: ChatState) => Partial<ChatState>)) => void,
+): void {
+  const key = `${chatId}_${messageId}`;
+  if (pinnedPreviewRequested.has(key)) return;
+  pinnedPreviewRequested.add(key);
+  fetchMessage(chatId, messageId).then((msg) => {
+    if (!msg) {
+      set((s) => ({ pinnedPreviews: { ...s.pinnedPreviews, [key]: null } }));
+      return;
+    }
+    let preview: string;
+    const text = extractText(msg.content);
+    if (text) {
+      preview = `"${text.slice(0, 40)}${text.length > 40 ? '…' : ''}"`;
+    } else {
+      const label = extractMediaLabel(msg.content);
+      if (label) {
+        preview = label === 'GIF' ? 'a GIF' : `a ${label.toLowerCase()}`;
+      } else {
+        preview = 'a message';
+      }
+    }
+    set((s) => ({ pinnedPreviews: { ...s.pinnedPreviews, [key]: preview } }));
+  });
+}
+
 /** Format a count with singular/plural label. "online" is special — no plural. */
 function formatCount(count: number, label: string): string {
   if (label === 'online') return `${count.toLocaleString()} online`;
@@ -383,6 +418,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   mediaUrls: {},
   thumbUrls: {},
   replyPreviews: {},
+  pinnedPreviews: {},
   customEmojiUrls: {},
   typingByChat: {},
   userStatuses: {},
@@ -1654,6 +1690,7 @@ let _prevMsgPending: PendingMessage[] | undefined;
 let _prevMsgUsers: Map<number, Td.user> | undefined;
 let _prevMsgLastReadOutboxId: number | undefined;
 let _prevMsgReplyPreviews: Record<string, UIReplyPreview | null> | undefined;
+let _prevMsgPinnedPreviews: Record<string, string | null> | undefined;
 let _prevMsgChats: Td.chat[] | undefined;
 let _prevMsgArchivedChats: Td.chat[] | undefined;
 let _prevMsgResult: UIMessageItem[] = EMPTY_UI_MESSAGES;
@@ -1667,6 +1704,7 @@ export function selectChatMessages(state: ChatState): UIMessageItem[] {
     chats,
     archivedChats,
     replyPreviews,
+    pinnedPreviews,
   } = state;
   if (!selectedChatId) return EMPTY_UI_MESSAGES;
 
@@ -1685,6 +1723,7 @@ export function selectChatMessages(state: ChatState): UIMessageItem[] {
     users === _prevMsgUsers &&
     lastReadOutboxId === _prevMsgLastReadOutboxId &&
     replyPreviews === _prevMsgReplyPreviews &&
+    pinnedPreviews === _prevMsgPinnedPreviews &&
     chats === _prevMsgChats &&
     archivedChats === _prevMsgArchivedChats
   ) {
@@ -1696,6 +1735,7 @@ export function selectChatMessages(state: ChatState): UIMessageItem[] {
   _prevMsgUsers = users;
   _prevMsgLastReadOutboxId = lastReadOutboxId;
   _prevMsgReplyPreviews = replyPreviews;
+  _prevMsgPinnedPreviews = pinnedPreviews;
   _prevMsgChats = chats;
   _prevMsgArchivedChats = archivedChats;
 
@@ -1720,6 +1760,22 @@ export function selectChatMessages(state: ChatState): UIMessageItem[] {
     } else if (cached === undefined) {
       // Not yet requested — trigger async fetch (fire-and-forget)
       resolveReplyPreview(m.chatId, m.replyToMessageId, () => state, useChatStore.setState);
+    }
+  }
+
+  for (let i = 0; i < converted.length; i++) {
+    const m = converted[i];
+    if (m.servicePinnedMessageId === 0) continue;
+    const key = `${m.chatId}_${m.servicePinnedMessageId}`;
+    const cached = pinnedPreviews[key];
+    if (typeof cached === 'string') {
+      const text = m.senderName ? `${m.senderName} pinned ${cached}` : `pinned ${cached}`;
+      converted[i] = { ...m, serviceText: text };
+    } else if (cached === undefined) {
+      resolvePinnedPreview(m.chatId, m.servicePinnedMessageId, () => state, useChatStore.setState);
+    } else {
+      const fallback = m.senderName ? `${m.senderName} pinned a message` : 'pinned a message';
+      converted[i] = { ...m, serviceText: fallback };
     }
   }
 

@@ -43,7 +43,7 @@ function toContentKind(content: Td.MessageContent): MessageContentKind {
 
 // --- Text extraction ---
 
-function extractText(content: Td.MessageContent): string {
+export function extractText(content: Td.MessageContent): string {
   if (content._ === 'messageText') return content.text.text;
   if ('caption' in content && content.caption) return (content.caption as Td.formattedText).text;
   return '';
@@ -58,7 +58,7 @@ function extractEntities(content: Td.MessageContent): Td.textEntity[] {
 
 // --- Media label ---
 
-function extractMediaLabel(content: Td.MessageContent): string {
+export function extractMediaLabel(content: Td.MessageContent): string {
   switch (content._) {
     case 'messagePhoto':
       return 'Photo';
@@ -431,6 +431,7 @@ export function toUIMessage(
     forwardFromPhotoId: extractForwardPhotoId(msg.forward_info),
     forwardDate: msg.forward_info?.date ?? 0,
     serviceText: extractServiceText(msg.content),
+    servicePinnedMessageId: msg.content._ === 'messagePinMessage' ? msg.content.message_id : 0,
     inlineKeyboard: extractInlineKeyboard(msg),
     replyPreview: null, // Populated by enrichReplyPreviews after batch conversion
     replyQuoteText:

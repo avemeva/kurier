@@ -63,7 +63,12 @@ export function Message({
 
   switch (state.layout) {
     case 'service':
-      return <PureServiceMessage text={state.text} />;
+      return (
+        <PureServiceMessage
+          text={state.text}
+          onClick={state.pinnedMessageId ? () => onReplyClick?.(state.pinnedMessageId) : undefined}
+        />
+      );
     case 'pending':
       return <PendingLayout state={state} groupPosition={groupPosition} />;
     case 'sticker':

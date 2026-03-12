@@ -21,6 +21,7 @@ export type MessageContext = {
 export type ServiceRenderState = {
   layout: 'service';
   text: string;
+  pinnedMessageId: number;
 };
 
 export type PendingRenderState = {
@@ -164,6 +165,7 @@ export function useMessage(input: MessageInput, ctx: MessageContext): MessageRen
     return {
       layout: 'service',
       text: msg.serviceText,
+      pinnedMessageId: msg.servicePinnedMessageId,
     };
   }
 
