@@ -1673,6 +1673,39 @@ let _prevHeaderChatInfo: ChatInfoResult | undefined;
 let _prevHeaderOnlineCount: number | undefined;
 let _prevHeaderResult: HeaderStatus = null;
 
+export function actionLabel(action: Td.ChatAction): string {
+  switch (action._) {
+    case 'chatActionRecordingVideo':
+      return 'recording video';
+    case 'chatActionUploadingVideo':
+      return 'sending video';
+    case 'chatActionRecordingVoiceNote':
+      return 'recording voice';
+    case 'chatActionUploadingVoiceNote':
+      return 'sending voice';
+    case 'chatActionUploadingPhoto':
+      return 'sending photo';
+    case 'chatActionUploadingDocument':
+      return 'sending file';
+    case 'chatActionChoosingSticker':
+      return 'choosing sticker';
+    case 'chatActionChoosingLocation':
+      return 'choosing location';
+    case 'chatActionChoosingContact':
+      return 'choosing contact';
+    case 'chatActionStartPlayingGame':
+      return 'playing game';
+    case 'chatActionRecordingVideoNote':
+      return 'recording video message';
+    case 'chatActionUploadingVideoNote':
+      return 'sending video message';
+    case 'chatActionWatchingAnimations':
+      return 'watching animation';
+    default:
+      return 'typing';
+  }
+}
+
 function computeHeaderStatus(state: ChatState): HeaderStatus {
   const { selectedChatId, chats, archivedChats } = state;
   if (!selectedChatId) return null;
@@ -1691,15 +1724,27 @@ function computeHeaderStatus(state: ChatState): HeaderStatus {
   const chatTyping = state.typingByChat[chatId];
   if (chatTyping && Object.keys(chatTyping).length > 0) {
     if (isPrivate) {
-      return { type: 'typing', text: 'typing' };
+      const entry = Object.values(chatTyping)[0];
+      return { type: 'typing', text: actionLabel(entry.action) };
     }
     const typerIds = Object.keys(chatTyping);
-    const names = typerIds.map((uid) => {
-      const user = state.users.get(Number(uid));
-      return user?.first_name ?? 'Someone';
-    });
-    const text = names.length === 1 ? `${names[0]} is typing` : `${names.join(', ')} are typing`;
-    return { type: 'typing', text };
+    const entries = typerIds.map((uid) => ({
+      name: state.users.get(Number(uid))?.first_name ?? 'Someone',
+      label: actionLabel(chatTyping[Number(uid)].action),
+    }));
+    // Group by action label
+    const byLabel = new Map<string, string[]>();
+    for (const e of entries) {
+      const arr = byLabel.get(e.label);
+      if (arr) arr.push(e.name);
+      else byLabel.set(e.label, [e.name]);
+    }
+    const parts: string[] = [];
+    for (const [label, names] of byLabel) {
+      const verb = names.length === 1 ? 'is' : 'are';
+      parts.push(`${names.join(', ')} ${verb} ${label}`);
+    }
+    return { type: 'typing', text: parts.join(', ') };
   }
   if (isPrivate) {
     const info = state.chatInfoCache[chatId];

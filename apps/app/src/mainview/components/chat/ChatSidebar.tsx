@@ -24,7 +24,7 @@ import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { formatTime } from '@/lib/format';
 import { log } from '@/lib/log';
-import { selectUIArchivedChats, selectUIChats, useChatStore } from '@/lib/store';
+import { actionLabel, selectUIArchivedChats, selectUIChats, useChatStore } from '@/lib/store';
 import type { PeerInfo, UIChat, UISearchResult } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { EmojiStatusBadge } from './EmojiStatusBadge';
@@ -666,15 +666,24 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                             chat.kind === 'basicGroup' || chat.kind === 'supergroup'
                               ? (() => {
                                   const typerIds = Object.keys(typingByChat[chat.id]);
-                                  const names = typerIds.map((uid) => {
-                                    const u = users.get(Number(uid));
-                                    return u?.first_name ?? 'Someone';
-                                  });
-                                  return names.length === 1
-                                    ? `${names[0]} is typing`
-                                    : `${names.join(', ')} are typing`;
+                                  const entries = typerIds.map((uid) => ({
+                                    name: users.get(Number(uid))?.first_name ?? 'Someone',
+                                    label: actionLabel(typingByChat[chat.id][Number(uid)].action),
+                                  }));
+                                  const byLabel = new Map<string, string[]>();
+                                  for (const e of entries) {
+                                    const arr = byLabel.get(e.label);
+                                    if (arr) arr.push(e.name);
+                                    else byLabel.set(e.label, [e.name]);
+                                  }
+                                  const parts: string[] = [];
+                                  for (const [label, names] of byLabel) {
+                                    const verb = names.length === 1 ? 'is' : 'are';
+                                    parts.push(`${names.join(', ')} ${verb} ${label}`);
+                                  }
+                                  return parts.join(', ');
                                 })()
-                              : 'typing'
+                              : actionLabel(Object.values(typingByChat[chat.id])[0].action)
                           }
                         />
                       ) : (
