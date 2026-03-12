@@ -377,7 +377,14 @@ function BubbleLayout({
         )
       )}
       {isPhoto && media && (
-        <PurePhotoView url={media.url} loading={media.loading} onRetry={media.retry} />
+        <PurePhotoView
+          url={media.url}
+          loading={media.loading}
+          onRetry={media.retry}
+          width={state.displayWidth}
+          height={state.displayHeight}
+          minithumbnail={state.minithumbnail}
+        />
       )}
       {isVideo && media && (
         <PureVideoView
@@ -386,6 +393,9 @@ function BubbleLayout({
           isCircle={ck === 'videoNote'}
           isGif={ck === 'animation'}
           onRetry={media.retry}
+          width={state.displayWidth}
+          height={state.displayHeight}
+          minithumbnail={state.minithumbnail}
         />
       )}
       {isVoice && media && (

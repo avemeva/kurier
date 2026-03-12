@@ -1,4 +1,4 @@
-import { ChevronUp, Loader2, Mic, Pause, Play } from 'lucide-react';
+import { ChevronUp, Loader2, Pause, Play } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -299,75 +299,29 @@ export function PureVoiceView({
     onTranscribe &&
     (speechStatus === 'none' || speechStatus === 'error' || speechStatus === 'done');
 
-  if (loading) {
-    return (
-      <div
-        className={cn(
-          'flex h-10 w-48 animate-pulse items-center gap-2 rounded-full bg-accent px-3',
-          className,
-        )}
-      >
-        <Mic size={16} className="shrink-0 text-text-quaternary" />
-        <div className="h-1 flex-1 rounded bg-border" />
-      </div>
-    );
-  }
-
-  if (!url) {
-    const allPlaceholderBars = generateBars('unavailable');
-    const placeholderBars = barCount > 0 ? sampleBars(allPlaceholderBars, barCount) : [];
-    return (
-      <div className={cn('flex w-full min-w-[200px] items-center gap-2 py-1', className)}>
-        {/* Play button — clickable for retry, otherwise just a muted circle */}
-        {onRetry ? (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="flex size-[42px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-text-quaternary/30 text-text-quaternary transition-opacity hover:opacity-80"
-            aria-label="Retry"
-          >
-            <Play size={18} fill="currentColor" className="ml-0.5" />
-          </button>
-        ) : (
-          <div className="flex size-[42px] shrink-0 items-center justify-center rounded-full bg-text-quaternary/30 text-text-quaternary">
-            <Play size={18} fill="currentColor" className="ml-0.5" />
-          </div>
-        )}
-
-        {/* Muted waveform bars at minimum height */}
-        <div ref={waveformRef} className="flex min-w-0 flex-1 items-center gap-[1px]">
-          {placeholderBars.map((h, i) => (
-            <div
-              key={`bar-${i}-${h}`}
-              className="w-[2px] rounded-full bg-muted-foreground/20"
-              style={{ height: `${BAR_MIN}px` }}
-            />
-          ))}
-        </div>
-
-        {/* Placeholder duration */}
-        <span className="min-w-[32px] shrink-0 text-right text-xs tabular-nums text-text-quaternary">
-          --:--
-        </span>
-      </div>
-    );
-  }
+  const isReady = !!url;
 
   return (
-    <div data-testid="voice-message" className={cn('w-[280px] py-1', className)}>
+    <div data-testid="voice-message" className={cn('min-h-[54px] w-[280px] py-1', className)}>
       {/* biome-ignore lint/a11y/useMediaCaption: Telegram voice messages don't have captions */}
-      <audio ref={audioRef} src={url} preload="metadata" />
+      {url && <audio ref={audioRef} src={url} preload="metadata" />}
 
       {/* Play button | right column */}
       <div className="flex gap-2">
         {/* Play/pause button — aligned to waveform row */}
         <button
           type="button"
-          onClick={togglePlay}
-          className="mt-0.5 flex size-[42px] shrink-0 items-center justify-center rounded-full bg-accent-brand text-white transition-opacity hover:opacity-90"
-          aria-label={playing ? 'Pause' : 'Play'}
+          onClick={isReady ? togglePlay : onRetry}
+          disabled={!isReady && !onRetry}
+          className={cn(
+            'mt-0.5 flex size-[42px] shrink-0 items-center justify-center rounded-full transition-opacity hover:opacity-90',
+            isReady ? 'bg-accent-brand text-white' : 'bg-text-quaternary/30 text-text-quaternary',
+          )}
+          aria-label={!isReady ? (loading ? 'Loading' : 'Retry') : playing ? 'Pause' : 'Play'}
         >
-          {playing ? (
+          {loading ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : playing ? (
             <Pause size={18} fill="currentColor" />
           ) : (
             <Play size={18} fill="currentColor" className="ml-0.5" />
@@ -387,8 +341,11 @@ export function PureVoiceView({
               aria-valuemax={100}
               aria-valuenow={Math.round(progress * 100)}
               tabIndex={0}
-              className="flex min-w-0 flex-1 cursor-pointer items-center gap-[1px]"
-              onMouseDown={handleWaveformMouseDown}
+              className={cn(
+                'flex min-w-0 flex-1 items-center gap-[1px]',
+                isReady && 'cursor-pointer',
+              )}
+              onMouseDown={isReady ? handleWaveformMouseDown : undefined}
             >
               {bars.map((height, i) => {
                 const barProgress = bars.length > 0 ? (i + 0.5) / bars.length : 0;

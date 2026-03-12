@@ -253,6 +253,64 @@ base('message panel is present when a chat is selected', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// Auto-scroll to bottom on chat open
+// ---------------------------------------------------------------------------
+
+base('opening a chat scrolls to latest messages', async () => {
+  const dialogs = page.locator('[data-testid="dialog-item"]');
+  const panel = page.locator('[data-testid="message-panel"]');
+  const count = await dialogs.count();
+
+  // Helper: click a dialog, wait for scrollable messages, assert scrolled to bottom
+  async function openAndAssertScrolled(index: number): Promise<boolean> {
+    await dialogs.nth(index).click();
+    try {
+      await page.waitForSelector('[data-testid="message-bubble"]', { timeout: 5_000 });
+    } catch {
+      return false;
+    }
+
+    const isScrollable = await panel.evaluate((el) => el.scrollHeight > el.clientHeight);
+    if (!isScrollable) return false;
+
+    // Poll until scrolled to bottom (handles async image/thumbnail loading)
+    await page.waitForFunction(
+      (sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return false;
+        return el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+      },
+      '[data-testid="message-panel"]',
+      { timeout: 5_000 },
+    );
+    return true;
+  }
+
+  // Ensure a chat switch happens by first navigating to the last dialog,
+  // since previous tests may have left dialog 0 selected.
+  await dialogs.nth(Math.min(count - 1, 5)).click();
+  await page.waitForTimeout(300);
+
+  // Find first scrollable chat (fetch path — guaranteed to be a chat switch)
+  let firstScrollable = -1;
+  for (let i = 0; i < Math.min(count, 5); i++) {
+    if (await openAndAssertScrolled(i)) {
+      firstScrollable = i;
+      break;
+    }
+  }
+  expect(firstScrollable, 'Need at least 1 scrollable chat to test').toBeGreaterThanOrEqual(0);
+
+  // Open a different dialog, then switch back (cached path)
+  const other = firstScrollable === 0 ? 1 : 0;
+  if (other < count) {
+    await dialogs.nth(other).click();
+    await page.waitForTimeout(300);
+    await openAndAssertScrolled(firstScrollable);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Visual structure
 // ---------------------------------------------------------------------------
 

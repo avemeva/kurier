@@ -180,6 +180,14 @@ function isChatPinned(chat: Td.chat): boolean {
   return chat.positions.some((p) => p.is_pinned);
 }
 
+function getChatOrder(chat: Td.chat): string {
+  return chat.positions[0]?.order ?? '0';
+}
+
+function sortByOrder(chats: Td.chat[]): Td.chat[] {
+  return [...chats].sort((a, b) => getChatOrder(b).localeCompare(getChatOrder(a)));
+}
+
 let tempIdCounter = 0;
 const photoRequested = new Set<number>();
 const mediaRequested = new Set<string>();
@@ -1226,7 +1234,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 }
               : c,
           );
-        return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
+        return {
+          chats: sortByOrder(update(s.chats)),
+          archivedChats: sortByOrder(update(s.archivedChats)),
+        };
       });
       if (event.last_message) {
         loadThumbnailForMessage(event.chat_id, event.last_message, set);
@@ -1244,7 +1255,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
             if (pos.order !== '0') newPositions.push(pos);
             return { ...c, positions: newPositions };
           });
-        return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
+        return {
+          chats: sortByOrder(update(s.chats)),
+          archivedChats: sortByOrder(update(s.archivedChats)),
+        };
       });
     }
 
@@ -1305,7 +1319,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 }
               : c,
           );
-        return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
+        return {
+          chats: sortByOrder(update(s.chats)),
+          archivedChats: sortByOrder(update(s.archivedChats)),
+        };
       });
     }
 

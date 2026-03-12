@@ -51,6 +51,9 @@ export type BubbleRenderState = {
   showAvatar: boolean;
   showSenderName: boolean;
   senderPhotoUrl?: string;
+  displayWidth?: number;
+  displayHeight?: number;
+  minithumbnail?: string | null;
 };
 
 export type AlbumRenderState = {
@@ -250,6 +253,15 @@ export function useMessage(input: MessageInput, ctx: MessageContext): MessageRen
     msg.contentKind === 'animation';
   const isMediaOnly = (isPhoto || isVideo) && !msg.text;
 
+  // Compute dimensions for photos/videos in bubble layout (defensive — prevents layout shift)
+  let bubbleDisplayWidth: number | undefined;
+  let bubbleDisplayHeight: number | undefined;
+  if ((isPhoto || isVideo) && msg.mediaWidth > 0 && msg.mediaHeight > 0) {
+    const sized = computeMediaSize(msg.mediaWidth, msg.mediaHeight, MAX_MEDIA_SIZE, MIN_MEDIA_SIZE);
+    bubbleDisplayWidth = sized.width;
+    bubbleDisplayHeight = sized.height;
+  }
+
   return {
     layout: 'bubble',
     msg,
@@ -259,5 +271,8 @@ export function useMessage(input: MessageInput, ctx: MessageContext): MessageRen
     showAvatar: ctx.showSender && !msg.isOutgoing,
     showSenderName: ctx.showSender && !msg.isOutgoing,
     senderPhotoUrl: ctx.senderPhotoUrl,
+    displayWidth: bubbleDisplayWidth,
+    displayHeight: bubbleDisplayHeight,
+    minithumbnail: isPhoto || isVideo ? msg.minithumbnail : undefined,
   };
 }
