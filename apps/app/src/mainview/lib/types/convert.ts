@@ -164,14 +164,37 @@ function extractMinithumbnail(content: Td.MessageContent): string | null {
 
 // --- Web preview ---
 
+/** Extract minithumbnail from any link preview type that carries a photo or thumbnail. */
+function extractLinkPreviewMinithumbnail(lp: Td.linkPreview): string | null {
+  const t = lp.type;
+  if (!t) return null;
+  switch (t._) {
+    case 'linkPreviewTypePhoto':
+      return t.photo.minithumbnail?.data ?? null;
+    case 'linkPreviewTypeVideo':
+      return t.cover?.minithumbnail?.data ?? t.video.minithumbnail?.data ?? null;
+    case 'linkPreviewTypeArticle':
+    case 'linkPreviewTypeApp':
+      return ('photo' in t && t.photo?.minithumbnail?.data) || null;
+    case 'linkPreviewTypeEmbeddedVideoPlayer':
+    case 'linkPreviewTypeEmbeddedAnimationPlayer':
+    case 'linkPreviewTypeEmbeddedAudioPlayer':
+      return ('thumbnail' in t && t.thumbnail?.minithumbnail?.data) || null;
+    default:
+      return null;
+  }
+}
+
 function extractWebPreview(content: Td.MessageContent): UIWebPreview | null {
   if (content._ !== 'messageText' || !content.link_preview) return null;
   const lp = content.link_preview;
+  const minithumbnail = extractLinkPreviewMinithumbnail(lp);
   return {
     url: lp.url,
     siteName: lp.site_name,
     title: lp.title,
     description: lp.description?.text ?? '',
+    minithumbnail,
   };
 }
 
@@ -499,6 +522,7 @@ export function toUIChat(chat: Td.chat, ctx: UIChatContext): UIChat {
     lastMessagePreview: extractMessagePreview(lastMsg),
     lastMessageSenderName: extractLastMessageSenderName(lastMsg, kind, ctx),
     lastMessageContentKind: lastMsg ? toContentKind(lastMsg.content) : null,
+    lastMessageIsForwarded: !!lastMsg?.forward_info,
     lastMessageId: lastMsg?.id ?? 0,
     lastMessageDate: lastMsg?.date ?? 0,
     lastMessageStatus: !lastMsg?.is_outgoing

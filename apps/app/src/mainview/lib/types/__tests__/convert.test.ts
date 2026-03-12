@@ -143,6 +143,7 @@ describe('toUIMessage', () => {
       title: 'Алекс Беляев @ Community Sprints',
       description:
         'Co-founder @ Community Sprints: сommunity-driven platform to grow career & business skills\n\nПишу о развитии компании в Европе и делюсь полезными материалами  про карьеру и бизнес\n\nStartupWiseGuys.com alumni \n\nDM @belalex',
+      minithumbnail: null,
     });
   });
 

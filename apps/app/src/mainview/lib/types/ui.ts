@@ -46,6 +46,7 @@ export type UIWebPreview = {
   siteName: string;
   title: string;
   description: string;
+  minithumbnail: string | null;
 };
 
 export type UIKeyboardButton = { text: string; url?: string };
@@ -139,6 +140,7 @@ export type UIChat = {
   lastMessagePreview: string;
   lastMessageSenderName: string | null;
   lastMessageContentKind: MessageContentKind | null;
+  lastMessageIsForwarded: boolean;
   lastMessageId: number;
   lastMessageDate: number;
   lastMessageStatus: 'none' | 'sent' | 'read';

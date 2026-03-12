@@ -316,6 +316,9 @@ function BubbleLayout({
 
   const storeRecognizeSpeech = useChatStore((s) => s.recognizeSpeech);
   const profilePhotos = useChatStore((s) => s.profilePhotos);
+  const linkPreviewThumbUrl = useChatStore((s) =>
+    msg.webPreview ? (s.thumbUrls[`${msg.chatId}_${msg.id}`] ?? null) : null,
+  );
   const handleTranscribe = useCallback(() => {
     storeRecognizeSpeech(msg.chatId, msg.id);
   }, [msg.chatId, msg.id, storeRecognizeSpeech]);
@@ -408,6 +411,8 @@ function BubbleLayout({
             siteName: msg.webPreview.siteName,
             title: msg.webPreview.title,
             description: msg.webPreview.description,
+            minithumbnail: msg.webPreview.minithumbnail,
+            thumbUrl: linkPreviewThumbUrl,
           }}
         />
       )}

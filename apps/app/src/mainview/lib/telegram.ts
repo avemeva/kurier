@@ -522,12 +522,23 @@ function getThumbnailFile(content: Td.MessageContent): Td.file | null {
     case 'messageSticker':
       return content.sticker.thumbnail?.file ?? null;
     case 'messageText': {
-      // Link preview with photo
+      // Link preview with photo/thumbnail
       const lp = content.link_preview;
       if (!lp) return null;
       const t = lp.type;
       if (t._ === 'linkPreviewTypePhoto') return t.photo.sizes[0]?.photo ?? null;
-      if (t._ === 'linkPreviewTypeVideo') return t.video.thumbnail?.file ?? null;
+      if (t._ === 'linkPreviewTypeVideo')
+        return t.cover?.sizes[0]?.photo ?? t.video.thumbnail?.file ?? null;
+      if (t._ === 'linkPreviewTypeArticle' || t._ === 'linkPreviewTypeApp') {
+        return ('photo' in t && t.photo?.sizes[0]?.photo) || null;
+      }
+      if (
+        t._ === 'linkPreviewTypeEmbeddedVideoPlayer' ||
+        t._ === 'linkPreviewTypeEmbeddedAnimationPlayer' ||
+        t._ === 'linkPreviewTypeEmbeddedAudioPlayer'
+      ) {
+        return ('thumbnail' in t && t.thumbnail?.sizes[0]?.photo) || null;
+      }
       return null;
     }
     default:

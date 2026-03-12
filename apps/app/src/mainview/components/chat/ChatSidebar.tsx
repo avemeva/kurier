@@ -6,6 +6,7 @@ import {
   CheckCheck,
   FileText,
   Film,
+  Forward,
   Loader2,
   Megaphone,
   Mic,
@@ -111,6 +112,9 @@ function ChatPreviewLine({ chat, thumbUrl }: { chat: UIChat; thumbUrl: string | 
       data-testid="dialog-preview"
       className="flex min-w-0 items-center gap-1.5 tg-text-chat text-text-tertiary"
     >
+      {chat.lastMessageIsForwarded && (
+        <Forward size={14} className="shrink-0 text-text-quaternary" />
+      )}
       {thumbUrl && (
         <img src={thumbUrl} alt="" className="size-5 shrink-0 rounded-[3px] object-cover" />
       )}
