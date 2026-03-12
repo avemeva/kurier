@@ -244,7 +244,10 @@ function MediaLayout({
         <div className="px-3 py-1.5">
           <p className="whitespace-pre-wrap break-words tg-text-chat text-text-primary">
             <FormattedText text={msg.text} entities={msg.entities} />
-            <span className="float-right h-[18px] w-12" aria-hidden="true" />
+            <span
+              className={cn('float-right h-[18px]', msg.editDate > 0 ? 'w-[5.5rem]' : 'w-12')}
+              aria-hidden="true"
+            />
           </p>
         </div>
       )}
@@ -379,7 +382,10 @@ function BubbleLayout({
           )}
         >
           <FormattedText text={msg.text} entities={msg.entities} />
-          <span className="float-right h-[18px] w-12" aria-hidden="true" />
+          <span
+            className={cn('float-right h-[18px]', msg.editDate > 0 ? 'w-[5.5rem]' : 'w-12')}
+            aria-hidden="true"
+          />
         </p>
       )}
       {msg.webPreview && (
@@ -501,7 +507,10 @@ function AlbumLayout({
         <div className="px-3 py-1.5">
           <p className="whitespace-pre-wrap break-words tg-text-chat text-text-primary">
             <FormattedText text={first.text} entities={first.entities} />
-            <span className="float-right h-[18px] w-12" aria-hidden="true" />
+            <span
+              className={cn('float-right h-[18px]', first.editDate > 0 ? 'w-[5.5rem]' : 'w-12')}
+              aria-hidden="true"
+            />
           </p>
         </div>
       )}
