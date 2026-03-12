@@ -377,6 +377,7 @@ export function toUIMessage(
     senderName: resolveSenderName(msg.sender_id, users),
     replyToMessageId: extractReplyToMessageId(msg),
     editDate: msg.edit_date,
+    viewCount: msg.interaction_info?.view_count ?? 0,
     reactions: toUIReactions(msg.interaction_info),
     webPreview: extractWebPreview(msg.content),
     isRead: msg.is_outgoing && msg.id > 0 && msg.id <= lastReadOutboxId,

@@ -91,6 +91,7 @@ export type UIMessage = {
   senderName: string;
   replyToMessageId: number;
   editDate: number;
+  viewCount: number;
   reactions: UIReaction[];
   webPreview: UIWebPreview | null;
   isRead: boolean;

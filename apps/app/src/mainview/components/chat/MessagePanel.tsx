@@ -133,6 +133,7 @@ export function MessagePanel() {
   }
 
   function getIsOutgoing(group: (typeof grouped)[number]): boolean {
+    if (selectedChat?.kind === 'channel') return false;
     if (group.type === 'album') return group.messages[0].isOutgoing;
     const msg = group.message;
     if ('isPending' in msg) return true;

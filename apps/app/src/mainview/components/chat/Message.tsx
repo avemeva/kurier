@@ -157,6 +157,7 @@ function StickerLayout({
           out={msg.isOutgoing}
           read={msg.isRead}
           edited={msg.editDate > 0}
+          views={msg.viewCount || undefined}
           displayType="background"
         />
       </span>
@@ -264,6 +265,7 @@ function MediaLayout({
             out={msg.isOutgoing}
             read={msg.isRead}
             edited={msg.editDate > 0}
+            views={msg.viewCount || undefined}
             displayType="image"
           />
         </span>
@@ -274,6 +276,7 @@ function MediaLayout({
             out={msg.isOutgoing}
             read={msg.isRead}
             edited={msg.editDate > 0}
+            views={msg.viewCount || undefined}
             displayType={state.displayType}
           />
         </span>
@@ -417,6 +420,7 @@ function BubbleLayout({
             out={msg.isOutgoing}
             read={msg.isRead}
             edited={msg.editDate > 0}
+            views={msg.viewCount || undefined}
             displayType={displayType}
           />
         </span>
@@ -427,6 +431,7 @@ function BubbleLayout({
             out={msg.isOutgoing}
             read={msg.isRead}
             edited={msg.editDate > 0}
+            views={msg.viewCount || undefined}
             displayType={displayType}
           />
         </span>
@@ -437,6 +442,7 @@ function BubbleLayout({
             out={msg.isOutgoing}
             read={msg.isRead}
             edited={msg.editDate > 0}
+            views={msg.viewCount || undefined}
             displayType={displayType}
           />
         </span>
@@ -527,6 +533,7 @@ function AlbumLayout({
             out={first.isOutgoing}
             read={first.isRead}
             edited={first.editDate > 0}
+            views={first.viewCount || undefined}
             displayType="default"
           />
         </span>
@@ -537,6 +544,7 @@ function AlbumLayout({
             out={first.isOutgoing}
             read={first.isRead}
             edited={first.editDate > 0}
+            views={first.viewCount || undefined}
             displayType="image"
           />
         </span>
