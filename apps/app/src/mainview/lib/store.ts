@@ -287,7 +287,10 @@ function fetchMissingChatPreviewUsers(
         !c.last_message.is_outgoing,
     )
     .map((c) => c.last_message as Td.message);
-  if (msgs.length > 0) fetchMissingUsers(msgs, get, set);
+  if (msgs.length > 0) {
+    fetchMissingUsers(msgs, get, set);
+    loadForwardPhotos(msgs, get().loadProfilePhoto);
+  }
 }
 
 /** Fetch any sender users not yet in the store's users Map. */
@@ -301,6 +304,14 @@ function fetchMissingUsers(
   for (const msg of messages) {
     if (msg.sender_id._ === 'messageSenderUser') {
       const uid = msg.sender_id.user_id;
+      if (!users.has(uid) && !userFetchRequested.has(uid)) {
+        userFetchRequested.add(uid);
+        missing.push(uid);
+      }
+    }
+    // Also fetch forward origin users
+    if (msg.forward_info?.origin._ === 'messageOriginUser') {
+      const uid = msg.forward_info.origin.sender_user_id;
       if (!users.has(uid) && !userFetchRequested.has(uid)) {
         userFetchRequested.add(uid);
         missing.push(uid);
@@ -328,6 +339,28 @@ function fetchMissingUsers(
       return statusChanged ? { users: next, userStatuses: nextStatuses } : { users: next };
     });
   });
+}
+
+/** Load profile photos for forward sources. */
+function loadForwardPhotos(
+  messages: Td.message[],
+  loadProfilePhoto: (chatId: number) => void,
+): void {
+  for (const msg of messages) {
+    if (!msg.forward_info) continue;
+    const origin = msg.forward_info.origin;
+    switch (origin._) {
+      case 'messageOriginUser':
+        loadProfilePhoto(origin.sender_user_id);
+        break;
+      case 'messageOriginChat':
+        loadProfilePhoto(origin.sender_chat_id);
+        break;
+      case 'messageOriginChannel':
+        loadProfilePhoto(origin.chat_id);
+        break;
+    }
+  }
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -484,6 +517,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         isAtLatest: { ...s.isAtLatest, [chat.id]: true },
       }));
       fetchMissingUsers(ordered, get, set);
+      loadForwardPhotos(ordered, get().loadProfilePhoto);
       markAsRead(chat.id);
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) });
@@ -527,6 +561,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         };
       });
       fetchMissingUsers(older, get, set);
+      loadForwardPhotos(older, get().loadProfilePhoto);
     } catch {
       set({ loadingOlderMessages: false });
     }
@@ -570,6 +605,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         };
       });
       fetchMissingUsers(newer, get, set);
+      loadForwardPhotos(newer, get().loadProfilePhoto);
     } catch {
       set({ loadingNewerMessages: false });
     }
@@ -594,6 +630,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         loadingMessages: false,
       }));
       fetchMissingUsers(msgs, get, set);
+      loadForwardPhotos(msgs, get().loadProfilePhoto);
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err), loadingMessages: false });
     }
@@ -615,6 +652,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         loadingMessages: false,
       }));
       fetchMissingUsers(ordered, get, set);
+      loadForwardPhotos(ordered, get().loadProfilePhoto);
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err), loadingMessages: false });
     }
@@ -652,6 +690,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         isAtLatest: { ...s.isAtLatest, [chatId]: true },
       }));
       fetchMissingUsers(ordered, get, set);
+      loadForwardPhotos(ordered, get().loadProfilePhoto);
       markAsRead(chatId);
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) });
@@ -919,6 +958,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
       loadThumbnailForMessage(event.chat_id, event.message, set);
       fetchMissingUsers([event.message], get, set);
+      loadForwardPhotos([event.message], get().loadProfilePhoto);
     }
 
     if (event.type === 'edit_message') {
@@ -1549,6 +1589,8 @@ let _prevMsgPending: PendingMessage[] | undefined;
 let _prevMsgUsers: Map<number, Td.user> | undefined;
 let _prevMsgLastReadOutboxId: number | undefined;
 let _prevMsgReplyPreviews: Record<string, UIReplyPreview | null> | undefined;
+let _prevMsgChats: Td.chat[] | undefined;
+let _prevMsgArchivedChats: Td.chat[] | undefined;
 let _prevMsgResult: UIMessageItem[] = EMPTY_UI_MESSAGES;
 
 export function selectChatMessages(state: ChatState): UIMessageItem[] {
@@ -1577,7 +1619,9 @@ export function selectChatMessages(state: ChatState): UIMessageItem[] {
     pending === _prevMsgPending &&
     users === _prevMsgUsers &&
     lastReadOutboxId === _prevMsgLastReadOutboxId &&
-    replyPreviews === _prevMsgReplyPreviews
+    replyPreviews === _prevMsgReplyPreviews &&
+    chats === _prevMsgChats &&
+    archivedChats === _prevMsgArchivedChats
   ) {
     return _prevMsgResult;
   }
@@ -1587,9 +1631,12 @@ export function selectChatMessages(state: ChatState): UIMessageItem[] {
   _prevMsgUsers = users;
   _prevMsgLastReadOutboxId = lastReadOutboxId;
   _prevMsgReplyPreviews = replyPreviews;
+  _prevMsgChats = chats;
+  _prevMsgArchivedChats = archivedChats;
 
+  const allChats = [...chats, ...archivedChats];
   const converted = real
-    ? enrichReplyPreviews(real.map((msg) => toUIMessage(msg, users, lastReadOutboxId)))
+    ? enrichReplyPreviews(real.map((msg) => toUIMessage(msg, users, lastReadOutboxId, allChats)))
     : [];
 
   // Fill unresolved reply previews from the remote cache and trigger fetches

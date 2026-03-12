@@ -242,6 +242,7 @@ function extractReplyToMessageId(msg: Td.message): number {
 export function extractForwardName(
   info: Td.messageForwardInfo | undefined,
   users: Map<number, Td.user>,
+  chats?: Td.chat[],
 ): string | null {
   if (!info) return null;
   const origin = info.origin;
@@ -252,12 +253,31 @@ export function extractForwardName(
     }
     case 'messageOriginHiddenUser':
       return origin.sender_name;
-    case 'messageOriginChat':
-      return null; // Chat name resolved by caller if needed
-    case 'messageOriginChannel':
-      return null; // Channel name resolved by caller if needed
+    case 'messageOriginChat': {
+      const chat = chats?.find((c) => c.id === origin.sender_chat_id);
+      return chat?.title ?? null;
+    }
+    case 'messageOriginChannel': {
+      const chat = chats?.find((c) => c.id === origin.chat_id);
+      return chat?.title ?? null;
+    }
     default:
       return null;
+  }
+}
+
+export function extractForwardPhotoId(info: Td.messageForwardInfo | undefined): number {
+  if (!info) return 0;
+  const origin = info.origin;
+  switch (origin._) {
+    case 'messageOriginUser':
+      return origin.sender_user_id;
+    case 'messageOriginChat':
+      return origin.sender_chat_id;
+    case 'messageOriginChannel':
+      return origin.chat_id;
+    default:
+      return 0;
   }
 }
 
@@ -362,6 +382,7 @@ export function toUIMessage(
   msg: Td.message,
   users: Map<number, Td.user>,
   lastReadOutboxId: number,
+  chats?: Td.chat[],
 ): UIMessage {
   return {
     id: msg.id,
@@ -381,7 +402,8 @@ export function toUIMessage(
     reactions: toUIReactions(msg.interaction_info),
     webPreview: extractWebPreview(msg.content),
     isRead: msg.is_outgoing && msg.id > 0 && msg.id <= lastReadOutboxId,
-    forwardFromName: extractForwardName(msg.forward_info, users),
+    forwardFromName: extractForwardName(msg.forward_info, users, chats),
+    forwardFromPhotoId: extractForwardPhotoId(msg.forward_info),
     forwardDate: msg.forward_info?.date ?? 0,
     serviceText: extractServiceText(msg.content),
     inlineKeyboard: extractInlineKeyboard(msg),

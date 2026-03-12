@@ -179,6 +179,7 @@ function MediaLayout({
   const { msg, media, bubbleVariant, displayWidth, displayHeight, minithumbnail } = state;
   const hasReactions = msg.reactions.length > 0;
   const isVideo = msg.contentKind === 'video' || msg.contentKind === 'animation';
+  const profilePhotos = useChatStore((s) => s.profilePhotos);
 
   return (
     <PureBubble
@@ -198,7 +199,10 @@ function MediaLayout({
       )}
       {bubbleVariant === 'framed' && msg.forwardFromName && (
         <div className="px-3">
-          <PureForwardHeader fromName={msg.forwardFromName} />
+          <PureForwardHeader
+            fromName={msg.forwardFromName}
+            photoUrl={profilePhotos[msg.forwardFromPhotoId]}
+          />
         </div>
       )}
       {bubbleVariant === 'framed' &&
@@ -311,6 +315,7 @@ function BubbleLayout({
   const hasReactions = msg.reactions.length > 0;
 
   const storeRecognizeSpeech = useChatStore((s) => s.recognizeSpeech);
+  const profilePhotos = useChatStore((s) => s.profilePhotos);
   const handleTranscribe = useCallback(() => {
     storeRecognizeSpeech(msg.chatId, msg.id);
   }, [msg.chatId, msg.id, storeRecognizeSpeech]);
@@ -328,7 +333,12 @@ function BubbleLayout({
       {state.showSenderName && (
         <p className="mb-0.5 text-xs font-medium text-accent-blue">{msg.senderName}</p>
       )}
-      {msg.forwardFromName && <PureForwardHeader fromName={msg.forwardFromName} />}
+      {msg.forwardFromName && (
+        <PureForwardHeader
+          fromName={msg.forwardFromName}
+          photoUrl={profilePhotos[msg.forwardFromPhotoId]}
+        />
+      )}
       {msg.replyPreview ? (
         <PureReplyHeader
           senderName={msg.replyPreview.senderName}
@@ -464,6 +474,7 @@ function AlbumLayout({
 }) {
   const { first, messages, bubbleVariant } = state;
   const hasReactions = first.reactions.length > 0;
+  const profilePhotos = useChatStore((s) => s.profilePhotos);
 
   return (
     <PureBubble
@@ -483,7 +494,10 @@ function AlbumLayout({
       )}
       {bubbleVariant === 'framed' && first.forwardFromName && (
         <div className="px-3">
-          <PureForwardHeader fromName={first.forwardFromName} />
+          <PureForwardHeader
+            fromName={first.forwardFromName}
+            photoUrl={profilePhotos[first.forwardFromPhotoId]}
+          />
         </div>
       )}
       {bubbleVariant === 'framed' &&

@@ -7,6 +7,7 @@ export {
   buildReplyPreview,
   enrichReplyPreviews,
   extractForwardName,
+  extractForwardPhotoId,
   extractInlineKeyboard,
   extractMessagePreview,
   extractServiceText,

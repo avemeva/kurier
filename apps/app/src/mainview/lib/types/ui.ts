@@ -96,6 +96,7 @@ export type UIMessage = {
   webPreview: UIWebPreview | null;
   isRead: boolean;
   forwardFromName: string | null;
+  forwardFromPhotoId: number;
   forwardDate: number;
   serviceText: string | null;
   inlineKeyboard: UIKeyboardRow[] | null;
