@@ -60,7 +60,7 @@ export function PureReplyHeader({
     <Tag
       type={onClick ? 'button' : undefined}
       className={cn(
-        'mb-1 flex gap-2 rounded border-l-2 border-accent-blue px-2 py-1 text-left',
+        'mb-1 flex w-full min-w-0 gap-2 overflow-hidden rounded border-l-2 border-accent-blue px-2 py-1 text-left',
         isOutgoing ? 'bg-accent-blue-subtle' : 'bg-code-bg',
         onClick && 'cursor-pointer',
       )}
