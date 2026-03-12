@@ -64,6 +64,16 @@ ALWAYS label statements with certainty level when explaining, reporting findings
 
 No exceptions. Every claim gets a label.
 
+## Codebase Symbols
+
+Before any coding task (implementing, refactoring, debugging, reviewing), run the symbol map first:
+
+```sh
+bun run scripts/symbols.ts .
+```
+
+This outputs every exported type, interface, class, function, and const per file (~1s). Use it to orient before touching code.
+
 ## Local CLAUDE.md
 
 Before editing files in a directory, check for a `CLAUDE.md` in that directory and read it first.
