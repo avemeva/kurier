@@ -282,6 +282,9 @@ export function PureVideoView({
   isGif,
   cover,
   onRetry,
+  width,
+  height,
+  minithumbnail,
   className,
 }: {
   url: string | null;
@@ -290,20 +293,147 @@ export function PureVideoView({
   isGif?: boolean;
   cover?: boolean;
   onRetry?: () => void;
+  width?: number;
+  height?: number;
+  minithumbnail?: string | null;
   className?: string;
 }) {
+  const hasDimensions = width != null && height != null && !isCircle && !cover;
+
+  // Circle path — unchanged
+  if (isCircle) {
+    if (loading) {
+      return <div className={cn('size-[200px] animate-pulse rounded-full bg-muted', className)} />;
+    }
+    if (!url) {
+      const Container = onRetry ? 'button' : 'div';
+      return (
+        <Container
+          type={onRetry ? 'button' : undefined}
+          onClick={onRetry}
+          className={cn(
+            'size-[200px] rounded-full bg-accent',
+            onRetry && 'cursor-pointer transition-colors hover:bg-accent/80',
+            className,
+          )}
+        />
+      );
+    }
+    return (
+      <div className={cn('size-[200px] overflow-hidden rounded-full', className)}>
+        <video src={url} className="h-full w-full object-cover" autoPlay muted loop playsInline />
+      </div>
+    );
+  }
+
+  // Cover path — unchanged
+  if (cover) {
+    if (loading) {
+      return <div className={cn('h-full w-full animate-pulse bg-muted', className)} />;
+    }
+    if (!url) {
+      const Container = onRetry ? 'button' : 'div';
+      return (
+        <Container
+          type={onRetry ? 'button' : undefined}
+          onClick={onRetry}
+          className={cn(
+            'h-full w-full bg-accent',
+            onRetry && 'cursor-pointer transition-colors hover:bg-accent/80',
+            className,
+          )}
+        />
+      );
+    }
+    return (
+      <video
+        src={url}
+        className={cn('h-full w-full object-cover', className)}
+        autoPlay
+        muted
+        loop
+        playsInline
+      />
+    );
+  }
+
+  // Metadata-driven path: explicit width/height from video dimensions
+  // Same pattern as PurePhotoView lines 46-98
+  if (hasDimensions) {
+    const sizeStyle = {
+      width: '100%',
+      maxWidth: width,
+      aspectRatio: `${width} / ${height}`,
+    } as const;
+
+    if (loading) {
+      if (minithumbnail) {
+        return (
+          <div style={sizeStyle} className={cn('relative overflow-hidden', className)}>
+            <img
+              src={`data:image/jpeg;base64,${minithumbnail}`}
+              className="h-full w-full object-cover blur-[20px] scale-110"
+              alt=""
+            />
+          </div>
+        );
+      }
+      return <div style={sizeStyle} className={cn('animate-pulse bg-muted', className)} />;
+    }
+    if (!url) {
+      const Container = onRetry ? 'button' : 'div';
+      return (
+        <Container
+          type={onRetry ? 'button' : undefined}
+          onClick={onRetry}
+          style={sizeStyle}
+          className={cn(
+            'bg-accent',
+            onRetry && 'cursor-pointer transition-colors hover:bg-accent/80',
+            className,
+          )}
+        />
+      );
+    }
+
+    if (isGif) {
+      return (
+        <div style={sizeStyle} className={cn('relative overflow-hidden', className)}>
+          {minithumbnail && (
+            <img
+              src={`data:image/jpeg;base64,${minithumbnail}`}
+              className="absolute inset-0 h-full w-full object-cover blur-[20px] scale-110"
+              alt=""
+            />
+          )}
+          <div className="relative flex h-full w-full items-center justify-center">
+            <video src={url} className="max-h-full max-w-full" autoPlay muted loop playsInline />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div style={sizeStyle} className={cn('relative overflow-hidden', className)}>
+        {minithumbnail && (
+          <img
+            src={`data:image/jpeg;base64,${minithumbnail}`}
+            className="absolute inset-0 h-full w-full object-cover blur-[20px] scale-110"
+            alt=""
+          />
+        )}
+        <div className="relative flex h-full w-full items-center justify-center">
+          <VideoPlayer url={url} className="max-h-full max-w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback path: no dimensions provided — original behavior
   if (loading) {
     return (
       <div
-        className={cn(
-          'animate-pulse bg-muted',
-          isCircle
-            ? 'size-[200px] rounded-full'
-            : cover
-              ? 'h-full w-full'
-              : 'aspect-video w-full max-w-xs rounded-lg',
-          className,
-        )}
+        className={cn('aspect-video w-full max-w-xs animate-pulse rounded-lg bg-muted', className)}
       />
     );
   }
@@ -314,34 +444,10 @@ export function PureVideoView({
         type={onRetry ? 'button' : undefined}
         onClick={onRetry}
         className={cn(
-          'bg-accent',
-          isCircle
-            ? 'size-[200px] rounded-full'
-            : cover
-              ? 'h-full w-full'
-              : 'aspect-video w-full max-w-xs rounded',
+          'aspect-video w-full max-w-xs rounded bg-accent',
           onRetry && 'cursor-pointer transition-colors hover:bg-accent/80',
           className,
         )}
-      />
-    );
-  }
-  if (isCircle) {
-    return (
-      <div className={cn('size-[200px] overflow-hidden rounded-full', className)}>
-        <video src={url} className="h-full w-full object-cover" autoPlay muted loop playsInline />
-      </div>
-    );
-  }
-  if (cover) {
-    return (
-      <video
-        src={url}
-        className={cn('h-full w-full object-cover', className)}
-        autoPlay
-        muted
-        loop
-        playsInline
       />
     );
   }

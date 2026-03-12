@@ -406,6 +406,54 @@ base('voice messages show pre-loaded duration', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// Layout shift (media dimension reservation)
+// ---------------------------------------------------------------------------
+
+for (let chatIdx = 0; chatIdx < 5; chatIdx++) {
+  base(`chat ${chatIdx + 1}: no layout shift after messages render`, async () => {
+    const dialogs = page.locator('[data-testid="dialog-item"]');
+    const count = await dialogs.count();
+    if (chatIdx >= count) {
+      base.skip(true, `Only ${count} dialogs available`);
+      return;
+    }
+
+    await dialogs.nth(chatIdx).click();
+    try {
+      await page.waitForSelector('[data-testid="message-bubble"]', { timeout: 5_000 });
+    } catch {
+      base.skip(true, `Chat ${chatIdx + 1} has no messages`);
+      return;
+    }
+
+    const panel = page.locator('[data-testid="message-panel"]');
+
+    // Skip non-scrollable chats (too few messages — trivially no shift)
+    const isScrollable = await panel.evaluate((el) => el.scrollHeight > el.clientHeight);
+    if (!isScrollable) {
+      base.skip(true, `Chat ${chatIdx + 1} is not scrollable`);
+      return;
+    }
+
+    // Record scrollHeight after initial render
+    const initialScrollHeight = await panel.evaluate((el) => el.scrollHeight);
+
+    // Wait 2s for async media loads (images, videos, stickers)
+    await page.waitForTimeout(2000);
+
+    const finalScrollHeight = await panel.evaluate((el) => el.scrollHeight);
+    const chatTitle = await page.locator('[data-testid="chat-title"]').textContent();
+    const delta = finalScrollHeight - initialScrollHeight;
+
+    console.log(
+      `  ${chatTitle}: scrollHeight ${initialScrollHeight} → ${finalScrollHeight} (delta: ${delta})`,
+    );
+
+    expect(delta, `${chatTitle}: scrollHeight shifted by ${delta}px`).toBe(0);
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Error checks
 // ---------------------------------------------------------------------------
 

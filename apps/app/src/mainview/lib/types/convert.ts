@@ -143,6 +143,7 @@ function extractMediaWidth(content: Td.MessageContent): number {
   }
   if (content._ === 'messageVideo') return content.video.width;
   if (content._ === 'messageAnimation') return content.animation.width;
+  if (content._ === 'messageSticker') return content.sticker.width;
   return 0;
 }
 
@@ -153,12 +154,14 @@ function extractMediaHeight(content: Td.MessageContent): number {
   }
   if (content._ === 'messageVideo') return content.video.height;
   if (content._ === 'messageAnimation') return content.animation.height;
+  if (content._ === 'messageSticker') return content.sticker.height;
   return 0;
 }
 
 function extractMinithumbnail(content: Td.MessageContent): string | null {
   if (content._ === 'messagePhoto') return content.photo.minithumbnail?.data ?? null;
   if (content._ === 'messageVideo') return content.video.minithumbnail?.data ?? null;
+  if (content._ === 'messageAnimation') return content.animation.minithumbnail?.data ?? null;
   return null;
 }
 

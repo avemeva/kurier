@@ -36,6 +36,8 @@ export type StickerRenderState = {
   layout: 'sticker';
   msg: UIMessage;
   media: MediaState;
+  displayWidth: number;
+  displayHeight: number;
   showAvatar: boolean;
   senderPhotoUrl?: string;
 };
@@ -171,10 +173,28 @@ export function useMessage(input: MessageInput, ctx: MessageContext): MessageRen
 
   // Sticker
   if (msg.contentKind === 'sticker') {
+    const STICKER_MAX_SIZE = 224;
+    let stickerW: number;
+    let stickerH: number;
+    if (msg.mediaWidth > 0 && msg.mediaHeight > 0) {
+      const sized = computeMediaSize(
+        msg.mediaWidth,
+        msg.mediaHeight,
+        STICKER_MAX_SIZE,
+        MIN_MEDIA_SIZE,
+      );
+      stickerW = sized.width;
+      stickerH = sized.height;
+    } else {
+      stickerW = STICKER_MAX_SIZE;
+      stickerH = STICKER_MAX_SIZE;
+    }
     return {
       layout: 'sticker',
       msg,
       media: resolvedMedia,
+      displayWidth: stickerW,
+      displayHeight: stickerH,
       showAvatar: ctx.showSender && !msg.isOutgoing,
       senderPhotoUrl: ctx.senderPhotoUrl,
     };

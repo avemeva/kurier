@@ -134,7 +134,7 @@ function StickerLayout({
   state: StickerRenderState;
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
 }) {
-  const { msg, media } = state;
+  const { msg, media, displayWidth, displayHeight } = state;
   const hasReactions = msg.reactions.length > 0;
 
   return (
@@ -146,10 +146,15 @@ function StickerLayout({
       senderName={msg.senderName}
       senderPhotoUrl={state.senderPhotoUrl}
       hasReactions={hasReactions}
-      className="max-w-[224px]"
     >
       <PureReactionPicker onReact={(e, c) => onReact(msg.id, e, c)} />
-      <PurePhotoView url={media.url} loading={media.loading} onRetry={media.retry} />
+      <PurePhotoView
+        url={media.url}
+        loading={media.loading}
+        width={displayWidth}
+        height={displayHeight}
+        onRetry={media.retry}
+      />
       {hasReactions && (
         <PureReactionBar
           reactions={toReactionInfos(msg.reactions)}
@@ -238,6 +243,9 @@ function MediaLayout({
           loading={media.loading}
           isCircle={false}
           isGif={msg.contentKind === 'animation'}
+          width={displayWidth}
+          height={displayHeight}
+          minithumbnail={minithumbnail}
           onRetry={media.retry}
         />
       ) : (
