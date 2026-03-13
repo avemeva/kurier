@@ -1,6 +1,6 @@
 import { formatLastSeen } from '../../lib/format';
-import type { Td, UIChatContext, UIMessage, UISearchResult, UIUser } from '../types';
-import { groupAndConvert, hydrateMessage, toUIChat, toUISearchResult, toUIUser } from '../types';
+import type { Td, TGChatContext, TGMessage, TGSearchResult, TGUser } from '../types';
+import { groupAndConvert, hydrateMessage, toTGChat, toTGSearchResult, toTGUser } from '../types';
 import { createSelector } from './create-selector';
 import type { ChatState, HeaderStatus } from './types';
 
@@ -8,10 +8,10 @@ import type { ChatState, HeaderStatus } from './types';
 // Constants
 // ---------------------------------------------------------------------------
 
-const EMPTY_UI_MESSAGES: UIMessage[] = [];
+const EMPTY_UI_MESSAGES: TGMessage[] = [];
 
 // ---------------------------------------------------------------------------
-// selectChatMessages — compositional UIMessage[], no side effects
+// selectChatMessages — compositional TGMessage[], no side effects
 // ---------------------------------------------------------------------------
 
 export const selectChatMessages = createSelector(
@@ -112,7 +112,7 @@ export const selectSelectedChat = createSelector(
   },
   ([rawChat, photo, user, status, myUserId], state) => {
     if (!rawChat) return null;
-    return toUIChat(rawChat, {
+    return toTGChat(rawChat, {
       photoUrl: photo ?? null,
       user,
       isOnline: status?._ === 'userStatusOnline',
@@ -257,7 +257,7 @@ export const selectHeaderStatus = createSelector(
 );
 
 // ---------------------------------------------------------------------------
-// selectUIChats / selectUIArchivedChats
+// selectChats / selectArchivedChats
 // ---------------------------------------------------------------------------
 
 function formatTypingText(
@@ -293,7 +293,7 @@ function formatTypingText(
   return parts.join(', ');
 }
 
-function chatContext(c: Td.chat, state: ChatState): UIChatContext {
+function chatContext(c: Td.chat, state: ChatState): TGChatContext {
   const userId = c.type._ === 'chatTypePrivate' ? c.type.user_id : 0;
   const lastMsgId = c.last_message?.id ?? 0;
   const thumbKey = `${c.id}_${lastMsgId}`;
@@ -309,7 +309,7 @@ function chatContext(c: Td.chat, state: ChatState): UIChatContext {
   };
 }
 
-export const selectUIChats = createSelector(
+export const selectChats = createSelector(
   (s: ChatState) =>
     [
       s.chats,
@@ -320,10 +320,10 @@ export const selectUIChats = createSelector(
       s.thumbUrls,
       s.typingByChat,
     ] as const,
-  (_deps, state) => state.chats.map((c: Td.chat) => toUIChat(c, chatContext(c, state))),
+  (_deps, state) => state.chats.map((c: Td.chat) => toTGChat(c, chatContext(c, state))),
 );
 
-export const selectUIArchivedChats = createSelector(
+export const selectArchivedChats = createSelector(
   (s: ChatState) =>
     [
       s.archivedChats,
@@ -334,41 +334,41 @@ export const selectUIArchivedChats = createSelector(
       s.thumbUrls,
       s.typingByChat,
     ] as const,
-  (_deps, state) => state.archivedChats.map((c: Td.chat) => toUIChat(c, chatContext(c, state))),
+  (_deps, state) => state.archivedChats.map((c: Td.chat) => toTGChat(c, chatContext(c, state))),
 );
 
 // ---------------------------------------------------------------------------
-// selectUIUser
+// selectTGUser
 // ---------------------------------------------------------------------------
 
-export function selectUIUser(state: ChatState, userId: number): UIUser | null {
+export function selectTGUser(state: ChatState, userId: number): TGUser | null {
   const user = state.users.get(userId);
   if (!user) return null;
-  return toUIUser(user);
+  return toTGUser(user);
 }
 
-// NOTE: selectUIUser is intentionally NOT memoized at module level.
+// NOTE: selectTGUser is intentionally NOT memoized at module level.
 // It accepts a parameter (userId), so module-level memo creates a singleton
 // that thrashes when called with different IDs.
 //
 // For component-level memoization, use:
 //   const selector = useMemo(() => createSelector(
 //     (s: ChatState) => [s.users.get(userId)] as const,
-//     ([user]) => user ? toUIUser(user) : null,
+//     ([user]) => user ? toTGUser(user) : null,
 //   ), [userId]);
 
 // ---------------------------------------------------------------------------
-// selectSearchResults — transforms raw Td.message[] → UISearchResult[]
+// selectSearchResults — transforms raw Td.message[] → TGSearchResult[]
 // ---------------------------------------------------------------------------
 
-const EMPTY_SEARCH_RESULTS: UISearchResult[] = [];
+const EMPTY_SEARCH_RESULTS: TGSearchResult[] = [];
 
 export const selectSearchResults = createSelector(
   (s: ChatState) => [s.searchResults, s.profilePhotos] as const,
-  ([results, profilePhotos]): UISearchResult[] => {
+  ([results, profilePhotos]): TGSearchResult[] => {
     if (results.length === 0) return EMPTY_SEARCH_RESULTS;
     return results.map((m: Td.message & { chat_title?: string }) =>
-      toUISearchResult(m, profilePhotos[m.chat_id] ?? null),
+      toTGSearchResult(m, profilePhotos[m.chat_id] ?? null),
     );
   },
 );
@@ -400,8 +400,8 @@ export function resetSelectors(): void {
   selectChatMessages.reset();
   selectSelectedChat.reset();
   selectHeaderStatus.reset();
-  selectUIChats.reset();
-  selectUIArchivedChats.reset();
+  selectChats.reset();
+  selectArchivedChats.reset();
   selectSearchResults.reset();
   selectContactPhotos.reset();
 }

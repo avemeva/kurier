@@ -1,19 +1,19 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { UITextEntity } from '@/data';
+import type { TGTextEntity } from '@/data';
 
 vi.mock('lottie-web/build/player/lottie_light', () => ({
   default: { loadAnimation: vi.fn(() => ({ destroy: vi.fn() })) },
 }));
 
-import { PureFormattedText } from './PureFormattedText';
+import { PureFormattedText } from './formatted-text';
 
 function entity(
   offset: number,
   length: number,
-  type: UITextEntity['type'],
-  extra?: Partial<UITextEntity>,
-): UITextEntity {
+  type: TGTextEntity['type'],
+  extra?: Partial<TGTextEntity>,
+): TGTextEntity {
   return { offset, length, type, ...extra };
 }
 

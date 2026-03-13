@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { useChatStore } from '@/data';
 import { cn } from '@/lib/utils';
-import { ChatHeader } from './ChatHeader';
-import { ChatSidebar } from './ChatSidebar';
-import { ChatView } from './ChatView';
-import { ComposeSearchTopBar, useChatSearchKeyboard } from './ComposeSearch';
+import { ChatHeader } from './chat-header';
+import { ChatSidebar } from './chat-sidebar';
+import { ChatView } from './chat-view';
+import { ComposeSearchTopBar, useChatSearchKeyboard } from './compose-search';
 
 export function ChatLayout({ onLogout }: { onLogout: () => void }) {
   const loadDialogs = useChatStore((s) => s.loadDialogs);

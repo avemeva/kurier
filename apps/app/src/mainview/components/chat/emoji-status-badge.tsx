@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { PureEmojiStatusIcon } from '@/components/ui/chat/EmojiStatusIcon';
+import { PureEmojiStatusIcon } from '@/components/ui/chat/emoji-status-icon';
 import { useChatStore } from '@/data';
 
 /**

@@ -135,7 +135,7 @@ export async function isAuthorized(): Promise<boolean> {
 
 export type { SearchResultMessage, TelegramUpdateEvent } from './types';
 
-export type { PeerInfo } from './types/ui';
+export type { PeerInfo } from './types/tg';
 
 // --- Update events ---
 

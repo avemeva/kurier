@@ -48,14 +48,14 @@ vi.mock('@/data/telegram', () => ({
 }));
 
 // Mock child components that do heavy lifting
-vi.mock('./PureAlbumGrid', () => ({
+vi.mock('@/components/ui/chat/pure-album-grid', () => ({
   PureAlbumGrid: () => null,
 }));
-vi.mock('./EmojiStatusBadge', () => ({ EmojiStatusBadge: () => null }));
-vi.mock('./PureFormattedText', () => ({
+vi.mock('./emoji-status-badge', () => ({ EmojiStatusBadge: () => null }));
+vi.mock('@/components/ui/chat/formatted-text', () => ({
   PureFormattedText: ({ text }: { text: string }) => <span>{text}</span>,
 }));
-vi.mock('./PureMessageRow', () => ({
+vi.mock('@/components/ui/chat/pure-message-row', () => ({
   PureMessageRow: ({ msg }: { msg: { kind: string; isRead?: boolean } }) => {
     const isRead = msg.kind === 'message' ? (msg.isRead ?? false) : false;
     return <div data-testid="bubble" data-read={isRead} />;
@@ -63,7 +63,7 @@ vi.mock('./PureMessageRow', () => ({
 }));
 
 import { _resetForTests, useChatStore } from '@/data';
-import { ChatLayout } from './ChatLayout';
+import { ChatLayout } from './chat-layout';
 
 function makeChat(overrides: Partial<Td.chat> = {}): Td.chat {
   return {

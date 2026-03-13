@@ -76,14 +76,14 @@ import {
 import type { PendingMessage } from '../types';
 import {
   _resetForTests,
+  selectArchivedChats,
   selectChatMessages,
+  selectChats,
   selectHeaderStatus,
   selectSelectedChat,
-  selectUIArchivedChats,
-  selectUIChats,
   useChatStore,
 } from './';
-import { actionLabel, selectUIUser } from './selectors';
+import { actionLabel, selectTGUser } from './selectors';
 
 // --- Factories ---
 
@@ -2638,50 +2638,50 @@ describe('actionLabel', () => {
   });
 });
 
-// --- selectUIChats / selectUIArchivedChats ---
+// --- selectChats / selectArchivedChats ---
 
-describe('selectUIChats', () => {
-  it('returns UIChat array from chats', () => {
+describe('selectChats', () => {
+  it('returns TGChat array from chats', () => {
     useChatStore.setState({
       chats: [makeChat({ id: 1 }), makeChat({ id: 2 })],
     });
-    const result = selectUIChats(useChatStore.getState());
+    const result = selectChats(useChatStore.getState());
     expect(result).toHaveLength(2);
   });
 
   it('memoizes when inputs unchanged', () => {
     useChatStore.setState({ chats: [makeChat({ id: 1 })] });
-    const r1 = selectUIChats(useChatStore.getState());
-    const r2 = selectUIChats(useChatStore.getState());
+    const r1 = selectChats(useChatStore.getState());
+    const r2 = selectChats(useChatStore.getState());
     expect(r1).toBe(r2);
   });
 });
 
-describe('selectUIArchivedChats', () => {
-  it('returns UIChat array from archivedChats', () => {
+describe('selectArchivedChats', () => {
+  it('returns TGChat array from archivedChats', () => {
     useChatStore.setState({
       archivedChats: [makeChat({ id: 1 })],
     });
-    const result = selectUIArchivedChats(useChatStore.getState());
+    const result = selectArchivedChats(useChatStore.getState());
     expect(result).toHaveLength(1);
   });
 
   it('memoizes when inputs unchanged', () => {
     useChatStore.setState({ archivedChats: [makeChat({ id: 1 })] });
-    const r1 = selectUIArchivedChats(useChatStore.getState());
-    const r2 = selectUIArchivedChats(useChatStore.getState());
+    const r1 = selectArchivedChats(useChatStore.getState());
+    const r2 = selectArchivedChats(useChatStore.getState());
     expect(r1).toBe(r2);
   });
 });
 
-// --- selectUIUser ---
+// --- selectTGUser ---
 
-describe('selectUIUser', () => {
+describe('selectTGUser', () => {
   it('returns null when user not found', () => {
-    expect(selectUIUser(useChatStore.getState(), 999)).toBeNull();
+    expect(selectTGUser(useChatStore.getState(), 999)).toBeNull();
   });
 
-  it('returns UIUser when user exists', () => {
+  it('returns TGUser when user exists', () => {
     const users = new Map<number, Td.user>();
     users.set(42, {
       id: 42,
@@ -2689,7 +2689,7 @@ describe('selectUIUser', () => {
       last_name: 'B',
     } as Td.user);
     useChatStore.setState({ users });
-    const result = selectUIUser(useChatStore.getState(), 42);
+    const result = selectTGUser(useChatStore.getState(), 42);
     expect(result).not.toBeNull();
   });
 
@@ -2697,9 +2697,9 @@ describe('selectUIUser', () => {
     const users = new Map<number, Td.user>();
     users.set(42, { id: 42, first_name: 'Alice' } as Td.user);
     useChatStore.setState({ users });
-    const r1 = selectUIUser(useChatStore.getState(), 42);
-    const r2 = selectUIUser(useChatStore.getState(), 42);
-    // selectUIUser is intentionally NOT memoized at module level (takes a parameter),
+    const r1 = selectTGUser(useChatStore.getState(), 42);
+    const r2 = selectTGUser(useChatStore.getState(), 42);
+    // selectTGUser is intentionally NOT memoized at module level (takes a parameter),
     // so we check deep equality, not referential identity.
     expect(r1).toStrictEqual(r2);
   });

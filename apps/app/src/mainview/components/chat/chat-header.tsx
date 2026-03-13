@@ -1,9 +1,9 @@
 import { ArrowLeft, Bookmark, Search, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PureStatusText } from '@/components/ui/chat/StatusText';
+import { PureStatusText } from '@/components/ui/chat/status-text';
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { selectHeaderStatus, selectSelectedChat, useChatStore } from '@/data';
-import { EmojiStatusBadge } from './EmojiStatusBadge';
+import { EmojiStatusBadge } from './emoji-status-badge';
 
 export function ChatHeader() {
   const selectedChat = useChatStore(selectSelectedChat);

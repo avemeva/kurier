@@ -5,26 +5,26 @@ import type {
   ChatKind,
   MessageContentKind,
   TextEntityKind,
-  UIAlbumContent,
-  UIAlbumItem,
-  UICaption,
-  UIChat,
-  UIContent,
-  UIForward,
-  UIKeyboardRow,
-  UIMessage,
-  UIMessageBase,
-  UIPendingMessage,
-  UIReaction,
-  UIReplyPreview,
-  UIReplyTo,
-  UISearchResult,
-  UISender,
-  UIServiceMessage,
-  UITextEntity,
-  UIUser,
-  UIWebPreview,
-} from './ui';
+  TGAlbumContent,
+  TGAlbumItem,
+  TGCaption,
+  TGChat,
+  TGContent,
+  TGForward,
+  TGKeyboardRow,
+  TGMessage,
+  TGMessageBase,
+  TGPendingMessage,
+  TGReaction,
+  TGReplyPreview,
+  TGReplyTo,
+  TGSearchResult,
+  TGSender,
+  TGServiceMessage,
+  TGTextEntity,
+  TGUser,
+  TGWebPreview,
+} from './tg';
 
 // --- Content kind ---
 
@@ -179,12 +179,12 @@ function extractLinkPreviewMinithumbnail(lp: Td.linkPreview): string | null {
 
 // --- Reply preview from raw Td message ---
 
-/** Build a UIReplyPreview from a raw TDLib message + user map. */
+/** Build a TGReplyPreview from a raw TDLib message + user map. */
 export function buildReplyPreview(
   target: Td.message,
   users: Map<number, Td.user>,
   quoteText: string,
-): UIReplyPreview {
+): TGReplyPreview {
   return {
     senderName: resolveSenderName(target.sender_id, users),
     text: extractText(target.content),
@@ -207,7 +207,7 @@ export function extractMessagePreview(msg: Td.message | undefined): string {
 function extractLastMessageSenderName(
   msg: Td.message | undefined,
   chatKind: ChatKind,
-  ctx: UIChatContext,
+  ctx: TGChatContext,
 ): string | null {
   if (!msg) return null;
   // Only show sender in groups (not private chats or channels)
@@ -307,7 +307,7 @@ export function extractServiceText(content: Td.MessageContent): string | null {
 
 // --- Inline keyboard ---
 
-export function extractInlineKeyboard(msg: Td.message): UIKeyboardRow[] | null {
+export function extractInlineKeyboard(msg: Td.message): TGKeyboardRow[] | null {
   if (msg.reply_markup?._ !== 'replyMarkupInlineKeyboard') return null;
   return msg.reply_markup.rows.map((row) =>
     row.map((btn) => {
@@ -342,9 +342,9 @@ const ENTITY_KIND_MAP: Record<string, TextEntityKind> = {
 
 // --- Public converters ---
 
-export function toUITextEntities(entities: Td.textEntity[]): UITextEntity[] {
+export function toTGTextEntities(entities: Td.textEntity[]): TGTextEntity[] {
   return entities.map((e) => {
-    const result: UITextEntity = {
+    const result: TGTextEntity = {
       offset: e.offset,
       length: e.length,
       type: ENTITY_KIND_MAP[e.type._] ?? 'unknown',
@@ -359,7 +359,7 @@ export function toUITextEntities(entities: Td.textEntity[]): UITextEntity[] {
   });
 }
 
-export function toUIReactions(info: Td.messageInteractionInfo | undefined): UIReaction[] {
+export function toTGReactions(info: Td.messageInteractionInfo | undefined): TGReaction[] {
   const reactions = info?.reactions?.reactions;
   if (!reactions) return [];
   return reactions.map((r) => ({
@@ -382,7 +382,7 @@ export function toChatKind(type: Td.ChatType): ChatKind {
   }
 }
 
-export type UIChatContext = {
+export type TGChatContext = {
   photoUrl: string | null;
   user: Td.user | undefined;
   isOnline: boolean;
@@ -393,7 +393,7 @@ export type UIChatContext = {
   typingText?: string | null;
 };
 
-export function toUIChat(chat: Td.chat, ctx: UIChatContext): UIChat {
+export function toTGChat(chat: Td.chat, ctx: TGChatContext): TGChat {
   const draftInput = chat.draft_message?.input_message_text;
   const draftText = draftInput?._ === 'inputMessageText' ? draftInput.text.text || null : null;
   const kind = toChatKind(chat.type);
@@ -432,17 +432,17 @@ export function toUIChat(chat: Td.chat, ctx: UIChatContext): UIChat {
       !!ctx.myUserId &&
       chat.type._ === 'chatTypePrivate' &&
       chat.type.user_id === ctx.myUserId,
-    user: ctx.user ? toUIUser(ctx.user) : null,
+    user: ctx.user ? toTGUser(ctx.user) : null,
     avatarUrl: ctx.avatarUrl,
     lastMessageThumbUrl: ctx.lastMessageThumbUrl ?? null,
     typingText: ctx.typingText ?? null,
   };
 }
 
-export function toUISearchResult(
+export function toTGSearchResult(
   msg: Td.message & { chat_title?: string },
   photoUrl: string | null,
-): UISearchResult {
+): TGSearchResult {
   return {
     chatId: msg.chat_id,
     messageId: msg.id,
@@ -477,7 +477,7 @@ function getMediaTypeLabel(contentType: string): string {
   return labels[contentType] ?? 'Message';
 }
 
-export function toUIUser(user: Td.user): UIUser {
+export function toTGUser(user: Td.user): TGUser {
   return {
     id: user.id,
     firstName: user.first_name,
@@ -496,20 +496,20 @@ export function toUIUser(user: Td.user): UIUser {
 // Compositional converters (new)
 // ===========================================================================
 
-// --- toUIContent ---
+// --- toTGContent ---
 
-function extractCaptionNew(content: Td.MessageContent): UICaption | null {
+function extractCaptionNew(content: Td.MessageContent): TGCaption | null {
   if (!('caption' in content) || !content.caption) return null;
   const ft = content.caption as Td.formattedText;
   if (!ft.text) return null;
   return {
     text: ft.text,
-    entities: toUITextEntities(ft.entities),
+    entities: toTGTextEntities(ft.entities),
     customEmojiUrls: {},
   };
 }
 
-function extractWebPreviewNew(content: Td.MessageContent): UIWebPreview | null {
+function extractWebPreviewNew(content: Td.MessageContent): TGWebPreview | null {
   if (content._ !== 'messageText' || !content.link_preview) return null;
   const lp = content.link_preview;
   const minithumbnail = extractLinkPreviewMinithumbnail(lp);
@@ -525,13 +525,13 @@ function extractWebPreviewNew(content: Td.MessageContent): UIWebPreview | null {
   };
 }
 
-export function toUIContent(content: Td.MessageContent): UIContent {
+export function toTGContent(content: Td.MessageContent): TGContent {
   switch (content._) {
     case 'messageText': {
       return {
         kind: 'text',
         text: content.text.text,
-        entities: toUITextEntities(content.text.entities),
+        entities: toTGTextEntities(content.text.entities),
         customEmojiUrls: {},
         webPreview: extractWebPreviewNew(content),
       };
@@ -634,13 +634,13 @@ export function toUIContent(content: Td.MessageContent): UIContent {
   }
 }
 
-// --- toUIForward ---
+// --- toTGForward ---
 
-export function toUIForward(
+export function toTGForward(
   info: Td.messageForwardInfo | undefined,
   users: Map<number, Td.user>,
   chats?: Td.chat[],
-): UIForward | null {
+): TGForward | null {
   if (!info) return null;
   const fromName = extractForwardName(info, users, chats);
   if (!fromName) return null;
@@ -652,9 +652,9 @@ export function toUIForward(
   };
 }
 
-// --- toUIReplyTo ---
+// --- toTGReplyTo ---
 
-export function toUIReplyTo(msg: Td.message): UIReplyTo | null {
+export function toTGReplyTo(msg: Td.message): TGReplyTo | null {
   if (msg.reply_to?._ !== 'messageReplyToMessage') return null;
   return {
     messageId: msg.reply_to.message_id,
@@ -666,9 +666,9 @@ export function toUIReplyTo(msg: Td.message): UIReplyTo | null {
   };
 }
 
-// --- toUISender ---
+// --- toTGSender ---
 
-export function toUISender(senderId: Td.MessageSender, users: Map<number, Td.user>): UISender {
+export function toTGSender(senderId: Td.MessageSender, users: Map<number, Td.user>): TGSender {
   const userId = senderId._ === 'messageSenderUser' ? senderId.user_id : 0;
   return {
     userId,
@@ -677,15 +677,15 @@ export function toUISender(senderId: Td.MessageSender, users: Map<number, Td.use
   };
 }
 
-// --- toUIMessage ---
+// --- toTGMessage ---
 
-export function toUIMessage(
+export function toTGMessage(
   msg: Td.message,
   users: Map<number, Td.user>,
   lastReadOutboxId: number,
   chats?: Td.chat[],
-): (UIMessageBase & { kind: 'message' }) | UIServiceMessage {
-  const sender = toUISender(msg.sender_id, users);
+): (TGMessageBase & { kind: 'message' }) | TGServiceMessage {
+  const sender = toTGSender(msg.sender_id, users);
   const serviceText = extractServiceText(msg.content);
 
   if (serviceText !== null) {
@@ -709,19 +709,19 @@ export function toUIMessage(
     isRead: msg.is_outgoing && msg.id > 0 && msg.id <= lastReadOutboxId,
     editDate: msg.edit_date,
     sender,
-    reactions: toUIReactions(msg.interaction_info),
+    reactions: toTGReactions(msg.interaction_info),
     viewCount: msg.interaction_info?.view_count ?? 0,
-    forward: toUIForward(msg.forward_info, users, chats),
-    replyTo: toUIReplyTo(msg),
+    forward: toTGForward(msg.forward_info, users, chats),
+    replyTo: toTGReplyTo(msg),
     inlineKeyboard: extractInlineKeyboard(msg),
-    content: toUIContent(msg.content),
+    content: toTGContent(msg.content),
   };
 }
 
 // --- enrichReplyPreviews ---
 
-export function enrichReplyPreviews(messages: UIMessage[]): UIMessage[] {
-  const byId = new Map<number, UIMessage>();
+export function enrichReplyPreviews(messages: TGMessage[]): TGMessage[] {
+  const byId = new Map<number, TGMessage>();
   for (const m of messages) {
     if (m.kind === 'message' || m.kind === 'service') byId.set(m.id, m);
   }
@@ -788,7 +788,7 @@ function extractMediaLabelFromContentKind(kind: string): string {
 
 // --- groupAndConvert ---
 
-function toAlbumItem(msg: Td.message, content: UIContent): UIAlbumItem | null {
+function toAlbumItem(msg: Td.message, content: TGContent): TGAlbumItem | null {
   if (content.kind !== 'photo' && content.kind !== 'video' && content.kind !== 'animation')
     return null;
   return {
@@ -807,8 +807,8 @@ export function groupAndConvert(
   users: Map<number, Td.user>,
   lastReadOutboxId: number,
   chats?: Td.chat[],
-): UIMessage[] {
-  const result: UIMessage[] = [];
+): TGMessage[] {
+  const result: TGMessage[] = [];
   let i = 0;
 
   while (i < rawMsgs.length) {
@@ -828,12 +828,12 @@ export function groupAndConvert(
       if (group.length > 1) {
         // Build album
         const firstMsg = group[0] as Td.message;
-        const sender = toUISender(firstMsg.sender_id, users);
-        const items: UIAlbumItem[] = [];
-        let caption: UICaption | null = null;
+        const sender = toTGSender(firstMsg.sender_id, users);
+        const items: TGAlbumItem[] = [];
+        let caption: TGCaption | null = null;
 
         for (const gMsg of group) {
-          const content = toUIContent(gMsg.content);
+          const content = toTGContent(gMsg.content);
           const item = toAlbumItem(gMsg, content);
           if (item) items.push(item);
           // Caption comes from whichever message has text
@@ -845,7 +845,7 @@ export function groupAndConvert(
           }
         }
 
-        const albumContent: UIAlbumContent = {
+        const albumContent: TGAlbumContent = {
           kind: 'album',
           items,
           caption,
@@ -860,19 +860,19 @@ export function groupAndConvert(
           isRead: firstMsg.is_outgoing && firstMsg.id > 0 && firstMsg.id <= lastReadOutboxId,
           editDate: firstMsg.edit_date,
           sender,
-          reactions: toUIReactions(firstMsg.interaction_info),
+          reactions: toTGReactions(firstMsg.interaction_info),
           viewCount: firstMsg.interaction_info?.view_count ?? 0,
-          forward: toUIForward(firstMsg.forward_info, users, chats),
-          replyTo: toUIReplyTo(firstMsg),
+          forward: toTGForward(firstMsg.forward_info, users, chats),
+          replyTo: toTGReplyTo(firstMsg),
           inlineKeyboard: extractInlineKeyboard(firstMsg),
           content: albumContent,
         });
       } else {
         // Single message with albumId — not grouped
-        result.push(toUIMessage(msg, users, lastReadOutboxId, chats));
+        result.push(toTGMessage(msg, users, lastReadOutboxId, chats));
       }
     } else {
-      result.push(toUIMessage(msg, users, lastReadOutboxId, chats));
+      result.push(toTGMessage(msg, users, lastReadOutboxId, chats));
     }
     i++;
   }
@@ -882,7 +882,7 @@ export function groupAndConvert(
 
   // Append pending messages
   for (const p of pending) {
-    const pendingMsg: UIPendingMessage = {
+    const pendingMsg: TGPendingMessage = {
       kind: 'pending',
       localId: p.localId,
       chatId: p.chat_id,
@@ -901,14 +901,14 @@ export function groupAndConvert(
 // ===========================================================================
 
 export function hydrateMessage(
-  msg: UIMessage,
+  msg: TGMessage,
   mediaUrls: Record<string, string | null>,
   thumbUrls: Record<string, string | null>,
   profilePhotos: Record<number, string>,
   customEmojiUrlsMap: Record<string, CustomEmojiInfo>,
-  replyPreviews: Record<string, UIReplyPreview | null>,
+  replyPreviews: Record<string, TGReplyPreview | null>,
   pinnedPreviews: Record<string, string | null>,
-): UIMessage {
+): TGMessage {
   if (msg.kind === 'pending') return msg;
 
   if (msg.kind === 'service') {
@@ -992,13 +992,13 @@ export function hydrateMessage(
 }
 
 function hydrateContent(
-  content: UIContent,
+  content: TGContent,
   mediaKey: string,
   chatId: number,
   mediaUrls: Record<string, string | null>,
   thumbUrls: Record<string, string | null>,
   customEmojiUrlsMap: Record<string, CustomEmojiInfo>,
-): UIContent {
+): TGContent {
   switch (content.kind) {
     case 'photo':
     case 'video':
@@ -1085,9 +1085,9 @@ function hydrateContent(
 }
 
 function hydrateCaption(
-  caption: UICaption,
+  caption: TGCaption,
   customEmojiUrlsMap: Record<string, CustomEmojiInfo>,
-): UICaption {
+): TGCaption {
   const merged = mergeCustomEmojis(caption.customEmojiUrls, customEmojiUrlsMap, caption.entities);
   if (merged === caption.customEmojiUrls) return caption;
   return { ...caption, customEmojiUrls: merged };

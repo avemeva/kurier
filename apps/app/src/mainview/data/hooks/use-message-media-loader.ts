@@ -1,13 +1,13 @@
 import { useEffect } from 'react';
 import { useChatStore } from '../store/store';
 import type { ChatState } from '../store/types';
-import type { UIMessage } from '../types';
+import type { TGMessage } from '../types';
 
 // ---------------------------------------------------------------------------
 // loadMessageMedia — triggers side-effect fetches for a single message
 // ---------------------------------------------------------------------------
 
-export function loadMessageMedia(msg: UIMessage, store: ChatState): void {
+export function loadMessageMedia(msg: TGMessage, store: ChatState): void {
   if (msg.kind === 'pending') return;
 
   if (msg.kind === 'service') {
@@ -110,7 +110,7 @@ export function loadMessageMedia(msg: UIMessage, store: ChatState): void {
 // useChatMessageLoader — triggers media loads for visible messages
 // ---------------------------------------------------------------------------
 
-export function useChatMessageLoader(messages: UIMessage[], visibleIds: Set<number>): void {
+export function useChatMessageLoader(messages: TGMessage[], visibleIds: Set<number>): void {
   useEffect(() => {
     const store = useChatStore.getState();
     for (const msg of messages) {

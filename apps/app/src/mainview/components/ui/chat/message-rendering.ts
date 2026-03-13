@@ -1,6 +1,14 @@
-import type { InfoDisplayType } from '@/components/ui/chat/MessageTime';
-import type { UIContent, UIMessage, UIMessageBase } from '@/data';
-import { computeMediaSize, MAX_MEDIA_SIZE, MIN_MEDIA_SIZE } from '../lib/media-sizing';
+// Rendering logic for messages — pure functions, no store dependency.
+// Lives alongside the consumer (PureMessageRow) instead of in @/data.
+
+import type { TGContent, TGMessage, TGMessageBase } from '@/data';
+import { computeMediaSize, MAX_MEDIA_SIZE, MIN_MEDIA_SIZE } from '@/lib/media-sizing';
+
+// --- Info display type (shared with MessageTime) ---
+
+export type InfoDisplayType = 'default' | 'image' | 'background';
+
+// --- Media state ---
 
 export type MediaState = {
   url: string | null;
@@ -32,7 +40,7 @@ export type PendingRenderState = {
 
 export type StickerRenderState = {
   layout: 'sticker';
-  msg: UIMessageBase & { kind: 'message' };
+  msg: TGMessageBase & { kind: 'message' };
   stickerUrl: string | undefined;
   stickerFormat: 'webp' | 'tgs' | 'webm';
   stickerEmoji: string;
@@ -43,7 +51,7 @@ export type StickerRenderState = {
 
 export type BubbleRenderState = {
   layout: 'bubble';
-  msg: UIMessageBase & { kind: 'message' };
+  msg: TGMessageBase & { kind: 'message' };
   displayType: InfoDisplayType;
   showAvatar: boolean;
   showSenderName: boolean;
@@ -52,7 +60,7 @@ export type BubbleRenderState = {
 
 export type MediaRenderState = {
   layout: 'media';
-  msg: UIMessageBase & { kind: 'message' };
+  msg: TGMessageBase & { kind: 'message' };
   bubbleVariant: 'media' | 'framed';
   displayWidth: number;
   displayHeight: number;
@@ -64,7 +72,7 @@ export type MediaRenderState = {
 
 export type AlbumRenderState = {
   layout: 'album';
-  msg: UIMessageBase & { kind: 'message' };
+  msg: TGMessageBase & { kind: 'message' };
   bubbleVariant: 'media' | 'framed';
   showAvatar: boolean;
   showSenderName: boolean;
@@ -80,7 +88,7 @@ export type MessageRenderState =
 
 // --- Display type logic ---
 
-function getDisplayType(content: UIContent, hasText: boolean): InfoDisplayType {
+function getDisplayType(content: TGContent, hasText: boolean): InfoDisplayType {
   if (content.kind === 'sticker') return 'background';
   if (
     content.kind === 'photo' ||
@@ -94,7 +102,7 @@ function getDisplayType(content: UIContent, hasText: boolean): InfoDisplayType {
   return 'default';
 }
 
-function getContentText(content: UIContent): string {
+function getContentText(content: TGContent): string {
   switch (content.kind) {
     case 'text':
       return content.text;
@@ -111,7 +119,7 @@ function getContentText(content: UIContent): string {
 // --- computeMessageState ---
 
 export function computeMessageState(
-  msg: UIMessage,
+  msg: TGMessage,
   ctx: MessageContext,
   onTranscribe?: (chatId: number, msgId: number) => void,
 ): MessageRenderState {

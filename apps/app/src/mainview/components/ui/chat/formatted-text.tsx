@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { PureStickerView } from '@/components/ui/chat/StickerView';
-import type { UITextEntity } from '@/data';
+import { PureStickerView } from '@/components/ui/chat/sticker-view';
+import type { TGTextEntity } from '@/data';
 
 function CustomEmoji({
   documentId,
@@ -52,7 +52,7 @@ export function PureFormattedText({
   customEmojiUrls,
 }: {
   text: string;
-  entities: UITextEntity[];
+  entities: TGTextEntity[];
   customEmojiUrls?: Record<string, { url: string; format: 'webp' | 'tgs' | 'webm' } | null>;
 }) {
   if (!entities || entities.length === 0) {

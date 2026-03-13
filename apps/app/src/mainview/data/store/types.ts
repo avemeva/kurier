@@ -1,5 +1,5 @@
 import type { ChatInfoResult, CustomEmojiInfo } from '../telegram';
-import type { PeerInfo, PendingMessage, Td, TelegramUpdateEvent, UIReplyPreview } from '../types';
+import type { PeerInfo, PendingMessage, Td, TelegramUpdateEvent, TGReplyPreview } from '../types';
 
 // ---------------------------------------------------------------------------
 // Derived types
@@ -33,7 +33,7 @@ export interface ChatState {
   mediaUrls: Record<string, string | null>;
   fileUrls: Record<string, string | null>;
   thumbUrls: Record<string, string | null>;
-  replyPreviews: Record<string, UIReplyPreview | null>;
+  replyPreviews: Record<string, TGReplyPreview | null>;
   pinnedPreviews: Record<string, string | null>;
   customEmojiUrls: Record<string, CustomEmojiInfo>;
 
@@ -64,7 +64,7 @@ export interface ChatState {
   // --- Global search ---
   searchQuery: string;
   searchMode: 'none' | 'global' | 'chat';
-  searchResults: Td.message[]; // Raw messages — selector derives UISearchResult[]
+  searchResults: Td.message[]; // Raw messages — selector derives TGSearchResult[]
   searchTotalCount: number | undefined;
   searchLoading: boolean;
   searchHasMore: boolean;

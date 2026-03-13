@@ -20,24 +20,24 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { PureOnlineDot } from '@/components/ui/chat/OnlineDot';
-import { PureTypingIndicator } from '@/components/ui/chat/TypingIndicator';
+import { PureOnlineDot } from '@/components/ui/chat/online-dot';
+import { PureTypingIndicator } from '@/components/ui/chat/typing-indicator';
 import { Separator } from '@/components/ui/separator';
 import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import { UserAvatar } from '@/components/ui/user-avatar';
-import type { PeerInfo, UIChat, UISearchResult } from '@/data';
+import type { PeerInfo, TGChat, TGSearchResult } from '@/data';
 import {
+  selectArchivedChats,
+  selectChats,
   selectContactPhotos,
   selectSearchResults,
-  selectUIArchivedChats,
-  selectUIChats,
   useChatStore,
   useSidebarPhotoLoader,
 } from '@/data';
 import { formatTime } from '@/lib/format';
 import { log } from '@/lib/log';
 import { cn } from '@/lib/utils';
-import { EmojiStatusBadge } from './EmojiStatusBadge';
+import { EmojiStatusBadge } from './emoji-status-badge';
 
 function SavedMessagesAvatar({ className }: { className?: string }) {
   return (
@@ -99,7 +99,7 @@ const MEDIA_ICON_KINDS = {
   document: FileText,
 } as const;
 
-function ChatPreviewLine({ chat }: { chat: UIChat }) {
+function ChatPreviewLine({ chat }: { chat: TGChat }) {
   const thumbUrl = chat.lastMessageThumbUrl;
   if (chat.draftText) {
     return (
@@ -146,7 +146,7 @@ function SearchMessageRow({
   query,
   onClick,
 }: {
-  result: UISearchResult;
+  result: TGSearchResult;
   query: string;
   onClick: () => void;
 }) {
@@ -221,15 +221,15 @@ function SearchResults({
   onSelectMessage,
 }: {
   query: string;
-  localMatches: UIChat[];
+  localMatches: TGChat[];
   contactResults: PeerInfo[];
-  messageResults: UISearchResult[];
+  messageResults: TGSearchResult[];
   searchLoading: boolean;
   contactsLoading: boolean;
   profilePhotos: Record<number, string>;
   onSelectChat: (chatId: number) => void;
   onSelectPeer: (peer: PeerInfo) => void;
-  onSelectMessage: (msg: UISearchResult) => void;
+  onSelectMessage: (msg: TGSearchResult) => void;
 }) {
   const hasQuery = query.trim().length > 0;
   const hasAnyResults =
@@ -338,8 +338,8 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const chats = useChatStore(selectUIChats);
-  const archivedChats = useChatStore(selectUIArchivedChats);
+  const chats = useChatStore(selectChats);
+  const archivedChats = useChatStore(selectArchivedChats);
   const selectedChatId = useChatStore((s) => s.selectedChatId);
   const loadingDialogs = useChatStore((s) => s.loadingDialogs);
   const loadingMoreChats = useChatStore((s) => s.loadingMoreChats);
@@ -485,7 +485,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
     openChatById(peer.id);
   }
 
-  function handleSelectMessage(msg: UISearchResult) {
+  function handleSelectMessage(msg: TGSearchResult) {
     const existing = [...chats, ...archivedChats].find((c) => c.id === msg.chatId);
     if (existing) {
       handleSelectChat(existing.id);

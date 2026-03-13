@@ -1,16 +1,16 @@
 import { AtSign, Heart } from 'lucide-react';
 import { useCallback, useRef } from 'react';
-import { PureCornerButton, PureCornerButtonStack } from '@/components/ui/chat/CornerButtons';
-import { PureMessageInput } from '@/components/ui/chat/MessageInput';
-import type { UIMessage } from '@/data';
+import { PureCornerButton, PureCornerButtonStack } from '@/components/ui/chat/corner-buttons';
+import { PureMessageInput } from '@/components/ui/chat/message-input';
+import type { GroupPosition } from '@/components/ui/chat/pure-message-row';
+import { PureMessageRow } from '@/components/ui/chat/pure-message-row';
+import type { ScrollContainerHandle } from '@/components/ui/chat/scroll-container';
+import { ScrollContainer } from '@/components/ui/chat/scroll-container';
+import type { TGMessage } from '@/data';
 import { selectChatMessages, selectSelectedChat, useChatMessageLoader, useChatStore } from '@/data';
-import { useVisibleMessages } from '@/hooks/useVisibleMessages';
+import { useVisibleMessages } from '@/hooks/use-visible-messages';
 import { cn } from '@/lib/utils';
-import { ComposeSearchBottomBar } from './ComposeSearch';
-import type { GroupPosition } from './PureMessageRow';
-import { PureMessageRow } from './PureMessageRow';
-import type { ScrollContainerHandle } from './ScrollContainer';
-import { ScrollContainer } from './ScrollContainer';
+import { ComposeSearchBottomBar } from './compose-search';
 
 const ArrowDownIcon = () => (
   <svg
@@ -118,19 +118,19 @@ export function ChatView() {
   const isGroup = selectedChat.kind === 'basicGroup' || selectedChat.kind === 'supergroup';
   const showSender = isGroup;
 
-  function getKey(msg: UIMessage): string | number {
+  function getKey(msg: TGMessage): string | number {
     if (msg.kind === 'pending') return msg.localId;
     return msg.id;
   }
 
-  function getIsOutgoing(msg: UIMessage): boolean {
+  function getIsOutgoing(msg: TGMessage): boolean {
     if (selectedChat?.kind === 'channel') return false;
     if (msg.kind === 'pending') return true;
     if (msg.kind === 'service') return false;
     return msg.isOutgoing;
   }
 
-  function getSenderId(msg: UIMessage): number | string {
+  function getSenderId(msg: TGMessage): number | string {
     if (msg.kind === 'pending') return `pending-${msg.localId}`;
     if (msg.kind === 'service') return msg.sender.userId;
     return msg.sender.userId;

@@ -4,7 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { log } from '@/lib/log';
 import type { AppRPCSchema } from '../shared/rpc-schema';
 import './index.css';
-import App from './App';
+import App from './app';
 
 window.addEventListener('error', (event) => {
   log.error('Uncaught:', event.error ?? event.message);

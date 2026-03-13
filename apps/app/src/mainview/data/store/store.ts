@@ -1156,7 +1156,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const result = await searchGlobal(query);
       if (get().searchQuery !== query) return;
       set({
-        searchResults: result.messages, // Store raw — selector derives UISearchResult[]
+        searchResults: result.messages, // Store raw — selector derives TGSearchResult[]
         searchTotalCount: result.totalCount,
         searchHasMore: result.hasMore,
         searchNextCursor: result.nextCursor,

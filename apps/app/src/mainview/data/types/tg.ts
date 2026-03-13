@@ -29,7 +29,7 @@ export type TextEntityKind =
   | 'customEmoji'
   | 'unknown';
 
-export type UITextEntity = {
+export type TGTextEntity = {
   offset: number;
   length: number;
   type: TextEntityKind;
@@ -37,14 +37,14 @@ export type UITextEntity = {
   customEmojiId?: string;
 };
 
-export type UIReaction = {
+export type TGReaction = {
   emoji: string;
   count: number;
   chosen: boolean;
 };
 
-export type UIKeyboardButton = { text: string; url?: string };
-export type UIKeyboardRow = UIKeyboardButton[];
+export type TGKeyboardButton = { text: string; url?: string };
+export type TGKeyboardRow = TGKeyboardButton[];
 
 export type MessageContentKind =
   | 'text'
@@ -65,7 +65,7 @@ export type MessageContentKind =
 
 export type ChatKind = 'private' | 'basicGroup' | 'supergroup' | 'channel';
 
-export type UIChat = {
+export type TGChat = {
   id: number;
   title: string;
   kind: ChatKind;
@@ -87,13 +87,13 @@ export type UIChat = {
   isBot: boolean;
   isOnline: boolean;
   isSavedMessages: boolean;
-  user: UIUser | null;
+  user: TGUser | null;
   avatarUrl: string | undefined;
   lastMessageThumbUrl: string | null;
   typingText: string | null;
 };
 
-export type UISearchResult = {
+export type TGSearchResult = {
   chatId: number;
   messageId: number;
   chatTitle: string;
@@ -102,7 +102,7 @@ export type UISearchResult = {
   photoUrl: string | null;
 };
 
-export type UIUser = {
+export type TGUser = {
   id: number;
   firstName: string;
   lastName: string;
@@ -112,7 +112,7 @@ export type UIUser = {
   emojiStatusId: string | null;
 };
 
-export type UIReplyPreview = {
+export type TGReplyPreview = {
   senderName: string;
   text: string;
   mediaLabel: string;
@@ -127,27 +127,27 @@ export type UIReplyPreview = {
 
 // ─── Shared shapes ───
 
-export type UIMedia = {
+export type TGMedia = {
   url: string | undefined;
   width: number;
   height: number;
   minithumbnail: string | null;
 };
 
-export type UICaption = {
+export type TGCaption = {
   text: string;
-  entities: UITextEntity[];
+  entities: TGTextEntity[];
   customEmojiUrls: Record<string, CustomEmojiInfo | null>;
 };
 
-export type UIForward = {
+export type TGForward = {
   fromName: string;
   photoId: number;
   photoUrl: string | undefined;
   date: number;
 };
 
-export type UIReplyTo = {
+export type TGReplyTo = {
   messageId: number;
   senderName: string | undefined;
   text: string | undefined;
@@ -156,7 +156,7 @@ export type UIReplyTo = {
   quoteText: string;
 };
 
-export type UIWebPreview = {
+export type TGWebPreview = {
   url: string;
   siteName: string;
   title: string;
@@ -167,7 +167,7 @@ export type UIWebPreview = {
   showMediaAboveDescription: boolean;
 };
 
-export type UISender = {
+export type TGSender = {
   userId: number;
   name: string;
   photoUrl: string | undefined;
@@ -175,34 +175,34 @@ export type UISender = {
 
 // ─── Content union ───
 
-export type UITextContent = {
+export type TGTextContent = {
   kind: 'text';
   text: string;
-  entities: UITextEntity[];
+  entities: TGTextEntity[];
   customEmojiUrls: Record<string, CustomEmojiInfo | null>;
-  webPreview: UIWebPreview | null;
+  webPreview: TGWebPreview | null;
 };
 
-export type UIPhotoContent = {
+export type TGPhotoContent = {
   kind: 'photo';
-  media: UIMedia;
-  caption: UICaption | null;
+  media: TGMedia;
+  caption: TGCaption | null;
 };
 
-export type UIVideoContent = {
+export type TGVideoContent = {
   kind: 'video';
-  media: UIMedia;
+  media: TGMedia;
   isGif: boolean;
-  caption: UICaption | null;
+  caption: TGCaption | null;
 };
 
-export type UIAnimationContent = {
+export type TGAnimationContent = {
   kind: 'animation';
-  media: UIMedia;
-  caption: UICaption | null;
+  media: TGMedia;
+  caption: TGCaption | null;
 };
 
-export type UIVoiceContent = {
+export type TGVoiceContent = {
   kind: 'voice';
   url: string | undefined;
   waveform: string | null;
@@ -212,12 +212,12 @@ export type UIVoiceContent = {
   speechText: string;
 };
 
-export type UIVideoNoteContent = {
+export type TGVideoNoteContent = {
   kind: 'videoNote';
-  media: UIMedia;
+  media: TGMedia;
 };
 
-export type UIStickerContent = {
+export type TGStickerContent = {
   kind: 'sticker';
   url: string | undefined;
   format: 'webp' | 'tgs' | 'webm';
@@ -226,7 +226,7 @@ export type UIStickerContent = {
   height: number;
 };
 
-export type UIAlbumItem = {
+export type TGAlbumItem = {
   messageId: number;
   contentKind: 'photo' | 'video' | 'animation';
   url: string | undefined;
@@ -235,63 +235,63 @@ export type UIAlbumItem = {
   minithumbnail: string | null;
 };
 
-export type UIAlbumContent = {
+export type TGAlbumContent = {
   kind: 'album';
-  items: UIAlbumItem[];
-  caption: UICaption | null;
+  items: TGAlbumItem[];
+  caption: TGCaption | null;
 };
 
-export type UIDocumentContent = {
+export type TGDocumentContent = {
   kind: 'document';
   label: string;
 };
 
-export type UIUnsupportedContent = {
+export type TGUnsupportedContent = {
   kind: 'unsupported';
   label: string;
 };
 
-export type UIContent =
-  | UITextContent
-  | UIPhotoContent
-  | UIVideoContent
-  | UIAnimationContent
-  | UIVoiceContent
-  | UIVideoNoteContent
-  | UIStickerContent
-  | UIAlbumContent
-  | UIDocumentContent
-  | UIUnsupportedContent;
+export type TGContent =
+  | TGTextContent
+  | TGPhotoContent
+  | TGVideoContent
+  | TGAnimationContent
+  | TGVoiceContent
+  | TGVideoNoteContent
+  | TGStickerContent
+  | TGAlbumContent
+  | TGDocumentContent
+  | TGUnsupportedContent;
 
 // ─── Message types ───
 
-export type UIMessageBase = {
+export type TGMessageBase = {
   id: number;
   chatId: number;
   date: number;
   isOutgoing: boolean;
   isRead: boolean;
   editDate: number;
-  sender: UISender;
-  reactions: UIReaction[];
+  sender: TGSender;
+  reactions: TGReaction[];
   viewCount: number;
-  forward: UIForward | null;
-  replyTo: UIReplyTo | null;
-  inlineKeyboard: UIKeyboardRow[] | null;
-  content: UIContent;
+  forward: TGForward | null;
+  replyTo: TGReplyTo | null;
+  inlineKeyboard: TGKeyboardRow[] | null;
+  content: TGContent;
 };
 
-export type UIServiceMessage = {
+export type TGServiceMessage = {
   kind: 'service';
   id: number;
   chatId: number;
   date: number;
-  sender: UISender;
+  sender: TGSender;
   text: string;
   pinnedMessageId: number;
 };
 
-export type UIPendingMessage = {
+export type TGPendingMessage = {
   kind: 'pending';
   localId: string;
   chatId: number;
@@ -300,4 +300,4 @@ export type UIPendingMessage = {
   status: 'sending' | 'failed';
 };
 
-export type UIMessage = (UIMessageBase & { kind: 'message' }) | UIServiceMessage | UIPendingMessage;
+export type TGMessage = (TGMessageBase & { kind: 'message' }) | TGServiceMessage | TGPendingMessage;

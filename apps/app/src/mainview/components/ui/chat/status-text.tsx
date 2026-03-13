@@ -1,6 +1,6 @@
 import type { HeaderStatus } from '@/data';
 import { cn } from '@/lib/utils';
-import { PureTypingIndicator } from './TypingIndicator';
+import { PureTypingIndicator } from './typing-indicator';
 
 export function PureStatusText({
   status,

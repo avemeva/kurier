@@ -6,9 +6,9 @@ import {
   useLayoutEffect,
   useRef,
 } from 'react';
-import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
-import { useStickToBottom } from '@/hooks/useStickToBottom';
-import { scrollToMessage } from '@/lib/scrollToMessage';
+import { useInfiniteScroll } from '@/hooks/use-infinite-scroll';
+import { useStickToBottom } from '@/hooks/use-stick-to-bottom';
+import { scrollToMessage } from '@/lib/scroll-to-message';
 
 export interface ScrollContainerProps {
   chatId: number | undefined;

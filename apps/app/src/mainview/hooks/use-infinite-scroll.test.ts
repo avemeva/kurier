@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useInfiniteScroll } from './useInfiniteScroll';
+import { useInfiniteScroll } from './use-infinite-scroll';
 
 function createMockElement(overrides: Partial<HTMLElement> = {}): HTMLElement {
   const el = document.createElement('div');

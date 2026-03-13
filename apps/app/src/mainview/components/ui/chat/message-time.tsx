@@ -1,7 +1,8 @@
 import { Check, CheckCheck, Clock, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { InfoDisplayType } from './message-rendering';
 
-export type InfoDisplayType = 'default' | 'image' | 'background';
+export type { InfoDisplayType } from './message-rendering';
 
 export interface MessageTimeProps {
   date: number;

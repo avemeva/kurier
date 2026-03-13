@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { scrollToMessage } from './scrollToMessage';
+import { scrollToMessage } from './scroll-to-message';
 
 describe('scrollToMessage', () => {
   let container: HTMLElement;

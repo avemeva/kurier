@@ -1,51 +1,53 @@
 import { memo } from 'react';
-import { PureBotKeyboard } from '@/components/ui/chat/BotKeyboard';
-import type { GroupPosition } from '@/components/ui/chat/Bubble';
-import { PureBubble } from '@/components/ui/chat/Bubble';
-import { PureForwardHeader } from '@/components/ui/chat/ForwardHeader';
-import { PureLinkPreviewCard } from '@/components/ui/chat/LinkPreviewCard';
-import { PureMessageTime } from '@/components/ui/chat/MessageTime';
-import { PurePhotoView } from '@/components/ui/chat/PhotoView';
-import { PureReactionBar, PureReactionPicker } from '@/components/ui/chat/ReactionBar';
-import { PureReplyHeader } from '@/components/ui/chat/ReplyHeader';
-import { PureServiceMessage } from '@/components/ui/chat/ServiceMessage';
-import { PureStickerView } from '@/components/ui/chat/StickerView';
-import { PureVideoView } from '@/components/ui/chat/VideoView';
-import { PureVoiceView } from '@/components/ui/chat/VoiceView';
+import type {
+  TGAlbumContent,
+  TGAnimationContent,
+  TGMessage,
+  TGPhotoContent,
+  TGReaction,
+  TGTextContent,
+  TGVideoContent,
+  TGVideoNoteContent,
+  TGVoiceContent,
+} from '@/data';
+import { computeMediaSize, MAX_MEDIA_SIZE, MIN_MEDIA_SIZE } from '@/lib/media-sizing';
+import { cn } from '@/lib/utils';
+import { PureBotKeyboard } from './bot-keyboard';
+import type { GroupPosition } from './bubble';
+import { PureBubble } from './bubble';
+import { PureFormattedText } from './formatted-text';
+import { PureForwardHeader } from './forward-header';
+import { PureLinkPreviewCard } from './link-preview-card';
 import type {
   AlbumRenderState,
   BubbleRenderState,
   MediaRenderState,
   PendingRenderState,
   StickerRenderState,
-  UIAlbumContent,
-  UIAnimationContent,
-  UIMessage,
-  UIPhotoContent,
-  UIReaction,
-  UITextContent,
-  UIVideoContent,
-  UIVideoNoteContent,
-  UIVoiceContent,
-} from '@/data';
-import { computeMessageState } from '@/data';
-import { computeMediaSize, MAX_MEDIA_SIZE, MIN_MEDIA_SIZE } from '@/lib/media-sizing';
-import { cn } from '@/lib/utils';
-import { PureAlbumGrid } from './PureAlbumGrid';
-import { PureFormattedText } from './PureFormattedText';
+} from './message-rendering';
+import { computeMessageState } from './message-rendering';
+import { PureMessageTime } from './message-time';
+import { PurePhotoView } from './photo-view';
+import { PureAlbumGrid } from './pure-album-grid';
+import { PureReactionBar, PureReactionPicker } from './reaction-bar';
+import { PureReplyHeader } from './reply-header';
+import { PureServiceMessage } from './service-message';
+import { PureStickerView } from './sticker-view';
+import { PureVideoView } from './video-view';
+import { PureVoiceView } from './voice-view';
 
-export type { GroupPosition } from '@/components/ui/chat/Bubble';
+export type { GroupPosition } from './bubble';
 
 // --- Helpers ---
 
-function toReactionInfos(reactions: UIReaction[]) {
+function toReactionInfos(reactions: TGReaction[]) {
   return reactions.map((r) => ({ emoticon: r.emoji, count: r.count, chosen: r.chosen }));
 }
 
 // --- Props ---
 
 export type MessageProps = {
-  msg: UIMessage;
+  msg: TGMessage;
   showSender: boolean;
   groupPosition?: GroupPosition;
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
@@ -203,7 +205,7 @@ function PureMediaLayout({
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
 }) {
   const { msg, bubbleVariant, displayWidth, displayHeight } = state;
-  const content = msg.content as UIPhotoContent | UIVideoContent | UIAnimationContent;
+  const content = msg.content as TGPhotoContent | TGVideoContent | TGAnimationContent;
   const hasReactions = msg.reactions.length > 0;
   const isVideo = content.kind === 'video' || content.kind === 'animation';
   const text = content.caption?.text ?? '';
@@ -345,22 +347,22 @@ function PureBubbleLayout({
   // Extract text based on content kind
   const text =
     ck === 'text'
-      ? (content as UITextContent).text
+      ? (content as TGTextContent).text
       : 'caption' in content && (content as { caption?: { text: string } | null }).caption?.text
         ? (content as { caption: { text: string } }).caption.text
         : '';
   const entities =
     ck === 'text'
-      ? (content as UITextContent).entities
+      ? (content as TGTextContent).entities
       : 'caption' in content && (content as { caption?: { entities: unknown[] } | null }).caption
-        ? (content as { caption: { entities: UITextContent['entities'] } }).caption.entities
+        ? (content as { caption: { entities: TGTextContent['entities'] } }).caption.entities
         : [];
   const customEmojiUrls =
     ck === 'text'
-      ? (content as UITextContent).customEmojiUrls
+      ? (content as TGTextContent).customEmojiUrls
       : 'caption' in content &&
           (content as { caption?: { customEmojiUrls: unknown } | null }).caption
-        ? (content as { caption: { customEmojiUrls: UITextContent['customEmojiUrls'] } }).caption
+        ? (content as { caption: { customEmojiUrls: TGTextContent['customEmojiUrls'] } }).caption
             .customEmojiUrls
         : undefined;
 
@@ -381,7 +383,7 @@ function PureBubbleLayout({
     'media' in content
   ) {
     const media = (
-      content as UIPhotoContent | UIVideoContent | UIAnimationContent | UIVideoNoteContent
+      content as TGPhotoContent | TGVideoContent | TGAnimationContent | TGVideoNoteContent
     ).media;
     if (media.width > 0 && media.height > 0) {
       const sized = computeMediaSize(media.width, media.height, MAX_MEDIA_SIZE, MIN_MEDIA_SIZE);
@@ -394,7 +396,7 @@ function PureBubbleLayout({
   const isMediaOnly = (isPhoto || isVideo) && !text;
 
   // Web preview
-  const webPreview = ck === 'text' ? (content as UITextContent).webPreview : null;
+  const webPreview = ck === 'text' ? (content as TGTextContent).webPreview : null;
 
   return (
     <PureBubble
@@ -435,8 +437,8 @@ function PureBubbleLayout({
       )}
       {isPhoto && 'media' in content && (
         <PurePhotoView
-          url={(content as UIPhotoContent).media.url ?? null}
-          loading={(content as UIPhotoContent).media.url === undefined}
+          url={(content as TGPhotoContent).media.url ?? null}
+          loading={(content as TGPhotoContent).media.url === undefined}
           width={bubbleDisplayWidth}
           height={bubbleDisplayHeight}
           minithumbnail={minithumbnail}
@@ -445,10 +447,10 @@ function PureBubbleLayout({
       {isVideo && 'media' in content && (
         <PureVideoView
           url={
-            (content as UIVideoContent | UIVideoNoteContent | UIAnimationContent).media.url ?? null
+            (content as TGVideoContent | TGVideoNoteContent | TGAnimationContent).media.url ?? null
           }
           loading={
-            (content as UIVideoContent | UIVideoNoteContent | UIAnimationContent).media.url ===
+            (content as TGVideoContent | TGVideoNoteContent | TGAnimationContent).media.url ===
             undefined
           }
           isCircle={ck === 'videoNote'}
@@ -460,13 +462,13 @@ function PureBubbleLayout({
       )}
       {isVoice && (
         <PureVoiceView
-          url={(content as UIVoiceContent).url ?? null}
-          loading={(content as UIVoiceContent).url === undefined}
-          waveform={(content as UIVoiceContent).waveform}
-          duration={(content as UIVoiceContent).duration}
-          fileSize={(content as UIVoiceContent).fileSize}
-          speechStatus={(content as UIVoiceContent).speechStatus}
-          speechText={(content as UIVoiceContent).speechText}
+          url={(content as TGVoiceContent).url ?? null}
+          loading={(content as TGVoiceContent).url === undefined}
+          waveform={(content as TGVoiceContent).waveform}
+          duration={(content as TGVoiceContent).duration}
+          fileSize={(content as TGVoiceContent).fileSize}
+          speechStatus={(content as TGVoiceContent).speechStatus}
+          speechText={(content as TGVoiceContent).speechText}
           onTranscribe={() => state.onTranscribe?.(msg.chatId, msg.id)}
         />
       )}
@@ -563,7 +565,7 @@ function PureAlbumLayout({
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
 }) {
   const { msg, bubbleVariant } = state;
-  const content = msg.content as UIAlbumContent;
+  const content = msg.content as TGAlbumContent;
   const hasReactions = msg.reactions.length > 0;
   const text = content.caption?.text ?? '';
 

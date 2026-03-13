@@ -1,6 +1,6 @@
-import { PurePhotoView } from '@/components/ui/chat/PhotoView';
-import { PureVideoView } from '@/components/ui/chat/VideoView';
-import type { UIAlbumItem } from '@/data';
+import { PurePhotoView } from '@/components/ui/chat/photo-view';
+import { PureVideoView } from '@/components/ui/chat/video-view';
+import type { TGAlbumItem } from '@/data';
 import {
   ALBUM_SPACING,
   type Corners,
@@ -11,12 +11,12 @@ import {
 } from '@/lib/media-sizing';
 
 type PureAlbumGridProps = {
-  items: UIAlbumItem[];
+  items: TGAlbumItem[];
   maxWidth: number;
 };
 
 type PureAlbumCellProps = {
-  item: UIAlbumItem;
+  item: TGAlbumItem;
   geometry: Rect;
   corners: Corners;
 };

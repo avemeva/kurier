@@ -8,17 +8,17 @@ import {
   groupAndConvert,
   hydrateMessage,
   toChatKind,
-  toUIChat,
-  toUIContent,
-  toUIForward,
-  toUIMessage,
-  toUIReactions,
-  toUIReplyTo,
-  toUITextEntities,
-  toUIUser,
+  toTGChat,
+  toTGContent,
+  toTGForward,
+  toTGMessage,
+  toTGReactions,
+  toTGReplyTo,
+  toTGTextEntities,
+  toTGUser,
 } from '../convert';
 import type { PendingMessage } from '../index';
-import type { UIMessage } from '../ui';
+import type { TGMessage } from '../tg';
 import {
   CHAT_CHANNEL,
   CHAT_HY_RID,
@@ -48,12 +48,12 @@ import {
 const users = USERS_MAP;
 
 // ---------------------------------------------------------------------------
-// toUIChat
+// toTGChat
 // ---------------------------------------------------------------------------
 
-describe('toUIChat', () => {
+describe('toTGChat', () => {
   it('converts private chat (Hy Rid)', () => {
-    const ui = toUIChat(CHAT_HY_RID, { photoUrl: null, user: undefined, isOnline: false });
+    const ui = toTGChat(CHAT_HY_RID, { photoUrl: null, user: undefined, isOnline: false });
     expect(ui.id).toBe(6098406782);
     expect(ui.title).toBe('Hy Rid');
     expect(ui.kind).toBe('private');
@@ -70,7 +70,7 @@ describe('toUIChat', () => {
   });
 
   it('converts private chat (Маруся)', () => {
-    const ui = toUIChat(CHAT_MARUSIA, {
+    const ui = toTGChat(CHAT_MARUSIA, {
       photoUrl: 'https://photo.url/marusia.jpg',
       user: USER_MARUSIA,
       isOnline: true,
@@ -89,7 +89,7 @@ describe('toUIChat', () => {
   });
 
   it('converts supergroup (muted)', () => {
-    const ui = toUIChat(CHAT_SUPERGROUP, { photoUrl: null, user: undefined, isOnline: false });
+    const ui = toTGChat(CHAT_SUPERGROUP, { photoUrl: null, user: undefined, isOnline: false });
     expect(ui.id).toBe(-1001731417779);
     expect(ui.kind).toBe('supergroup');
     expect(ui.userId).toBe(0);
@@ -101,7 +101,7 @@ describe('toUIChat', () => {
   });
 
   it('converts channel', () => {
-    const ui = toUIChat(CHAT_CHANNEL, { photoUrl: null, user: undefined, isOnline: false });
+    const ui = toTGChat(CHAT_CHANNEL, { photoUrl: null, user: undefined, isOnline: false });
     expect(ui.kind).toBe('channel');
     expect(ui.isBot).toBe(false);
     expect(ui.isOnline).toBe(false);
@@ -111,7 +111,7 @@ describe('toUIChat', () => {
   it('handles chat with no last message', () => {
     // Supergroup chat has no last_message set (we'll test with a constructed chat)
     const chatNoMsg = { ...CHAT_SUPERGROUP, last_message: undefined } as Td.chat;
-    const ui = toUIChat(chatNoMsg, { photoUrl: null, user: undefined, isOnline: false });
+    const ui = toTGChat(chatNoMsg, { photoUrl: null, user: undefined, isOnline: false });
     expect(ui.lastMessagePreview).toBe('');
     expect(ui.lastMessageDate).toBe(0);
   });
@@ -148,12 +148,12 @@ describe('toChatKind', () => {
 });
 
 // ---------------------------------------------------------------------------
-// toUIUser
+// toTGUser
 // ---------------------------------------------------------------------------
 
-describe('toUIUser', () => {
+describe('toTGUser', () => {
   it('converts premium user with username (Andrey)', () => {
-    const ui = toUIUser(USER_ME);
+    const ui = toTGUser(USER_ME);
     expect(ui.id).toBe(91754006);
     expect(ui.firstName).toBe('Andrey');
     expect(ui.lastName).toBe('');
@@ -164,7 +164,7 @@ describe('toUIUser', () => {
   });
 
   it('converts non-premium user without username (Hy Rid)', () => {
-    const ui = toUIUser(USER_HY_RID);
+    const ui = toTGUser(USER_HY_RID);
     expect(ui.id).toBe(6098406782);
     expect(ui.fullName).toBe('Hy Rid');
     expect(ui.username).toBeNull();
@@ -173,7 +173,7 @@ describe('toUIUser', () => {
   });
 
   it('converts user with emoji status (Маруся)', () => {
-    const ui = toUIUser(USER_MARUSIA);
+    const ui = toTGUser(USER_MARUSIA);
     expect(ui.fullName).toBe('Маруся');
     expect(ui.username).toBe('naluneteplo');
     expect(ui.isPremium).toBe(true);
@@ -181,7 +181,7 @@ describe('toUIUser', () => {
   });
 
   it('converts user with emoji status (Валидол)', () => {
-    const ui = toUIUser(USER_VALIDOL);
+    const ui = toTGUser(USER_VALIDOL);
     expect(ui.fullName).toBe('Валидол');
     expect(ui.username).toBe('kxt9_8');
     expect(ui.emojiStatusId).toBe('5393542049674831462');
@@ -189,15 +189,15 @@ describe('toUIUser', () => {
 });
 
 // ---------------------------------------------------------------------------
-// toUITextEntities
+// toTGTextEntities
 // ---------------------------------------------------------------------------
 
-describe('toUITextEntities', () => {
+describe('toTGTextEntities', () => {
   it('converts bold entity', () => {
     const entities: Td.textEntity[] = [
       { _: 'textEntity', offset: 0, length: 4, type: { _: 'textEntityTypeBold' } },
     ];
-    const result = toUITextEntities(entities);
+    const result = toTGTextEntities(entities);
     expect(result).toEqual([{ offset: 0, length: 4, type: 'bold' }]);
   });
 
@@ -205,7 +205,7 @@ describe('toUITextEntities', () => {
     const entities: Td.textEntity[] = [
       { _: 'textEntity', offset: 0, length: 15, type: { _: 'textEntityTypeUrl' } },
     ];
-    const result = toUITextEntities(entities);
+    const result = toTGTextEntities(entities);
     expect(result).toEqual([{ offset: 0, length: 15, type: 'url' }]);
   });
 
@@ -218,7 +218,7 @@ describe('toUITextEntities', () => {
         type: { _: 'textEntityTypeTextUrl', url: 'https://example.com' },
       },
     ];
-    const result = toUITextEntities(entities);
+    const result = toTGTextEntities(entities);
     expect(result).toEqual([
       { offset: 0, length: 10, type: 'textUrl', url: 'https://example.com' },
     ]);
@@ -233,7 +233,7 @@ describe('toUITextEntities', () => {
         type: { _: 'textEntityTypeCustomEmoji', custom_emoji_id: '12345' },
       },
     ];
-    const result = toUITextEntities(entities);
+    const result = toTGTextEntities(entities);
     expect(result).toEqual([{ offset: 0, length: 5, type: 'customEmoji', customEmojiId: '12345' }]);
   });
 
@@ -241,20 +241,20 @@ describe('toUITextEntities', () => {
     const entities: Td.textEntity[] = [
       { _: 'textEntity', offset: 5, length: 3, type: { _: 'textEntityTypeSpoiler' } },
     ];
-    const result = toUITextEntities(entities);
+    const result = toTGTextEntities(entities);
     expect(result).toEqual([{ offset: 5, length: 3, type: 'spoiler' }]);
   });
 
   it('handles empty entities array', () => {
-    expect(toUITextEntities([])).toEqual([]);
+    expect(toTGTextEntities([])).toEqual([]);
   });
 });
 
 // ---------------------------------------------------------------------------
-// toUIReactions
+// toTGReactions
 // ---------------------------------------------------------------------------
 
-describe('toUIReactions', () => {
+describe('toTGReactions', () => {
   it('converts emoji reactions with counts and chosen state', () => {
     const info: Td.messageInteractionInfo = {
       _: 'messageInteractionInfo',
@@ -283,7 +283,7 @@ describe('toUIReactions', () => {
         can_get_added_reactions: false,
       },
     };
-    const result = toUIReactions(info);
+    const result = toTGReactions(info);
     expect(result).toEqual([
       { emoji: '🔥', count: 7, chosen: true },
       { emoji: '👎', count: 1, chosen: false },
@@ -291,7 +291,7 @@ describe('toUIReactions', () => {
   });
 
   it('returns empty array for undefined info', () => {
-    expect(toUIReactions(undefined)).toEqual([]);
+    expect(toTGReactions(undefined)).toEqual([]);
   });
 
   it('returns empty array when no reactions', () => {
@@ -300,7 +300,7 @@ describe('toUIReactions', () => {
       view_count: 5,
       forward_count: 0,
     };
-    expect(toUIReactions(info)).toEqual([]);
+    expect(toTGReactions(info)).toEqual([]);
   });
 
   it('handles non-emoji reaction type', () => {
@@ -324,7 +324,7 @@ describe('toUIReactions', () => {
         can_get_added_reactions: false,
       },
     };
-    const result = toUIReactions(info);
+    const result = toTGReactions(info);
     expect(result).toEqual([{ emoji: '', count: 2, chosen: false }]);
   });
 });
@@ -544,12 +544,12 @@ describe('extractInlineKeyboard', () => {
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// toUIMessage
+// toTGMessage
 // ---------------------------------------------------------------------------
 
-describe('toUIMessage', () => {
+describe('toTGMessage', () => {
   it('converts envelope fields', () => {
-    const m = toUIMessage(MSG_TEXT_INCOMING, users, 0);
+    const m = toTGMessage(MSG_TEXT_INCOMING, users, 0);
     expect(m.kind).toBe('message');
     if (m.kind !== 'message') return;
     expect(m.id).toBe(MSG_TEXT_INCOMING.id);
@@ -561,7 +561,7 @@ describe('toUIMessage', () => {
   });
 
   it('marks outgoing read when id <= lastReadOutboxId', () => {
-    const m = toUIMessage(MSG_TEXT_INCOMING, users, MSG_TEXT_INCOMING.id);
+    const m = toTGMessage(MSG_TEXT_INCOMING, users, MSG_TEXT_INCOMING.id);
     // MSG_TEXT_INCOMING is not outgoing, so isRead should be false
     if (m.kind !== 'message') return;
     expect(m.isRead).toBe(false);
@@ -572,7 +572,7 @@ describe('toUIMessage', () => {
       ...MSG_TEXT_INCOMING,
       content: { _: 'messagePinMessage' as const, message_id: 42 },
     } as unknown as import('tdlib-types').message;
-    const m = toUIMessage(serviceMsg, users, 0);
+    const m = toTGMessage(serviceMsg, users, 0);
     expect(m.kind).toBe('service');
     if (m.kind !== 'service') return;
     expect(m.text).toContain('pinned');
@@ -584,23 +584,23 @@ describe('toUIMessage', () => {
       ...MSG_TEXT_INCOMING,
       sender_id: { _: 'messageSenderUser' as const, user_id: 99999 },
     };
-    const m = toUIMessage(msg, users, 0);
+    const m = toTGMessage(msg, users, 0);
     if (m.kind !== 'message') return;
     expect(m.sender.name).toBe('Unknown');
   });
 });
 
 // ---------------------------------------------------------------------------
-// toUIForward
+// toTGForward
 // ---------------------------------------------------------------------------
 
-describe('toUIForward', () => {
+describe('toTGForward', () => {
   it('returns null when no forward info', () => {
-    expect(toUIForward(undefined, users)).toBeNull();
+    expect(toTGForward(undefined, users)).toBeNull();
   });
 
   it('returns correct fields when present', () => {
-    const f = toUIForward(MSG_FORWARDED.forward_info, users);
+    const f = toTGForward(MSG_FORWARDED.forward_info, users);
     expect(f).not.toBeNull();
     expect(f?.fromName).toBeTruthy();
     expect(f?.date).toBe(MSG_FORWARDED.forward_info?.date);
@@ -608,28 +608,28 @@ describe('toUIForward', () => {
 });
 
 // ---------------------------------------------------------------------------
-// toUIReplyTo
+// toTGReplyTo
 // ---------------------------------------------------------------------------
 
-describe('toUIReplyTo', () => {
+describe('toTGReplyTo', () => {
   it('returns null when no reply', () => {
-    expect(toUIReplyTo(MSG_TEXT_INCOMING)).toBeNull();
+    expect(toTGReplyTo(MSG_TEXT_INCOMING)).toBeNull();
   });
 
   it('returns correct messageId and quoteText when present', () => {
-    const r = toUIReplyTo(MSG_REPLY);
+    const r = toTGReplyTo(MSG_REPLY);
     expect(r).not.toBeNull();
     expect(r?.messageId).toBeGreaterThan(0);
   });
 });
 
 // ---------------------------------------------------------------------------
-// toUIContent
+// toTGContent
 // ---------------------------------------------------------------------------
 
-describe('toUIContent', () => {
+describe('toTGContent', () => {
   it('converts text content', () => {
-    const c = toUIContent(MSG_TEXT_INCOMING.content);
+    const c = toTGContent(MSG_TEXT_INCOMING.content);
     expect(c.kind).toBe('text');
     if (c.kind === 'text') {
       expect(c.text).toBe('All good, take your time.');
@@ -639,7 +639,7 @@ describe('toUIContent', () => {
   });
 
   it('converts text with link preview', () => {
-    const c = toUIContent(MSG_TEXT_WITH_LINK_PREVIEW.content);
+    const c = toTGContent(MSG_TEXT_WITH_LINK_PREVIEW.content);
     expect(c.kind).toBe('text');
     if (c.kind === 'text') {
       expect(c.webPreview).not.toBeNull();
@@ -649,7 +649,7 @@ describe('toUIContent', () => {
   });
 
   it('converts photo content', () => {
-    const c = toUIContent(MSG_PHOTO_SINGLE.content);
+    const c = toTGContent(MSG_PHOTO_SINGLE.content);
     expect(c.kind).toBe('photo');
     if (c.kind === 'photo') {
       expect(c.media.width).toBe(1280);
@@ -663,7 +663,7 @@ describe('toUIContent', () => {
   });
 
   it('converts video content', () => {
-    const c = toUIContent(MSG_VIDEO.content);
+    const c = toTGContent(MSG_VIDEO.content);
     expect(c.kind).toBe('video');
     if (c.kind === 'video') {
       expect(c.media.width).toBe(848);
@@ -674,7 +674,7 @@ describe('toUIContent', () => {
   });
 
   it('converts animation content', () => {
-    const c = toUIContent(MSG_ANIMATION.content);
+    const c = toTGContent(MSG_ANIMATION.content);
     expect(c.kind).toBe('animation');
     if (c.kind === 'animation') {
       expect(c.media.width).toBe(288);
@@ -684,7 +684,7 @@ describe('toUIContent', () => {
   });
 
   it('converts voice content', () => {
-    const c = toUIContent(MSG_VOICE_INCOMING.content);
+    const c = toTGContent(MSG_VOICE_INCOMING.content);
     expect(c.kind).toBe('voice');
     if (c.kind === 'voice') {
       expect(c.duration).toBe(4);
@@ -695,7 +695,7 @@ describe('toUIContent', () => {
   });
 
   it('converts videoNote content', () => {
-    const c = toUIContent(MSG_VIDEO_NOTE.content);
+    const c = toTGContent(MSG_VIDEO_NOTE.content);
     expect(c.kind).toBe('videoNote');
     if (c.kind === 'videoNote') {
       expect(c.media.width).toBe(300);
@@ -705,7 +705,7 @@ describe('toUIContent', () => {
   });
 
   it('converts sticker content (webp)', () => {
-    const c = toUIContent(MSG_STICKER_INCOMING.content);
+    const c = toTGContent(MSG_STICKER_INCOMING.content);
     expect(c.kind).toBe('sticker');
     if (c.kind === 'sticker') {
       expect(c.format).toBe('webp');
@@ -717,7 +717,7 @@ describe('toUIContent', () => {
   });
 
   it('converts animated emoji to sticker content', () => {
-    const c = toUIContent(MSG_ANIMATED_EMOJI.content);
+    const c = toTGContent(MSG_ANIMATED_EMOJI.content);
     expect(c.kind).toBe('sticker');
     if (c.kind === 'sticker') {
       expect(c.format).toBe('tgs');
@@ -727,7 +727,7 @@ describe('toUIContent', () => {
 
   it('converts document content', () => {
     const docContent = { _: 'messageDocument', document: {} } as Td.MessageContent;
-    const c = toUIContent(docContent);
+    const c = toTGContent(docContent);
     expect(c.kind).toBe('document');
     if (c.kind === 'document') {
       expect(c.label).toBe('File');
@@ -736,7 +736,7 @@ describe('toUIContent', () => {
 
   it('converts unsupported content', () => {
     const content = { _: 'messagePoll' } as Td.MessageContent;
-    const c = toUIContent(content);
+    const c = toTGContent(content);
     expect(c.kind).toBe('unsupported');
     if (c.kind === 'unsupported') {
       expect(c.label).toBe('Poll');
@@ -853,8 +853,8 @@ describe('groupAndConvert', () => {
 describe('hydrateMessage', () => {
   // Helper to create a base message for hydration
   function makeTestMessage(
-    overrides: Partial<UIMessage & { kind: 'message' }> = {},
-  ): UIMessage & { kind: 'message' } {
+    overrides: Partial<TGMessage & { kind: 'message' }> = {},
+  ): TGMessage & { kind: 'message' } {
     return {
       kind: 'message',
       id: 1,
@@ -1034,7 +1034,7 @@ describe('hydrateMessage', () => {
   });
 
   it('hydrates service message sender photo', () => {
-    const msg: UIMessage = {
+    const msg: TGMessage = {
       kind: 'service',
       id: 1,
       chatId: 100,
@@ -1050,7 +1050,7 @@ describe('hydrateMessage', () => {
   });
 
   it('hydrates service message pinned preview', () => {
-    const msg: UIMessage = {
+    const msg: TGMessage = {
       kind: 'service',
       id: 1,
       chatId: 100,
@@ -1066,7 +1066,7 @@ describe('hydrateMessage', () => {
   });
 
   it('returns pending message unchanged', () => {
-    const msg: UIMessage = {
+    const msg: TGMessage = {
       kind: 'pending',
       localId: 'local-1',
       chatId: 100,
