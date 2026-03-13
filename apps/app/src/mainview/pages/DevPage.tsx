@@ -1,8 +1,8 @@
 import { Agentation } from 'agentation';
 import { AtSign, BellOff, Pin } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { FormattedText } from '@/components/chat/FormattedText';
-import { Message } from '@/components/chat/Message';
+import { PureFormattedText } from '@/components/chat/PureFormattedText';
+import { PureMessageRow } from '@/components/chat/PureMessageRow';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PureBotKeyboard } from '@/components/ui/chat/BotKeyboard';
@@ -24,7 +24,6 @@ import { Separator } from '@/components/ui/separator';
 import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { log } from '@/lib/log';
-import { useChatStore } from '@/lib/store';
 import { groupUIMessages, type UIMessage } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { CHATS, HEADER_STATES, MEDIA_URLS, MESSAGES, PROFILE_PHOTOS } from './dev-data';
@@ -100,6 +99,21 @@ const mediaVariant4Album = MESSAGES.filter((m) =>
 const albums = groupUIMessages(MESSAGES).filter(
   (g): g is { type: 'album'; messages: UIMessage[] } => g.type === 'album',
 );
+
+// Helper: resolved media props for a single message in dev fixtures
+function devMediaProps(msg: UIMessage) {
+  return {
+    mediaUrl: MEDIA_URLS[msg.id] ?? null,
+    mediaLoading: false as const,
+  };
+}
+
+// Helper: resolved album media props for dev fixtures
+function devAlbumMediaProps(messages: UIMessage[]) {
+  return {
+    albumMedia: messages.map((m) => ({ url: MEDIA_URLS[m.id] ?? null, loading: false })),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Find first available real media URL for pure view demo sections
@@ -227,22 +241,6 @@ export default function DevPage() {
       });
     }
   }, []);
-
-  // Seed the store with dev media URLs so useMedia can resolve them.
-  // Must run before first render (not in useEffect) to prevent race with useMedia hooks.
-  const seededRef = useRef(false);
-  if (!seededRef.current) {
-    seededRef.current = true;
-    const mediaMap: Record<string, string> = {};
-    for (const [msgIdStr, url] of Object.entries(MEDIA_URLS)) {
-      const msgId = Number(msgIdStr);
-      const msg = MESSAGES.find((m) => m.id === msgId);
-      if (msg && url) {
-        mediaMap[`${msg.chatId}_${msg.id}`] = url;
-      }
-    }
-    useChatStore.getState().seedMedia(mediaMap);
-  }
 
   const now = Math.floor(Date.now() / 1000);
 
@@ -439,11 +437,12 @@ export default function DevPage() {
               text={`Incoming text message ${i + 1}. Peer bubble with sender name and avatar.`}
             >
               <div className="flex justify-start">
-                <Message
+                <PureMessageRow
                   input={{ kind: 'single', message: msg }}
                   showSender={true}
                   senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                   onReact={() => {}}
+                  {...devMediaProps(msg)}
                 />
               </div>
             </Case>
@@ -454,10 +453,11 @@ export default function DevPage() {
               text={`Outgoing text message ${i + 1}. Own bubble aligned right with read checkmarks.`}
             >
               <div className="flex justify-end">
-                <Message
+                <PureMessageRow
                   input={{ kind: 'single', message: msg }}
                   showSender={false}
                   onReact={() => {}}
+                  {...devMediaProps(msg)}
                 />
               </div>
             </Case>
@@ -478,11 +478,12 @@ export default function DevPage() {
                   .join(', ')}).`}
               >
                 <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                  <Message
+                  <PureMessageRow
                     input={{ kind: 'single', message: msg }}
                     showSender={!msg.isOutgoing}
                     senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                     onReact={() => {}}
+                    {...devMediaProps(msg)}
                   />
                 </div>
               </Case>
@@ -494,11 +495,12 @@ export default function DevPage() {
                 text="Message with spoiler entity. Text should be hidden behind a blur overlay until tapped."
               >
                 <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                  <Message
+                  <PureMessageRow
                     input={{ kind: 'single', message: msg }}
                     showSender={!msg.isOutgoing}
                     senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                     onReact={() => {}}
+                    {...devMediaProps(msg)}
                   />
                 </div>
               </Case>
@@ -521,11 +523,12 @@ export default function DevPage() {
                 text={`Photo-only bubble, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. No caption text, timestamp overlays the image.`}
               >
                 <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                  <Message
+                  <PureMessageRow
                     input={{ kind: 'single', message: msg }}
                     showSender={!msg.isOutgoing}
                     senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                     onReact={() => {}}
+                    {...devMediaProps(msg)}
                   />
                 </div>
               </Case>
@@ -536,11 +539,12 @@ export default function DevPage() {
               text={`Photo with caption, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. Image above, text below, timestamp after text.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <Message
+                <PureMessageRow
                   input={{ kind: 'single', message: msg }}
                   showSender={!msg.isOutgoing}
                   senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                   onReact={() => {}}
+                  {...devMediaProps(msg)}
                 />
               </div>
             </Case>
@@ -555,11 +559,12 @@ export default function DevPage() {
               text={`${msg.mediaLabel} bubble, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. Tests video thumbnail, play button overlay, and timestamp.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <Message
+                <PureMessageRow
                   input={{ kind: 'single', message: msg }}
                   showSender={!msg.isOutgoing}
                   senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                   onReact={() => {}}
+                  {...devMediaProps(msg)}
                 />
               </div>
             </Case>
@@ -575,11 +580,12 @@ export default function DevPage() {
                 text={`GIF bubble, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. Should autoplay silently with no play button.`}
               >
                 <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                  <Message
+                  <PureMessageRow
                     input={{ kind: 'single', message: msg }}
                     showSender={!msg.isOutgoing}
                     senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                     onReact={() => {}}
+                    {...devMediaProps(msg)}
                   />
                 </div>
               </Case>
@@ -599,11 +605,12 @@ export default function DevPage() {
               text={`Sticker, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. Renders without a bubble background, with timestamp below.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <Message
+                <PureMessageRow
                   input={{ kind: 'single', message: msg }}
                   showSender={!msg.isOutgoing}
                   senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                   onReact={() => {}}
+                  {...devMediaProps(msg)}
                 />
               </div>
             </Case>
@@ -618,11 +625,12 @@ export default function DevPage() {
               text={`Voice message, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. Waveform visualization with play/pause button inside a bubble.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <Message
+                <PureMessageRow
                   input={{ kind: 'single', message: msg }}
                   showSender={!msg.isOutgoing}
                   senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                   onReact={() => {}}
+                  {...devMediaProps(msg)}
                 />
               </div>
             </Case>
@@ -637,11 +645,12 @@ export default function DevPage() {
               text={`Link preview in ${msg.isOutgoing ? 'outgoing' : 'incoming'} bubble. Card with site name, title, description, and optional image.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <Message
+                <PureMessageRow
                   input={{ kind: 'single', message: msg }}
                   showSender={!msg.isOutgoing}
                   senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                   onReact={() => {}}
+                  {...devMediaProps(msg)}
                 />
               </div>
             </Case>
@@ -656,11 +665,12 @@ export default function DevPage() {
               text={`Text reply, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. Quoted message header above the reply body.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <Message
+                <PureMessageRow
                   input={{ kind: 'single', message: msg }}
                   showSender={!msg.isOutgoing}
                   senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                   onReact={() => {}}
+                  {...devMediaProps(msg)}
                 />
               </div>
             </Case>
@@ -699,11 +709,12 @@ export default function DevPage() {
               text={`Reply to a media message, ${msg.isOutgoing ? 'outgoing' : 'incoming'}. Reply header includes a media thumbnail.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <Message
+                <PureMessageRow
                   input={{ kind: 'single', message: msg }}
                   showSender={!msg.isOutgoing}
                   senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                   onReact={() => {}}
+                  {...devMediaProps(msg)}
                 />
               </div>
             </Case>
@@ -783,7 +794,7 @@ export default function DevPage() {
               }. Verifies inline formatting renders correctly.`}
             >
               <p className="text-[13px] leading-[18px] text-text-primary">
-                <FormattedText text={msg.text} entities={msg.entities} />
+                <PureFormattedText text={msg.text} entities={msg.entities} />
               </p>
             </Case>
           ))}
@@ -793,77 +804,85 @@ export default function DevPage() {
         <Section id="media-variants" title="Media Variants">
           <Case text="Standalone Photo (no bubble). No caption, no reply, no forward — renders without a text bubble frame.">
             <div className="flex justify-start">
-              <Message
+              <PureMessageRow
                 input={{ kind: 'single', message: mediaVariantStandalone }}
                 showSender={false}
                 senderPhotoUrl={PROFILE_PHOTOS[mediaVariantStandalone.senderUserId]}
                 onReact={() => {}}
+                {...devMediaProps(mediaVariantStandalone)}
               />
             </div>
           </Case>
           <Case text="Portrait Photo (square cap). Tall 1080x1920 image — should get square-capped border radius at top/bottom.">
             <div className="flex justify-start">
-              <Message
+              <PureMessageRow
                 input={{ kind: 'single', message: mediaVariantPortrait }}
                 showSender={false}
                 senderPhotoUrl={PROFILE_PHOTOS[mediaVariantPortrait.senderUserId]}
                 onReact={() => {}}
+                {...devMediaProps(mediaVariantPortrait)}
               />
             </div>
           </Case>
           <Case text="Photo + Caption (framed). Image above, caption text below inside a bubble frame.">
             <div className="flex justify-start">
-              <Message
+              <PureMessageRow
                 input={{ kind: 'single', message: mediaVariantCaption }}
                 showSender={true}
                 senderPhotoUrl={PROFILE_PHOTOS[mediaVariantCaption.senderUserId]}
                 onReact={() => {}}
+                {...devMediaProps(mediaVariantCaption)}
               />
             </div>
           </Case>
           <Case text="Photo + Reply (framed). Reply header above the photo inside a bubble frame.">
             <div className="flex justify-start">
-              <Message
+              <PureMessageRow
                 input={{ kind: 'single', message: mediaVariantReply }}
                 showSender={true}
                 senderPhotoUrl={PROFILE_PHOTOS[mediaVariantReply.senderUserId]}
                 onReact={() => {}}
+                {...devMediaProps(mediaVariantReply)}
               />
             </div>
           </Case>
           <Case text="Outgoing Photo. Own standalone photo aligned right with read checkmarks.">
             <div className="flex justify-end">
-              <Message
+              <PureMessageRow
                 input={{ kind: 'single', message: mediaVariantOutgoing }}
                 showSender={false}
                 onReact={() => {}}
+                {...devMediaProps(mediaVariantOutgoing)}
               />
             </div>
           </Case>
           <Case text="3-Photo Album (mixed ratios). Landscape + portrait + square grouped together.">
             <div className="flex justify-start">
-              <Message
+              <PureMessageRow
                 input={{ kind: 'album', messages: mediaVariant3Album }}
                 showSender={false}
                 onReact={() => {}}
+                {...devAlbumMediaProps(mediaVariant3Album)}
               />
             </div>
           </Case>
           <Case text="4-Photo Album (all landscape). Four 1920x1080 photos in an outgoing album grid.">
             <div className="flex justify-end">
-              <Message
+              <PureMessageRow
                 input={{ kind: 'album', messages: mediaVariant4Album }}
                 showSender={false}
                 onReact={() => {}}
+                {...devAlbumMediaProps(mediaVariant4Album)}
               />
             </div>
           </Case>
           <Case text="Existing 2-Photo Album. Original fixture album with two forwarded photos.">
             {albums.length > 0 ? (
-              <Message
+              <PureMessageRow
                 input={{ kind: 'album', messages: albums[0].messages }}
                 showSender={false}
                 onReact={() => {}}
+                {...devAlbumMediaProps(albums[0].messages)}
               />
             ) : (
               <p className="text-xs italic text-text-quaternary">No albums in data</p>
@@ -879,10 +898,11 @@ export default function DevPage() {
                 key={album.messages[0].id}
                 text={`Album with ${album.messages.length} media items. Tests the grid layout algorithm for multi-photo/video groups.`}
               >
-                <Message
+                <PureMessageRow
                   input={{ kind: 'album', messages: album.messages }}
                   showSender={false}
                   onReact={() => {}}
+                  {...devAlbumMediaProps(album.messages)}
                 />
               </Case>
             ))
@@ -922,11 +942,12 @@ export default function DevPage() {
               text={`Reactions attached to ${msg.isOutgoing ? 'outgoing' : 'incoming'} bubble. Emoji pills render below the message text.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <Message
+                <PureMessageRow
                   input={{ kind: 'single', message: msg }}
                   showSender={!msg.isOutgoing}
                   senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                   onReact={() => {}}
+                  {...devMediaProps(msg)}
                 />
               </div>
             </Case>
@@ -947,11 +968,12 @@ export default function DevPage() {
               text={`Forwarded message in ${msg.isOutgoing ? 'outgoing' : 'incoming'} bubble. Forward header sits above the message content.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <Message
+                <PureMessageRow
                   input={{ kind: 'single', message: msg }}
                   showSender={!msg.isOutgoing}
                   senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                   onReact={() => {}}
+                  {...devMediaProps(msg)}
                 />
               </div>
             </Case>
@@ -990,11 +1012,12 @@ export default function DevPage() {
               text={`Bot keyboard attached to ${msg.isOutgoing ? 'outgoing' : 'incoming'} bubble. Buttons render below the message text.`}
             >
               <div className={cn('flex', msg.isOutgoing ? 'justify-end' : 'justify-start')}>
-                <Message
+                <PureMessageRow
                   input={{ kind: 'single', message: msg }}
                   showSender={!msg.isOutgoing}
                   senderPhotoUrl={PROFILE_PHOTOS[msg.senderUserId]}
                   onReact={() => {}}
+                  {...devMediaProps(msg)}
                 />
               </div>
             </Case>
@@ -1243,19 +1266,21 @@ export default function DevPage() {
           <Case text="Service messages mixed with regular bubbles. Tests vertical spacing and alignment in a realistic chat flow.">
             <div className="space-y-1 rounded-lg bg-sand-2 p-4">
               <div className="flex justify-start">
-                <Message
+                <PureMessageRow
                   input={{ kind: 'single', message: MESSAGES[0] }}
                   showSender={true}
                   senderPhotoUrl={PROFILE_PHOTOS[MESSAGES[0].senderUserId]}
                   onReact={() => {}}
+                  {...devMediaProps(MESSAGES[0])}
                 />
               </div>
               <PureServiceMessage text="Andrey joined the group" />
               <div className="flex justify-end">
-                <Message
+                <PureMessageRow
                   input={{ kind: 'single', message: MESSAGES[3] }}
                   showSender={false}
                   onReact={() => {}}
+                  {...devMediaProps(MESSAGES[3])}
                 />
               </div>
               <PureServiceMessage text="Marusya pinned a message" />

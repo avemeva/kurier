@@ -1,10 +1,8 @@
 import { AtSign, Heart } from 'lucide-react';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { PureCornerButton, PureCornerButtonStack } from '@/components/ui/chat/CornerButtons';
 import { PureMessageInput } from '@/components/ui/chat/MessageInput';
-import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
-import { useStickToBottom } from '@/hooks/useStickToBottom';
-import { scrollToMessage } from '@/lib/scrollToMessage';
+import { useVisibleMessages } from '@/hooks/useVisibleMessages';
 import {
   selectChatMessages,
   selectSelectedChat,
@@ -16,8 +14,10 @@ import type { UIMessage, UIPendingMessage } from '@/lib/types';
 import { groupUIMessages } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ComposeSearchBottomBar } from './ComposeSearch';
-import type { GroupPosition } from './Message';
-import { Message } from './Message';
+import type { GroupPosition } from './PureMessageRow';
+import { PureMessageRow } from './PureMessageRow';
+import type { ScrollContainerHandle } from './ScrollContainer';
+import { ScrollContainer } from './ScrollContainer';
 
 const ArrowDownIcon = () => (
   <svg
@@ -36,9 +36,13 @@ const ArrowDownIcon = () => (
   </svg>
 );
 
-export function MessagePanel() {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const { scrollRef, scrollToBottom } = useStickToBottom();
+export function ChatView() {
+  const scrollContainerRef = useRef<ScrollContainerHandle>(null);
+  const getScrollElement = useCallback(
+    () => scrollContainerRef.current?.getScrollElement() ?? null,
+    [],
+  );
+  const visibleMessageIds = useVisibleMessages(getScrollElement);
 
   const selectedChat = useChatStore(selectSelectedChat);
   const messages = useChatStore(selectChatMessages);
@@ -61,6 +65,10 @@ export function MessagePanel() {
   const react = useChatStore((s) => s.react);
   const searchMode = useChatStore((s) => s.searchMode);
   const profilePhotos = useChatStore((s) => s.profilePhotos);
+  const mediaUrls = useChatStore((s) => s.mediaUrls);
+  const thumbUrls = useChatStore((s) => s.thumbUrls);
+  const customEmojiUrls = useChatStore((s) => s.customEmojiUrls);
+  const recognizeSpeech = useChatStore((s) => s.recognizeSpeech);
   const goToNextUnreadMention = useChatStore((s) => s.goToNextUnreadMention);
   const goToNextUnreadReaction = useChatStore((s) => s.goToNextUnreadReaction);
 
@@ -83,58 +91,146 @@ export function MessagePanel() {
     }
   }, [unresolvedPinned]);
 
-  // Merge refs: useStickToBottom needs its callback ref, useInfiniteScroll needs a ref object
-  const combinedRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      scrollContainerRef.current = node;
-      scrollRef(node);
-    },
-    [scrollRef],
-  );
-
-  useInfiniteScroll(scrollContainerRef, {
-    onTop: loadOlderMessages,
-    onBottom: loadNewerMessages,
-    hasOlder,
-    hasNewer,
-  });
-
-  // Scroll to bottom on chat switch
-  const selectedChatId = selectedChat?.id;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scrollToBottom is stable
-  useEffect(() => {
-    scrollToBottom();
-  }, [selectedChatId]);
-
-  // Scroll to bottom on "go to latest" (isAtLatest: false → true)
-  const prevIsAtLatestRef = useRef(isAtLatest);
-  useEffect(() => {
-    const was = prevIsAtLatestRef.current;
-    prevIsAtLatestRef.current = isAtLatest;
-    if (!was && isAtLatest) {
-      scrollToBottom();
+  // Build a lookup from message id → UIMessage for visible messages
+  const messageById = useMemo(() => {
+    const map = new Map<number, UIMessage>();
+    for (const item of messages) {
+      if ('isPending' in item) continue;
+      const msg = item as UIMessage;
+      map.set(msg.id, msg);
     }
-  }, [isAtLatest, scrollToBottom]);
+    return map;
+  }, [messages]);
+
+  const grouped = useMemo(() => groupUIMessages(messages), [messages]);
+
+  // Map from album's first message ID → all message IDs in the album
+  const albumByFirstId = useMemo(() => {
+    const map = new Map<number, number[]>();
+    for (const group of grouped) {
+      if (group.type === 'album') {
+        map.set(
+          group.messages[0].id,
+          group.messages.map((m) => m.id),
+        );
+      }
+    }
+    return map;
+  }, [grouped]);
+
+  // Trigger media loading for visible messages (expands album groups)
+  useEffect(() => {
+    if (!selectedChat) return;
+    const chatId = selectedChat.id;
+    const { loadMedia } = useChatStore.getState();
+    for (const msgId of visibleMessageIds) {
+      const idsToLoad = albumByFirstId.get(msgId) ?? [msgId];
+      for (const id of idsToLoad) {
+        const msg = messageById.get(id);
+        if (!msg) continue;
+        const ck = msg.contentKind;
+        if (
+          ck === 'photo' ||
+          ck === 'video' ||
+          ck === 'videoNote' ||
+          ck === 'animation' ||
+          ck === 'sticker' ||
+          ck === 'voice'
+        ) {
+          const key = `${chatId}_${id}`;
+          if (mediaUrls[key] === undefined) {
+            loadMedia(chatId, id);
+          }
+        }
+      }
+    }
+  }, [visibleMessageIds, selectedChat, mediaUrls, messageById, albumByFirstId]);
+
+  // Trigger custom emoji loading for visible messages
+  useEffect(() => {
+    if (!selectedChat) return;
+    const { loadCustomEmojiUrl } = useChatStore.getState();
+    const needed = new Set<string>();
+    for (const msgId of visibleMessageIds) {
+      const msg = messageById.get(msgId);
+      if (!msg) continue;
+      for (const entity of msg.entities) {
+        if (entity.type === 'customEmoji' && entity.customEmojiId) {
+          if (customEmojiUrls[entity.customEmojiId] === undefined) {
+            needed.add(entity.customEmojiId);
+          }
+        }
+      }
+    }
+    for (const id of needed) {
+      loadCustomEmojiUrl(id);
+    }
+  }, [visibleMessageIds, selectedChat, customEmojiUrls, messageById]);
+
+  // Trigger forward photo loading for visible messages
+  useEffect(() => {
+    if (!selectedChat) return;
+    const { loadProfilePhoto } = useChatStore.getState();
+    for (const msgId of visibleMessageIds) {
+      const msg = messageById.get(msgId);
+      if (!msg) continue;
+      if (msg.forwardFromPhotoId && profilePhotos[msg.forwardFromPhotoId] === undefined) {
+        loadProfilePhoto(msg.forwardFromPhotoId);
+      }
+    }
+  }, [visibleMessageIds, selectedChat, profilePhotos, messageById]);
+
+  // Trigger link preview thumb loading for visible messages
+  useEffect(() => {
+    if (!selectedChat) return;
+    const chatId = selectedChat.id;
+    const { loadReplyThumb } = useChatStore.getState();
+    for (const msgId of visibleMessageIds) {
+      const msg = messageById.get(msgId);
+      if (!msg?.webPreview) continue;
+      const key = `${chatId}_${msgId}`;
+      if (thumbUrls[key] === undefined) {
+        loadReplyThumb(chatId, msgId);
+      }
+    }
+  }, [visibleMessageIds, selectedChat, thumbUrls, messageById]);
+
+  const selectedChatId = selectedChat?.id;
 
   const handleReplyClick = useCallback(
     async (messageId: number) => {
-      const el = scrollContainerRef.current;
+      const el = scrollContainerRef.current?.getScrollElement();
       if (!el || !messageId) return;
 
       // If already in the DOM, just scroll to it
       const existing = el.querySelector(`#msg-${messageId}`);
       if (existing) {
-        scrollToMessage(el, messageId);
+        scrollContainerRef.current?.scrollToMessage(messageId);
         return;
       }
 
       // Load messages around the target, then scroll after render
       await loadMessagesAround(messageId);
       requestAnimationFrame(() => {
-        scrollToMessage(el, messageId);
+        scrollContainerRef.current?.scrollToMessage(messageId);
       });
     },
     [loadMessagesAround],
+  );
+
+  const handleReact = useCallback(
+    (messageId: number, emoticon: string, chosen: boolean) => {
+      if (!selectedChat) return;
+      react(selectedChat.id, messageId, emoticon, chosen);
+    },
+    [selectedChat, react],
+  );
+
+  const handleTranscribe = useCallback(
+    (chatId: number, msgId: number) => {
+      recognizeSpeech(chatId, msgId);
+    },
+    [recognizeSpeech],
   );
 
   if (!selectedChat) {
@@ -150,15 +246,8 @@ export function MessagePanel() {
     send(selectedChat.id, text);
   }
 
-  function handleReact(messageId: number, emoticon: string, chosen: boolean) {
-    if (!selectedChat) return;
-    react(selectedChat.id, messageId, emoticon, chosen);
-  }
-
   const isGroup = selectedChat.kind === 'basicGroup' || selectedChat.kind === 'supergroup';
   const showSender = isGroup;
-
-  const grouped = groupUIMessages(messages);
 
   function getKey(group: (typeof grouped)[number]): string | number {
     if (group.type === 'album') return group.messages[0].id;
@@ -206,10 +295,15 @@ export function MessagePanel() {
   return (
     <>
       <div className="relative flex-1">
-        <div
-          ref={combinedRef}
-          data-testid="message-panel"
-          className="absolute inset-0 overflow-y-auto px-4 py-3 scrollbar-subtle"
+        <ScrollContainer
+          ref={scrollContainerRef}
+          chatId={selectedChatId}
+          isAtLatest={isAtLatest}
+          hasOlder={hasOlder}
+          hasNewer={hasNewer}
+          loadingOlder={loadingOlderMessages}
+          onReachTop={loadOlderMessages}
+          onReachBottom={loadNewerMessages}
         >
           {loadingOlderMessages && (
             <p className="shimmer py-4 text-center text-sm text-text-tertiary">
@@ -236,6 +330,59 @@ export function MessagePanel() {
                 !('isPending' in group.message) &&
                 !!(group.message as UIMessage).serviceText;
 
+              // Resolve media props for this group
+              const chatId = selectedChat.id;
+              const msg: UIMessage | null =
+                group.type === 'album'
+                  ? group.messages[0]
+                  : group.type === 'single' && !('isPending' in group.message)
+                    ? (group.message as UIMessage)
+                    : null;
+              const msgId = msg?.id ?? 0;
+
+              // Media URL for single messages
+              const mediaKey = msgId ? `${chatId}_${msgId}` : '';
+              const mediaEntry = mediaKey ? mediaUrls[mediaKey] : undefined;
+
+              // Album media
+              const albumMedia =
+                group.type === 'album'
+                  ? group.messages.map((m) => {
+                      const key = `${chatId}_${m.id}`;
+                      const entry = mediaUrls[key];
+                      return { url: entry ?? null, loading: entry === undefined };
+                    })
+                  : undefined;
+
+              // Forward photo
+              const forwardPhotoUrl = msg?.forwardFromPhotoId
+                ? profilePhotos[msg.forwardFromPhotoId]
+                : undefined;
+
+              // Reply thumb
+              const replyThumbUrl = msg?.replyToMessageId
+                ? (thumbUrls[`${chatId}_${msg.replyToMessageId}`] ?? null)
+                : undefined;
+
+              // Link preview thumb
+              const linkPreviewThumbUrl = msg?.webPreview
+                ? (thumbUrls[`${chatId}_${msg.id}`] ?? null)
+                : undefined;
+
+              // Custom emoji URLs subset for this message's entities
+              const msgEntities = msg?.entities ?? [];
+              const emojiIds = msgEntities
+                .filter((e) => e.type === 'customEmoji' && e.customEmojiId)
+                .map((e) => e.customEmojiId!);
+              const msgCustomEmojiUrls =
+                emojiIds.length > 0
+                  ? Object.fromEntries(
+                      emojiIds
+                        .filter((id) => customEmojiUrls[id])
+                        .map((id) => [id, customEmojiUrls[id]]),
+                    )
+                  : undefined;
+
               return (
                 <div
                   key={getKey(group)}
@@ -245,20 +392,28 @@ export function MessagePanel() {
                     isService ? 'justify-center' : isOut ? 'sm:justify-end' : 'justify-start',
                   )}
                 >
-                  <Message
+                  <PureMessageRow
                     input={input}
                     showSender={showSender}
                     senderPhotoUrl={getSenderPhotoUrl(group)}
                     groupPosition={getGroupPosition(index)}
                     onReact={handleReact}
                     onReplyClick={handleReplyClick}
+                    mediaUrl={mediaEntry !== undefined ? (mediaEntry ?? null) : undefined}
+                    mediaLoading={mediaEntry === undefined}
+                    replyThumbUrl={replyThumbUrl}
+                    forwardPhotoUrl={forwardPhotoUrl}
+                    linkPreviewThumbUrl={linkPreviewThumbUrl}
+                    onTranscribe={handleTranscribe}
+                    albumMedia={albumMedia}
+                    customEmojiUrls={msgCustomEmojiUrls}
                   />
                 </div>
               );
             })}
           </div>
           <div />
-        </div>
+        </ScrollContainer>
         <PureCornerButtonStack>
           {selectedChat.unreadReactionCount > 0 && (
             <PureCornerButton

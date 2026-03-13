@@ -6,10 +6,11 @@ Components have no knowledge of external data sources or transport protocols. Th
 
 | Type | Responsibilities |
 |---|---|
-| **Pure** | Single visual element. Props only. No state, no hooks, no store, no side effects. Reusable anywhere. |
+| **Pure** (`Pure*` prefix) | Props only. No state, no hooks, no store, no side effects. Reusable anywhere. All components below ChatView are pure. |
 | **Bubble** | Visual container for a message. Background, padding, border-radius, avatar. Accepts children. Knows nothing about what's inside it. |
-| **Message** | The integration point. Connects data (hooks, store) to UI. Decides what content goes inside the Bubble. Only component that touches business logic. |
-| **Panel** | The list. Scroll, fetch, grouping. Passes data down to Messages. Knows nothing about how a message looks. |
+| **ChatView** (was MessagePanel) | The single store boundary. Reads all store state, triggers media loading for visible messages via IntersectionObserver, resolves per-message data via inline map lookups, passes fully resolved props to PureMessageRow. |
+| **ScrollContainer** | Generic scrollable container. Stick-to-bottom, infinite scroll, scroll-to-message. Knows nothing about Telegram or messages. |
+| **PureMessageRow** (was Message) | Pure rendering switch wrapped in React.memo. Receives fully resolved props, calls `computeMessageState()`, picks the right layout. Zero store access. |
 
 ## Skills
 

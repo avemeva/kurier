@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { memo } from 'react';
 import { PureBotKeyboard } from '@/components/ui/chat/BotKeyboard';
 import type { GroupPosition } from '@/components/ui/chat/Bubble';
 import { PureBubble } from '@/components/ui/chat/Bubble';
@@ -21,14 +21,12 @@ import type {
   PendingRenderState,
   StickerRenderState,
 } from '@/hooks/useMessage';
-import { useMessage } from '@/hooks/useMessage';
-import { useReplyThumb } from '@/hooks/useReplyThumb';
+import { computeMessageState } from '@/hooks/useMessage';
 import { MAX_MEDIA_SIZE } from '@/lib/media-sizing';
-import { useChatStore } from '@/lib/store';
 import type { UIReaction } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { AlbumGrid } from './AlbumGrid';
-import { FormattedText } from './FormattedText';
+import { PureAlbumGrid } from './PureAlbumGrid';
+import { PureFormattedText } from './PureFormattedText';
 
 export type { GroupPosition } from '@/components/ui/chat/Bubble';
 
@@ -47,20 +45,46 @@ export type MessageProps = {
   groupPosition?: GroupPosition;
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
   onReplyClick?: (messageId: number) => void;
+  // Resolved media data — passed from ChatView
+  mediaUrl?: string | null;
+  mediaLoading?: boolean;
+  replyThumbUrl?: string | null;
+  forwardPhotoUrl?: string | null;
+  linkPreviewThumbUrl?: string | null;
+  onTranscribe?: (chatId: number, msgId: number) => void;
+  albumMedia?: Array<{ url: string | null; loading: boolean }>;
+  customEmojiUrls?: Record<string, { url: string; format: 'webp' | 'tgs' | 'webm' } | null>;
 };
 
 // --- Main component ---
 
-export function Message({
+function PureMessageRowInner({
   input,
   showSender,
   senderPhotoUrl,
   groupPosition = 'single',
   onReact,
   onReplyClick,
+  mediaUrl,
+  mediaLoading,
+  replyThumbUrl,
+  forwardPhotoUrl,
+  linkPreviewThumbUrl,
+  onTranscribe,
+  albumMedia,
+  customEmojiUrls,
 }: MessageProps) {
   const ctx: MessageContext = { showSender, senderPhotoUrl };
-  const state = useMessage(input, ctx);
+  const state = computeMessageState(input, ctx, {
+    mediaUrl,
+    mediaLoading,
+    replyThumbUrl,
+    forwardPhotoUrl,
+    linkPreviewThumbUrl,
+    onTranscribe,
+    albumMedia,
+    customEmojiUrls,
+  });
 
   switch (state.layout) {
     case 'service':
@@ -71,14 +95,14 @@ export function Message({
         />
       );
     case 'pending':
-      return <PendingLayout state={state} groupPosition={groupPosition} />;
+      return <PurePendingLayout state={state} groupPosition={groupPosition} />;
     case 'sticker':
-      return <StickerLayout state={state} onReact={onReact} />;
+      return <PureStickerLayout state={state} onReact={onReact} />;
     case 'media':
-      return <MediaLayout state={state} groupPosition={groupPosition} onReact={onReact} />;
+      return <PureMediaLayout state={state} groupPosition={groupPosition} onReact={onReact} />;
     case 'bubble':
       return (
-        <BubbleLayout
+        <PureBubbleLayout
           state={state}
           groupPosition={groupPosition}
           onReact={onReact}
@@ -86,13 +110,45 @@ export function Message({
         />
       );
     case 'album':
-      return <AlbumLayout state={state} groupPosition={groupPosition} onReact={onReact} />;
+      return <PureAlbumLayout state={state} groupPosition={groupPosition} onReact={onReact} />;
   }
 }
 
+function arePropsEqual(prev: MessageProps, next: MessageProps): boolean {
+  if (prev.input !== next.input) return false;
+  if (prev.showSender !== next.showSender) return false;
+  if (prev.senderPhotoUrl !== next.senderPhotoUrl) return false;
+  if (prev.groupPosition !== next.groupPosition) return false;
+  if (prev.onReact !== next.onReact) return false;
+  if (prev.onReplyClick !== next.onReplyClick) return false;
+  if (prev.mediaUrl !== next.mediaUrl) return false;
+  if (prev.mediaLoading !== next.mediaLoading) return false;
+  if (prev.replyThumbUrl !== next.replyThumbUrl) return false;
+  if (prev.forwardPhotoUrl !== next.forwardPhotoUrl) return false;
+  if (prev.linkPreviewThumbUrl !== next.linkPreviewThumbUrl) return false;
+  if (prev.onTranscribe !== next.onTranscribe) return false;
+  if (prev.customEmojiUrls !== next.customEmojiUrls) return false;
+
+  // Element-wise compare albumMedia (new array each render)
+  const prevAlbum = prev.albumMedia;
+  const nextAlbum = next.albumMedia;
+  if (prevAlbum !== nextAlbum) {
+    if (!prevAlbum || !nextAlbum) return false;
+    if (prevAlbum.length !== nextAlbum.length) return false;
+    for (let i = 0; i < prevAlbum.length; i++) {
+      if (prevAlbum[i].url !== nextAlbum[i].url) return false;
+      if (prevAlbum[i].loading !== nextAlbum[i].loading) return false;
+    }
+  }
+
+  return true;
+}
+
+export const PureMessageRow = memo(PureMessageRowInner, arePropsEqual);
+
 // --- Pending layout ---
 
-function PendingLayout({
+function PurePendingLayout({
   state,
   groupPosition,
 }: {
@@ -128,7 +184,7 @@ function PendingLayout({
 
 // --- Sticker layout ---
 
-function StickerLayout({
+function PureStickerLayout({
   state,
   onReact,
 }: {
@@ -178,7 +234,7 @@ function StickerLayout({
 
 // --- Media layout ---
 
-function MediaLayout({
+function PureMediaLayout({
   state,
   groupPosition,
   onReact,
@@ -190,7 +246,6 @@ function MediaLayout({
   const { msg, media, bubbleVariant, displayWidth, displayHeight, minithumbnail } = state;
   const hasReactions = msg.reactions.length > 0;
   const isVideo = msg.contentKind === 'video' || msg.contentKind === 'animation';
-  const profilePhotos = useChatStore((s) => s.profilePhotos);
 
   return (
     <PureBubble
@@ -210,10 +265,7 @@ function MediaLayout({
       )}
       {bubbleVariant === 'framed' && msg.forwardFromName && (
         <div className="px-3">
-          <PureForwardHeader
-            fromName={msg.forwardFromName}
-            photoUrl={profilePhotos[msg.forwardFromPhotoId]}
-          />
+          <PureForwardHeader fromName={msg.forwardFromName} photoUrl={state.forwardPhotoUrl} />
         </div>
       )}
       {bubbleVariant === 'framed' &&
@@ -262,7 +314,11 @@ function MediaLayout({
       {msg.text && (
         <div className="px-3 py-1.5">
           <p className="whitespace-pre-wrap break-words tg-text-chat text-text-primary">
-            <FormattedText text={msg.text} entities={msg.entities} />
+            <PureFormattedText
+              text={msg.text}
+              entities={msg.entities}
+              customEmojiUrls={state.customEmojiUrls}
+            />
             <span
               className={cn('float-right h-[1.125rem]', msg.editDate > 0 ? 'w-[5.5rem]' : 'w-12')}
               aria-hidden="true"
@@ -305,7 +361,7 @@ function MediaLayout({
 
 // --- Bubble layout ---
 
-function BubbleLayout({
+function PureBubbleLayout({
   state,
   groupPosition,
   onReact,
@@ -317,25 +373,12 @@ function BubbleLayout({
   onReplyClick?: (messageId: number) => void;
 }) {
   const { msg, media, displayType, isMediaOnly } = state;
-  const replyThumbUrl = useReplyThumb(
-    msg.replyPreview ? msg.chatId : 0,
-    msg.replyPreview ? msg.replyToMessageId : 0,
-  );
   const ck = msg.contentKind;
   const isPhoto = ck === 'photo';
   const isVideo = ck === 'video' || ck === 'videoNote' || ck === 'animation';
   const isVoice = ck === 'voice';
   const hasMedia = isPhoto || isVideo || isVoice;
   const hasReactions = msg.reactions.length > 0;
-
-  const storeRecognizeSpeech = useChatStore((s) => s.recognizeSpeech);
-  const profilePhotos = useChatStore((s) => s.profilePhotos);
-  const linkPreviewThumbUrl = useChatStore((s) =>
-    msg.webPreview ? (s.thumbUrls[`${msg.chatId}_${msg.id}`] ?? null) : null,
-  );
-  const handleTranscribe = useCallback(() => {
-    storeRecognizeSpeech(msg.chatId, msg.id);
-  }, [msg.chatId, msg.id, storeRecognizeSpeech]);
 
   return (
     <PureBubble
@@ -351,17 +394,14 @@ function BubbleLayout({
         <p className="mb-0.5 text-xs font-medium text-accent-brand">{msg.senderName}</p>
       )}
       {msg.forwardFromName && (
-        <PureForwardHeader
-          fromName={msg.forwardFromName}
-          photoUrl={profilePhotos[msg.forwardFromPhotoId]}
-        />
+        <PureForwardHeader fromName={msg.forwardFromName} photoUrl={state.forwardPhotoUrl} />
       )}
       {msg.replyPreview ? (
         <PureReplyHeader
           senderName={msg.replyPreview.senderName}
           text={msg.replyPreview.quoteText || msg.replyPreview.text}
           mediaType={msg.replyPreview.mediaLabel}
-          mediaUrl={replyThumbUrl ?? undefined}
+          mediaUrl={state.replyThumbUrl ?? undefined}
           isOutgoing={msg.isOutgoing}
           onClick={() => onReplyClick?.(msg.replyToMessageId)}
         />
@@ -408,7 +448,7 @@ function BubbleLayout({
           fileSize={msg.voiceFileSize}
           speechStatus={msg.voiceSpeechStatus}
           speechText={msg.voiceSpeechText}
-          onTranscribe={handleTranscribe}
+          onTranscribe={() => state.onTranscribe?.(msg.chatId, msg.id)}
         />
       )}
       {!isPhoto && !isVideo && !isVoice && msg.mediaLabel && (
@@ -421,7 +461,11 @@ function BubbleLayout({
             hasMedia && 'mt-2',
           )}
         >
-          <FormattedText text={msg.text} entities={msg.entities} />
+          <PureFormattedText
+            text={msg.text}
+            entities={msg.entities}
+            customEmojiUrls={state.customEmojiUrls}
+          />
           <span
             className={cn('float-right h-[1.125rem]', msg.editDate > 0 ? 'w-[5.5rem]' : 'w-12')}
             aria-hidden="true"
@@ -436,7 +480,7 @@ function BubbleLayout({
             title: msg.webPreview.title,
             description: msg.webPreview.description,
             minithumbnail: msg.webPreview.minithumbnail,
-            thumbUrl: linkPreviewThumbUrl,
+            thumbUrl: state.linkPreviewThumbUrl,
             showLargeMedia: msg.webPreview.showLargeMedia,
             showMediaAboveDescription: msg.webPreview.showMediaAboveDescription,
           }}
@@ -494,7 +538,7 @@ function BubbleLayout({
 
 // --- Album layout ---
 
-function AlbumLayout({
+function PureAlbumLayout({
   state,
   groupPosition,
   onReact,
@@ -505,7 +549,6 @@ function AlbumLayout({
 }) {
   const { first, messages, bubbleVariant } = state;
   const hasReactions = first.reactions.length > 0;
-  const profilePhotos = useChatStore((s) => s.profilePhotos);
 
   return (
     <PureBubble
@@ -525,10 +568,7 @@ function AlbumLayout({
       )}
       {bubbleVariant === 'framed' && first.forwardFromName && (
         <div className="px-3">
-          <PureForwardHeader
-            fromName={first.forwardFromName}
-            photoUrl={profilePhotos[first.forwardFromPhotoId]}
-          />
+          <PureForwardHeader fromName={first.forwardFromName} photoUrl={state.forwardPhotoUrl} />
         </div>
       )}
       {bubbleVariant === 'framed' &&
@@ -553,11 +593,15 @@ function AlbumLayout({
             </div>
           )
         ))}
-      <AlbumGrid messages={messages} chatId={first.chatId} maxWidth={MAX_MEDIA_SIZE} />
+      <PureAlbumGrid messages={messages} albumMedia={state.albumMedia} maxWidth={MAX_MEDIA_SIZE} />
       {first.text && (
         <div className="px-3 py-1.5">
           <p className="whitespace-pre-wrap break-words tg-text-chat text-text-primary">
-            <FormattedText text={first.text} entities={first.entities} />
+            <PureFormattedText
+              text={first.text}
+              entities={first.entities}
+              customEmojiUrls={state.customEmojiUrls}
+            />
             <span
               className={cn('float-right h-[1.125rem]', first.editDate > 0 ? 'w-[5.5rem]' : 'w-12')}
               aria-hidden="true"

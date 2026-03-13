@@ -1,6 +1,5 @@
 import { PurePhotoView } from '@/components/ui/chat/PhotoView';
 import { PureVideoView } from '@/components/ui/chat/VideoView';
-import { useMedia } from '@/hooks/useMedia';
 import {
   ALBUM_SPACING,
   type Corners,
@@ -11,21 +10,21 @@ import {
 } from '@/lib/media-sizing';
 import type { UIMessage } from '@/lib/types';
 
-type AlbumGridProps = {
+type PureAlbumGridProps = {
   messages: UIMessage[];
-  chatId: number;
+  albumMedia?: Array<{ url: string | null; loading: boolean }>;
   maxWidth: number;
 };
 
-type AlbumCellProps = {
+type PureAlbumCellProps = {
   msg: UIMessage;
-  chatId: number;
+  url: string | null;
+  loading: boolean;
   geometry: Rect;
   corners: Corners;
 };
 
-function AlbumCell({ msg, chatId, geometry, corners }: AlbumCellProps) {
-  const { url, loading, retry } = useMedia(chatId, msg.id);
+function PureAlbumCell({ msg, url, loading, geometry, corners }: PureAlbumCellProps) {
   const lg = '12px';
   const none = '0px';
   const borderRadius = `${corners.topLeft ? lg : none} ${corners.topRight ? lg : none} ${corners.bottomRight ? lg : none} ${corners.bottomLeft ? lg : none}`;
@@ -44,27 +43,15 @@ function AlbumCell({ msg, chatId, geometry, corners }: AlbumCellProps) {
       }}
     >
       {isVideo ? (
-        <PureVideoView
-          url={url}
-          loading={loading}
-          isGif={msg.contentKind === 'animation'}
-          cover
-          onRetry={retry}
-        />
+        <PureVideoView url={url} loading={loading} isGif={msg.contentKind === 'animation'} cover />
       ) : (
-        <PurePhotoView
-          url={url}
-          loading={loading}
-          cover
-          onRetry={retry}
-          minithumbnail={msg.minithumbnail}
-        />
+        <PurePhotoView url={url} loading={loading} cover minithumbnail={msg.minithumbnail} />
       )}
     </div>
   );
 }
 
-export function AlbumGrid({ messages, chatId, maxWidth }: AlbumGridProps) {
+export function PureAlbumGrid({ messages, albumMedia, maxWidth }: PureAlbumGridProps) {
   const sizes = messages.map((m) => ({
     width: m.mediaWidth || 100,
     height: m.mediaHeight || 100,
@@ -87,10 +74,11 @@ export function AlbumGrid({ messages, chatId, maxWidth }: AlbumGridProps) {
         if (!item) return null;
         const corners = cornersFromSides(item.sides);
         return (
-          <AlbumCell
+          <PureAlbumCell
             key={msg.id}
             msg={msg}
-            chatId={chatId}
+            url={albumMedia?.[i]?.url ?? null}
+            loading={albumMedia?.[i]?.loading ?? false}
             geometry={item.geometry}
             corners={corners}
           />

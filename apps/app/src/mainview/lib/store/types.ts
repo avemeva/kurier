@@ -107,7 +107,6 @@ export interface ChatState {
   loadProfilePhoto: (chatId: number) => void;
   loadMedia: (chatId: number, messageId: number) => void;
   clearMediaUrl: (chatId: number, messageId: number) => void;
-  seedMedia: (urls: Record<string, string>) => void;
   loadFile: (fileId: number) => void;
   clearFileUrl: (fileId: number) => void;
   loadCustomEmojiUrl: (documentId: string) => void;
@@ -160,7 +159,6 @@ export const INITIAL_STATE: Omit<
   | 'loadProfilePhoto'
   | 'loadMedia'
   | 'clearMediaUrl'
-  | 'seedMedia'
   | 'loadFile'
   | 'clearFileUrl'
   | 'loadCustomEmojiUrl'

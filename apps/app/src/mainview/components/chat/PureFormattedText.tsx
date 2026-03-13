@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { PureStickerView } from '@/components/ui/chat/StickerView';
-import { useChatStore } from '@/lib/store';
 import type { UITextEntity } from '@/lib/types';
 
-function CustomEmoji({ documentId, fallback }: { documentId: string; fallback: string }) {
-  const info = useChatStore((s) => s.customEmojiUrls[documentId] ?? null);
-  const loadCustomEmojiUrl = useChatStore((s) => s.loadCustomEmojiUrl);
-
-  useEffect(() => {
-    loadCustomEmojiUrl(documentId);
-  }, [documentId, loadCustomEmojiUrl]);
+function CustomEmoji({
+  documentId,
+  fallback,
+  customEmojiUrls,
+}: {
+  documentId: string;
+  fallback: string;
+  customEmojiUrls?: Record<string, { url: string; format: 'webp' | 'tgs' | 'webm' } | null>;
+}) {
+  const info = customEmojiUrls?.[documentId] ?? null;
 
   if (!info) {
     return <span className="inline-block align-text-bottom">{fallback}</span>;
@@ -44,7 +46,15 @@ function SpoilerText({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function FormattedText({ text, entities }: { text: string; entities: UITextEntity[] }) {
+export function PureFormattedText({
+  text,
+  entities,
+  customEmojiUrls,
+}: {
+  text: string;
+  entities: UITextEntity[];
+  customEmojiUrls?: Record<string, { url: string; format: 'webp' | 'tgs' | 'webm' } | null>;
+}) {
   if (!entities || entities.length === 0) {
     return <>{text}</>;
   }
@@ -142,7 +152,12 @@ export function FormattedText({ text, entities }: { text: string; entities: UITe
         const customEmojiId = entity.customEmojiId;
         parts.push(
           customEmojiId ? (
-            <CustomEmoji key={key} documentId={customEmojiId} fallback={slice} />
+            <CustomEmoji
+              key={key}
+              documentId={customEmojiId}
+              fallback={slice}
+              customEmojiUrls={customEmojiUrls}
+            />
           ) : (
             <span key={key} className="inline-block align-text-bottom">
               {slice}

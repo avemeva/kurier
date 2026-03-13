@@ -1,7 +1,12 @@
 import type { InfoDisplayType } from '@/components/ui/chat/MessageTime';
 import type { UIMessage, UIMessageItem } from '@/lib/types';
 import { computeMediaSize, MAX_MEDIA_SIZE, MIN_MEDIA_SIZE } from '../lib/media-sizing';
-import { type MediaState, useMedia } from './useMedia';
+
+export type MediaState = {
+  url: string | null;
+  loading: boolean;
+  retry: (() => void) | undefined;
+};
 
 // --- Input types ---
 
@@ -14,6 +19,19 @@ export type MessageInput =
 export type MessageContext = {
   showSender: boolean;
   senderPhotoUrl?: string;
+};
+
+// --- Resolved props (passed from ChatView / store boundary) ---
+
+export type ResolvedProps = {
+  mediaUrl?: string | null;
+  mediaLoading?: boolean;
+  replyThumbUrl?: string | null;
+  forwardPhotoUrl?: string | null;
+  linkPreviewThumbUrl?: string | null;
+  onTranscribe?: (chatId: number, msgId: number) => void;
+  albumMedia?: Array<{ url: string | null; loading: boolean }>;
+  customEmojiUrls?: Record<string, { url: string; format: 'webp' | 'tgs' | 'webm' } | null>;
 };
 
 // --- Render state ---
@@ -54,6 +72,11 @@ export type BubbleRenderState = {
   displayWidth?: number;
   displayHeight?: number;
   minithumbnail?: string | null;
+  forwardPhotoUrl?: string;
+  replyThumbUrl?: string | null;
+  linkPreviewThumbUrl?: string | null;
+  onTranscribe?: (chatId: number, msgId: number) => void;
+  customEmojiUrls?: Record<string, { url: string; format: 'webp' | 'tgs' | 'webm' } | null>;
 };
 
 export type AlbumRenderState = {
@@ -64,6 +87,9 @@ export type AlbumRenderState = {
   showAvatar: boolean;
   showSenderName: boolean;
   senderPhotoUrl?: string;
+  forwardPhotoUrl?: string;
+  albumMedia?: Array<{ url: string | null; loading: boolean }>;
+  customEmojiUrls?: Record<string, { url: string; format: 'webp' | 'tgs' | 'webm' } | null>;
 };
 
 export type MediaRenderState = {
@@ -80,6 +106,8 @@ export type MediaRenderState = {
   showSenderName: boolean;
   displayType: InfoDisplayType;
   isMediaOnly: boolean;
+  forwardPhotoUrl?: string;
+  customEmojiUrls?: Record<string, { url: string; format: 'webp' | 'tgs' | 'webm' } | null>;
 };
 
 export type MessageRenderState =
@@ -118,20 +146,16 @@ function hasMediaContent(msg: UIMessage): boolean {
 
 const EMPTY_MEDIA: MediaState = { url: null, loading: false, retry: undefined };
 
-export function useMessage(input: MessageInput, ctx: MessageContext): MessageRenderState {
-  // For albums, no per-message media needed at this level (AlbumGrid handles it)
-  // For single messages, we may need media
-  const singleMsg =
-    input.kind === 'single' && !('isPending' in input.message)
-      ? (input.message as UIMessage)
-      : null;
-
-  const needsMedia = singleMsg ? hasMediaContent(singleMsg) : false;
-  const media = useMedia(
-    needsMedia && singleMsg ? singleMsg.chatId : 0,
-    needsMedia && singleMsg ? singleMsg.id : 0,
-  );
-  const resolvedMedia = needsMedia ? media : EMPTY_MEDIA;
+export function computeMessageState(
+  input: MessageInput,
+  ctx: MessageContext,
+  resolved: ResolvedProps,
+): MessageRenderState {
+  // Construct MediaState from resolved props
+  const resolvedMedia: MediaState =
+    resolved.mediaUrl !== undefined
+      ? { url: resolved.mediaUrl, loading: resolved.mediaLoading ?? false, retry: undefined }
+      : EMPTY_MEDIA;
 
   // --- Album ---
   if (input.kind === 'album') {
@@ -148,6 +172,9 @@ export function useMessage(input: MessageInput, ctx: MessageContext): MessageRen
       showAvatar,
       showSenderName,
       senderPhotoUrl: ctx.senderPhotoUrl,
+      forwardPhotoUrl: resolved.forwardPhotoUrl ?? undefined,
+      albumMedia: resolved.albumMedia,
+      customEmojiUrls: resolved.customEmojiUrls,
     };
   }
 
@@ -242,6 +269,8 @@ export function useMessage(input: MessageInput, ctx: MessageContext): MessageRen
       showSenderName,
       displayType: msg.text ? 'default' : 'image',
       isMediaOnly: !msg.text,
+      forwardPhotoUrl: resolved.forwardPhotoUrl ?? undefined,
+      customEmojiUrls: resolved.customEmojiUrls,
     };
   }
 
@@ -262,6 +291,8 @@ export function useMessage(input: MessageInput, ctx: MessageContext): MessageRen
     bubbleDisplayHeight = sized.height;
   }
 
+  const needsMedia = hasMediaContent(msg);
+
   return {
     layout: 'bubble',
     msg,
@@ -274,5 +305,10 @@ export function useMessage(input: MessageInput, ctx: MessageContext): MessageRen
     displayWidth: bubbleDisplayWidth,
     displayHeight: bubbleDisplayHeight,
     minithumbnail: isPhoto || isVideo ? msg.minithumbnail : undefined,
+    forwardPhotoUrl: resolved.forwardPhotoUrl ?? undefined,
+    replyThumbUrl: resolved.replyThumbUrl,
+    linkPreviewThumbUrl: resolved.linkPreviewThumbUrl,
+    onTranscribe: resolved.onTranscribe,
+    customEmojiUrls: resolved.customEmojiUrls,
   };
 }

@@ -1040,10 +1040,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     });
   },
 
-  seedMedia: (urls: Record<string, string>) => {
-    set((s) => ({ mediaUrls: { ...s.mediaUrls, ...urls } }));
-  },
-
   loadFile: (fileId: number) => {
     if (!requests.track('file', fileId)) return;
     downloadFileById(fileId).then((url) => {

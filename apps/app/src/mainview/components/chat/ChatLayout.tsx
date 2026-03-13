@@ -3,8 +3,8 @@ import { useChatStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 import { ChatHeader } from './ChatHeader';
 import { ChatSidebar } from './ChatSidebar';
+import { ChatView } from './ChatView';
 import { ComposeSearchTopBar, useChatSearchKeyboard } from './ComposeSearch';
-import { MessagePanel } from './MessagePanel';
 
 export function ChatLayout({ onLogout }: { onLogout: () => void }) {
   const loadDialogs = useChatStore((s) => s.loadDialogs);
@@ -30,7 +30,7 @@ export function ChatLayout({ onLogout }: { onLogout: () => void }) {
 
       <div className={cn('flex-1 flex-col', selectedChatId ? 'flex' : 'hidden md:flex')}>
         {isChatSearch ? <ComposeSearchTopBar /> : <ChatHeader />}
-        <MessagePanel />
+        <ChatView />
       </div>
 
       {error && (

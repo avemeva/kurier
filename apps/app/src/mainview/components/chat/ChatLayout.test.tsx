@@ -56,15 +56,15 @@ vi.mock('@/lib/types', async () => {
 });
 
 // Mock child components that do heavy lifting
-vi.mock('./AlbumGrid', () => ({
-  AlbumGrid: () => null,
+vi.mock('./PureAlbumGrid', () => ({
+  PureAlbumGrid: () => null,
 }));
 vi.mock('./EmojiStatusBadge', () => ({ EmojiStatusBadge: () => null }));
-vi.mock('./FormattedText', () => ({
-  FormattedText: ({ text }: { text: string }) => <span>{text}</span>,
+vi.mock('./PureFormattedText', () => ({
+  PureFormattedText: ({ text }: { text: string }) => <span>{text}</span>,
 }));
-vi.mock('./Message', () => ({
-  Message: ({ input }: { input: { kind: string; message?: { isRead?: boolean } } }) => {
+vi.mock('./PureMessageRow', () => ({
+  PureMessageRow: ({ input }: { input: { kind: string; message?: { isRead?: boolean } } }) => {
     const msg = input.kind === 'single' ? input.message : undefined;
     return <div data-testid="bubble" data-read={msg?.isRead ?? false} />;
   },

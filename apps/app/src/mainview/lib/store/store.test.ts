@@ -2210,7 +2210,7 @@ describe('loadMoreChats', () => {
   });
 });
 
-// --- loadMedia / clearMediaUrl / seedMedia ---
+// --- loadMedia / clearMediaUrl ---
 
 describe('loadMedia', () => {
   it('calls downloadMedia and stores URL', async () => {
@@ -2235,14 +2235,6 @@ describe('clearMediaUrl', () => {
     useChatStore.getState().clearMediaUrl(42, 10);
     expect(useChatStore.getState().mediaUrls['42_10']).toBeUndefined();
     expect(clearMediaCache).toHaveBeenCalledWith(10);
-  });
-});
-
-describe('seedMedia', () => {
-  it('merges URLs into mediaUrls', () => {
-    useChatStore.setState({ mediaUrls: { a: 'x' } });
-    useChatStore.getState().seedMedia({ b: 'y' });
-    expect(useChatStore.getState().mediaUrls).toEqual({ a: 'x', b: 'y' });
   });
 });
 
