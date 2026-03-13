@@ -1,21 +1,15 @@
 import { ArrowLeft, Bookmark, Search, Star } from 'lucide-react';
-import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { PureStatusText } from '@/components/ui/chat/StatusText';
 import { UserAvatar } from '@/components/ui/user-avatar';
-import { selectHeaderStatus, selectSelectedChat, useChatStore } from '@/lib/store';
-import { toUIUser } from '@/lib/types';
+import { selectHeaderStatus, selectSelectedChat, useChatStore } from '@/data';
 import { EmojiStatusBadge } from './EmojiStatusBadge';
 
 export function ChatHeader() {
   const selectedChat = useChatStore(selectSelectedChat);
   const headerStatus = useChatStore(selectHeaderStatus);
   const openChatSearch = useChatStore((s) => s.openChatSearch);
-  const userId = selectedChat?.userId ?? 0;
-  const rawUser = useChatStore((s) => (userId ? s.users.get(userId) : undefined));
-  const user = useMemo(() => (rawUser ? toUIUser(rawUser) : null), [rawUser]);
-  const avatarId = selectedChat?.userId || selectedChat?.id;
-  const avatarSrc = useChatStore((s) => (avatarId ? s.profilePhotos[avatarId] : undefined));
+  const user = selectedChat?.user ?? null;
 
   if (!selectedChat) return null;
 
@@ -35,7 +29,11 @@ export function ChatHeader() {
           <Bookmark size={16} className="fill-current" />
         </div>
       ) : (
-        <UserAvatar name={selectedChat.title} src={avatarSrc} className="size-8 text-sm" />
+        <UserAvatar
+          name={selectedChat.title}
+          src={selectedChat.avatarUrl}
+          className="size-8 text-sm"
+        />
       )}
       <div className="flex-1">
         <h2

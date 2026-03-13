@@ -1,8 +1,8 @@
 import { ArrowLeft, ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { useChatStore } from '@/data';
 import { log } from '@/lib/log';
-import { useChatStore } from '@/lib/store';
 
 const DEBOUNCE_MS = 900;
 

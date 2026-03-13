@@ -1,5 +1,5 @@
 import type { InfoDisplayType } from '@/components/ui/chat/MessageTime';
-import type { UIMessage, UIMessageItem } from '@/lib/types';
+import type { UIContent, UIMessage, UIMessageBase } from '@/data';
 import { computeMediaSize, MAX_MEDIA_SIZE, MIN_MEDIA_SIZE } from '../lib/media-sizing';
 
 export type MediaState = {
@@ -8,30 +8,10 @@ export type MediaState = {
   retry: (() => void) | undefined;
 };
 
-// --- Input types ---
-
-export type MessageInput =
-  | { kind: 'single'; message: UIMessageItem }
-  | { kind: 'album'; messages: UIMessage[] };
-
 // --- Context from parent ---
 
 export type MessageContext = {
   showSender: boolean;
-  senderPhotoUrl?: string;
-};
-
-// --- Resolved props (passed from ChatView / store boundary) ---
-
-export type ResolvedProps = {
-  mediaUrl?: string | null;
-  mediaLoading?: boolean;
-  replyThumbUrl?: string | null;
-  forwardPhotoUrl?: string | null;
-  linkPreviewThumbUrl?: string | null;
-  onTranscribe?: (chatId: number, msgId: number) => void;
-  albumMedia?: Array<{ url: string | null; loading: boolean }>;
-  customEmojiUrls?: Record<string, { url: string; format: 'webp' | 'tgs' | 'webm' } | null>;
 };
 
 // --- Render state ---
@@ -52,62 +32,42 @@ export type PendingRenderState = {
 
 export type StickerRenderState = {
   layout: 'sticker';
-  msg: UIMessage;
-  media: MediaState;
+  msg: UIMessageBase & { kind: 'message' };
+  stickerUrl: string | undefined;
+  stickerFormat: 'webp' | 'tgs' | 'webm';
+  stickerEmoji: string;
   displayWidth: number;
   displayHeight: number;
   showAvatar: boolean;
-  senderPhotoUrl?: string;
 };
 
 export type BubbleRenderState = {
   layout: 'bubble';
-  msg: UIMessage;
-  media: MediaState | null;
+  msg: UIMessageBase & { kind: 'message' };
   displayType: InfoDisplayType;
-  isMediaOnly: boolean;
   showAvatar: boolean;
   showSenderName: boolean;
-  senderPhotoUrl?: string;
-  displayWidth?: number;
-  displayHeight?: number;
-  minithumbnail?: string | null;
-  forwardPhotoUrl?: string;
-  replyThumbUrl?: string | null;
-  linkPreviewThumbUrl?: string | null;
   onTranscribe?: (chatId: number, msgId: number) => void;
-  customEmojiUrls?: Record<string, { url: string; format: 'webp' | 'tgs' | 'webm' } | null>;
-};
-
-export type AlbumRenderState = {
-  layout: 'album';
-  messages: UIMessage[];
-  first: UIMessage;
-  bubbleVariant: 'media' | 'framed';
-  showAvatar: boolean;
-  showSenderName: boolean;
-  senderPhotoUrl?: string;
-  forwardPhotoUrl?: string;
-  albumMedia?: Array<{ url: string | null; loading: boolean }>;
-  customEmojiUrls?: Record<string, { url: string; format: 'webp' | 'tgs' | 'webm' } | null>;
 };
 
 export type MediaRenderState = {
   layout: 'media';
-  msg: UIMessage;
-  media: MediaState;
+  msg: UIMessageBase & { kind: 'message' };
   bubbleVariant: 'media' | 'framed';
   displayWidth: number;
   displayHeight: number;
-  minithumbnail: string | null;
   showAvatar: boolean;
-  senderName?: string;
-  senderPhotoUrl?: string;
   showSenderName: boolean;
   displayType: InfoDisplayType;
   isMediaOnly: boolean;
-  forwardPhotoUrl?: string;
-  customEmojiUrls?: Record<string, { url: string; format: 'webp' | 'tgs' | 'webm' } | null>;
+};
+
+export type AlbumRenderState = {
+  layout: 'album';
+  msg: UIMessageBase & { kind: 'message' };
+  bubbleVariant: 'media' | 'framed';
+  showAvatar: boolean;
+  showSenderName: boolean;
 };
 
 export type MessageRenderState =
@@ -120,69 +80,43 @@ export type MessageRenderState =
 
 // --- Display type logic ---
 
-function getDisplayType(msg: UIMessage): InfoDisplayType {
-  const ck = msg.contentKind;
-  if (ck === 'sticker') return 'background';
-  if (ck === 'photo' || ck === 'video' || ck === 'videoNote' || ck === 'animation') {
-    if (msg.text) return 'default';
+function getDisplayType(content: UIContent, hasText: boolean): InfoDisplayType {
+  if (content.kind === 'sticker') return 'background';
+  if (
+    content.kind === 'photo' ||
+    content.kind === 'video' ||
+    content.kind === 'videoNote' ||
+    content.kind === 'animation'
+  ) {
+    if (hasText) return 'default';
     return 'image';
   }
   return 'default';
 }
 
-function hasMediaContent(msg: UIMessage): boolean {
-  const ck = msg.contentKind;
-  return (
-    ck === 'photo' ||
-    ck === 'video' ||
-    ck === 'videoNote' ||
-    ck === 'animation' ||
-    ck === 'sticker' ||
-    ck === 'voice'
-  );
+function getContentText(content: UIContent): string {
+  switch (content.kind) {
+    case 'text':
+      return content.text;
+    case 'photo':
+    case 'video':
+    case 'animation':
+    case 'album':
+      return content.caption?.text ?? '';
+    default:
+      return '';
+  }
 }
 
-// --- Hook ---
-
-const EMPTY_MEDIA: MediaState = { url: null, loading: false, retry: undefined };
+// --- computeMessageState ---
 
 export function computeMessageState(
-  input: MessageInput,
+  msg: UIMessage,
   ctx: MessageContext,
-  resolved: ResolvedProps,
+  onTranscribe?: (chatId: number, msgId: number) => void,
 ): MessageRenderState {
-  // Construct MediaState from resolved props
-  const resolvedMedia: MediaState =
-    resolved.mediaUrl !== undefined
-      ? { url: resolved.mediaUrl, loading: resolved.mediaLoading ?? false, retry: undefined }
-      : EMPTY_MEDIA;
-
-  // --- Album ---
-  if (input.kind === 'album') {
-    const first = input.messages[0];
-    const showAvatar = ctx.showSender && !first.isOutgoing;
-    const showSenderName = ctx.showSender && !first.isOutgoing;
-    const needsBubble =
-      !!first.text || !!first.replyToMessageId || !!first.forwardFromName || showSenderName;
-    return {
-      layout: 'album',
-      messages: input.messages,
-      first,
-      bubbleVariant: needsBubble ? 'framed' : 'media',
-      showAvatar,
-      showSenderName,
-      senderPhotoUrl: ctx.senderPhotoUrl,
-      forwardPhotoUrl: resolved.forwardPhotoUrl ?? undefined,
-      albumMedia: resolved.albumMedia,
-      customEmojiUrls: resolved.customEmojiUrls,
-    };
-  }
-
-  // --- Single message ---
-  const msg = input.message;
-
   // Pending
-  if ('isPending' in msg) {
+  if (msg.kind === 'pending') {
     return {
       layout: 'pending',
       localId: msg.localId,
@@ -193,23 +127,27 @@ export function computeMessageState(
   }
 
   // Service
-  if (msg.serviceText) {
+  if (msg.kind === 'service') {
     return {
       layout: 'service',
-      text: msg.serviceText,
-      pinnedMessageId: msg.servicePinnedMessageId,
+      text: msg.text,
+      pinnedMessageId: msg.pinnedMessageId,
     };
   }
 
+  // Regular message (kind === 'message')
+  const content = msg.content;
+  const text = getContentText(content);
+
   // Sticker
-  if (msg.contentKind === 'sticker') {
+  if (content.kind === 'sticker') {
     const STICKER_MAX_SIZE = 224;
     let stickerW: number;
     let stickerH: number;
-    if (msg.mediaWidth > 0 && msg.mediaHeight > 0) {
+    if (content.width > 0 && content.height > 0) {
       const sized = computeMediaSize(
-        msg.mediaWidth,
-        msg.mediaHeight,
+        content.width,
+        content.height,
         STICKER_MAX_SIZE,
         MIN_MEDIA_SIZE,
       );
@@ -222,29 +160,42 @@ export function computeMessageState(
     return {
       layout: 'sticker',
       msg,
-      media: resolvedMedia,
+      stickerUrl: content.url,
+      stickerFormat: content.format,
+      stickerEmoji: content.emoji,
       displayWidth: stickerW,
       displayHeight: stickerH,
       showAvatar: ctx.showSender && !msg.isOutgoing,
-      senderPhotoUrl: ctx.senderPhotoUrl,
     };
   }
 
-  // Media layout (photos, videos, animations — NOT videoNote which is circular)
-  const ck = msg.contentKind;
-  if (ck === 'photo' || ck === 'video' || ck === 'animation') {
+  // Album
+  if (content.kind === 'album') {
     const showAvatar = ctx.showSender && !msg.isOutgoing;
     const showSenderName = ctx.showSender && !msg.isOutgoing;
-    const needsBubble =
-      !!msg.text || !!msg.replyToMessageId || !!msg.forwardFromName || showSenderName;
+    const needsBubble = !!text || !!msg.replyTo || !!msg.forward || showSenderName;
+    return {
+      layout: 'album',
+      msg,
+      bubbleVariant: needsBubble ? 'framed' : 'media',
+      showAvatar,
+      showSenderName,
+    };
+  }
+
+  // Media layout (photos, videos, animations — NOT videoNote which goes to bubble)
+  if (content.kind === 'photo' || content.kind === 'video' || content.kind === 'animation') {
+    const showAvatar = ctx.showSender && !msg.isOutgoing;
+    const showSenderName = ctx.showSender && !msg.isOutgoing;
+    const needsBubble = !!text || !!msg.replyTo || !!msg.forward || showSenderName;
     const bubbleVariant = needsBubble ? 'framed' : 'media';
 
     let displayWidth: number;
     let displayHeight: number;
-    if (msg.mediaWidth > 0 && msg.mediaHeight > 0) {
+    if (content.media.width > 0 && content.media.height > 0) {
       const sized = computeMediaSize(
-        msg.mediaWidth,
-        msg.mediaHeight,
+        content.media.width,
+        content.media.height,
         MAX_MEDIA_SIZE,
         MIN_MEDIA_SIZE,
       );
@@ -258,57 +209,23 @@ export function computeMessageState(
     return {
       layout: 'media',
       msg,
-      media: resolvedMedia,
       bubbleVariant,
       displayWidth,
       displayHeight,
-      minithumbnail: msg.minithumbnail,
       showAvatar,
-      senderName: msg.senderName,
-      senderPhotoUrl: ctx.senderPhotoUrl,
       showSenderName,
-      displayType: msg.text ? 'default' : 'image',
-      isMediaOnly: !msg.text,
-      forwardPhotoUrl: resolved.forwardPhotoUrl ?? undefined,
-      customEmojiUrls: resolved.customEmojiUrls,
+      displayType: text ? 'default' : 'image',
+      isMediaOnly: !text,
     };
   }
 
-  // Regular bubble
-  const isPhoto = msg.contentKind === 'photo';
-  const isVideo =
-    msg.contentKind === 'video' ||
-    msg.contentKind === 'videoNote' ||
-    msg.contentKind === 'animation';
-  const isMediaOnly = (isPhoto || isVideo) && !msg.text;
-
-  // Compute dimensions for photos/videos in bubble layout (defensive — prevents layout shift)
-  let bubbleDisplayWidth: number | undefined;
-  let bubbleDisplayHeight: number | undefined;
-  if ((isPhoto || isVideo) && msg.mediaWidth > 0 && msg.mediaHeight > 0) {
-    const sized = computeMediaSize(msg.mediaWidth, msg.mediaHeight, MAX_MEDIA_SIZE, MIN_MEDIA_SIZE);
-    bubbleDisplayWidth = sized.width;
-    bubbleDisplayHeight = sized.height;
-  }
-
-  const needsMedia = hasMediaContent(msg);
-
+  // Regular bubble (text, voice, videoNote, document, unsupported)
   return {
     layout: 'bubble',
     msg,
-    media: needsMedia ? resolvedMedia : null,
-    displayType: getDisplayType(msg),
-    isMediaOnly,
+    displayType: getDisplayType(content, !!text),
     showAvatar: ctx.showSender && !msg.isOutgoing,
     showSenderName: ctx.showSender && !msg.isOutgoing,
-    senderPhotoUrl: ctx.senderPhotoUrl,
-    displayWidth: bubbleDisplayWidth,
-    displayHeight: bubbleDisplayHeight,
-    minithumbnail: isPhoto || isVideo ? msg.minithumbnail : undefined,
-    forwardPhotoUrl: resolved.forwardPhotoUrl ?? undefined,
-    replyThumbUrl: resolved.replyThumbUrl,
-    linkPreviewThumbUrl: resolved.linkPreviewThumbUrl,
-    onTranscribe: resolved.onTranscribe,
-    customEmojiUrls: resolved.customEmojiUrls,
+    onTranscribe,
   };
 }

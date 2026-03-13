@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Td } from '@/lib/types';
+import type { Td } from './types';
 
 // Mock @tg/protocol before importing telegram module
 const {
@@ -36,7 +36,7 @@ vi.mock('@tg/protocol', () => ({
 }));
 
 // Mock log
-vi.mock('./log', () => {
+vi.mock('../lib/log', () => {
   const noop = () => {};
   return {
     log: { debug: noop, info: noop, warn: noop, error: noop },

@@ -1,4 +1,8 @@
-## Store Responsibilities
+## Utilities
+
+This directory contains presentation utilities (format, log, markdown, media-sizing, scroll, theme, utils). The data layer (store, types, telegram, session) has moved to `@/data` — see `data/CLAUDE.md`.
+
+## Store Responsibilities (reference — store now lives in `data/store/`)
 
 The store is the application state machine between TDLib and the UI.
 

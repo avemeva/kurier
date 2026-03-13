@@ -10,8 +10,8 @@
  */
 
 import { TelegramClient } from '@tg/protocol';
-import type { PeerInfo, SearchResultMessage, Td, TelegramUpdateEvent } from '@/lib/types';
-import { telegramLog } from './log';
+import { telegramLog } from '../lib/log';
+import type { PeerInfo, SearchResultMessage, Td, TelegramUpdateEvent } from './types';
 
 // --- TelegramClient instance (same-origin in dev, Vite proxies /api/tg → daemon) ---
 
@@ -133,7 +133,7 @@ export async function isAuthorized(): Promise<boolean> {
 
 // --- Data types ---
 
-export type { SearchResultMessage, TelegramUpdateEvent } from '@/lib/types';
+export type { SearchResultMessage, TelegramUpdateEvent } from './types';
 
 export type { PeerInfo } from './types/ui';
 
@@ -1115,7 +1115,7 @@ export async function searchContacts(
 
 // --- Formatting ---
 
-export { formatLastSeen, formatTime } from './format';
+export { formatLastSeen, formatTime } from '../lib/format';
 
 // --- TDLib message utilities ---
 

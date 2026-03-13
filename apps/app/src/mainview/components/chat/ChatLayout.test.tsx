@@ -1,6 +1,6 @@
 import { act, render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Td } from '@/lib/types';
+import type { Td } from '@/data';
 
 // Mock modules before importing store
 vi.mock('@/lib/log', () => {
@@ -11,7 +11,7 @@ vi.mock('@/lib/log', () => {
   };
 });
 
-vi.mock('@/lib/telegram', () => ({
+vi.mock('@/data/telegram', () => ({
   getDialogs: vi.fn(),
   getMessages: vi.fn(),
   getProfilePhotoUrl: vi.fn(() => Promise.resolve(null)),
@@ -47,14 +47,6 @@ vi.mock('@/lib/telegram', () => ({
   getMe: vi.fn(() => Promise.resolve({ id: 42, first_name: 'Test' })),
 }));
 
-vi.mock('@/lib/types', async () => {
-  const actual = await vi.importActual('@/lib/types');
-  return {
-    ...actual,
-    groupUIMessages: (items: unknown[]) => items.map((m) => ({ type: 'single', message: m })),
-  };
-});
-
 // Mock child components that do heavy lifting
 vi.mock('./PureAlbumGrid', () => ({
   PureAlbumGrid: () => null,
@@ -64,13 +56,13 @@ vi.mock('./PureFormattedText', () => ({
   PureFormattedText: ({ text }: { text: string }) => <span>{text}</span>,
 }));
 vi.mock('./PureMessageRow', () => ({
-  PureMessageRow: ({ input }: { input: { kind: string; message?: { isRead?: boolean } } }) => {
-    const msg = input.kind === 'single' ? input.message : undefined;
-    return <div data-testid="bubble" data-read={msg?.isRead ?? false} />;
+  PureMessageRow: ({ msg }: { msg: { kind: string; isRead?: boolean } }) => {
+    const isRead = msg.kind === 'message' ? (msg.isRead ?? false) : false;
+    return <div data-testid="bubble" data-read={isRead} />;
   },
 }));
 
-import { _resetForTests, useChatStore } from '@/lib/store';
+import { _resetForTests, useChatStore } from '@/data';
 import { ChatLayout } from './ChatLayout';
 
 function makeChat(overrides: Partial<Td.chat> = {}): Td.chat {

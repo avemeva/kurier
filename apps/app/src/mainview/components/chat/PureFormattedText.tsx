@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { PureStickerView } from '@/components/ui/chat/StickerView';
-import type { UITextEntity } from '@/lib/types';
+import type { UITextEntity } from '@/data';
 
 function CustomEmoji({
   documentId,

@@ -25,16 +25,17 @@ import { PureTypingIndicator } from '@/components/ui/chat/TypingIndicator';
 import { Separator } from '@/components/ui/separator';
 import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import { UserAvatar } from '@/components/ui/user-avatar';
-import { formatTime } from '@/lib/format';
-import { log } from '@/lib/log';
+import type { PeerInfo, UIChat, UISearchResult } from '@/data';
 import {
-  actionLabel,
+  selectContactPhotos,
   selectSearchResults,
   selectUIArchivedChats,
   selectUIChats,
   useChatStore,
-} from '@/lib/store';
-import type { PeerInfo, UIChat, UISearchResult } from '@/lib/types';
+  useSidebarPhotoLoader,
+} from '@/data';
+import { formatTime } from '@/lib/format';
+import { log } from '@/lib/log';
 import { cn } from '@/lib/utils';
 import { EmojiStatusBadge } from './EmojiStatusBadge';
 
@@ -98,7 +99,8 @@ const MEDIA_ICON_KINDS = {
   document: FileText,
 } as const;
 
-function ChatPreviewLine({ chat, thumbUrl }: { chat: UIChat; thumbUrl: string | null }) {
+function ChatPreviewLine({ chat }: { chat: UIChat }) {
+  const thumbUrl = chat.lastMessageThumbUrl;
   if (chat.draftText) {
     return (
       <span
@@ -339,10 +341,6 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
   const chats = useChatStore(selectUIChats);
   const archivedChats = useChatStore(selectUIArchivedChats);
   const selectedChatId = useChatStore((s) => s.selectedChatId);
-  const profilePhotos = useChatStore((s) => s.profilePhotos);
-  const thumbUrls = useChatStore((s) => s.thumbUrls);
-  const typingByChat = useChatStore((s) => s.typingByChat);
-  const users = useChatStore((s) => s.users);
   const loadingDialogs = useChatStore((s) => s.loadingDialogs);
   const loadingMoreChats = useChatStore((s) => s.loadingMoreChats);
   const loadingMoreArchivedChats = useChatStore((s) => s.loadingMoreArchivedChats);
@@ -354,9 +352,9 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
   const searchLoading = useChatStore((s) => s.searchLoading);
   const contactResults = useChatStore((s) => s.contactResults);
   const contactsLoading = useChatStore((s) => s.contactsLoading);
+  const contactPhotos = useChatStore(selectContactPhotos);
 
   const openChatById = useChatStore((s) => s.openChatById);
-  const loadProfilePhoto = useChatStore((s) => s.loadProfilePhoto);
   const openGlobalSearch = useChatStore((s) => s.openGlobalSearch);
   const closeGlobalSearch = useChatStore((s) => s.closeGlobalSearch);
   const setSearchQuery = useChatStore((s) => s.setSearchQuery);
@@ -375,15 +373,9 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
     return allChats.filter((c) => c.title.toLowerCase().includes(q)).slice(0, 10);
   }, [searchQuery, chats, archivedChats]);
 
-  // Load profile photos. Uses raw chats (not UIChats) to avoid the cycle:
-  // photo loads → profilePhotos change → selectUIChats recomputes → useEffect fires → repeat.
-  const rawChats = useChatStore((s) => (tab === 'all' ? s.chats : s.archivedChats));
-  // biome-ignore lint/correctness/useExhaustiveDependencies: loadProfilePhoto deduplicates internally
-  useEffect(() => {
-    for (const c of rawChats) {
-      loadProfilePhoto(c.id);
-    }
-  }, [rawChats]);
+  // Trigger profile photo loading for sidebar chats without avatars.
+  // Uses imperative getState() internally to avoid re-render cycles.
+  useSidebarPhotoLoader(displayedChats);
 
   // Focus search input when search mode opens
   useEffect(() => {
@@ -573,7 +565,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
           messageResults={searchResults}
           searchLoading={searchLoading}
           contactsLoading={contactsLoading}
-          profilePhotos={profilePhotos}
+          profilePhotos={contactPhotos}
           onSelectChat={handleSelectChat}
           onSelectPeer={handleSelectPeer}
           onSelectMessage={handleSelectMessage}
@@ -679,37 +671,10 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
                       )}
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                      {typingByChat[chat.id] && Object.keys(typingByChat[chat.id]).length > 0 ? (
-                        <PureTypingIndicator
-                          text={
-                            chat.kind === 'basicGroup' || chat.kind === 'supergroup'
-                              ? (() => {
-                                  const typerIds = Object.keys(typingByChat[chat.id]);
-                                  const entries = typerIds.map((uid) => ({
-                                    name: users.get(Number(uid))?.first_name ?? 'Someone',
-                                    label: actionLabel(typingByChat[chat.id][Number(uid)].action),
-                                  }));
-                                  const byLabel = new Map<string, string[]>();
-                                  for (const e of entries) {
-                                    const arr = byLabel.get(e.label);
-                                    if (arr) arr.push(e.name);
-                                    else byLabel.set(e.label, [e.name]);
-                                  }
-                                  const parts: string[] = [];
-                                  for (const [label, names] of byLabel) {
-                                    const verb = names.length === 1 ? 'is' : 'are';
-                                    parts.push(`${names.join(', ')} ${verb} ${label}`);
-                                  }
-                                  return parts.join(', ');
-                                })()
-                              : actionLabel(Object.values(typingByChat[chat.id])[0].action)
-                          }
-                        />
+                      {chat.typingText ? (
+                        <PureTypingIndicator text={chat.typingText} />
                       ) : (
-                        <ChatPreviewLine
-                          chat={chat}
-                          thumbUrl={thumbUrls[`${chat.id}_${chat.lastMessageId}`] ?? null}
-                        />
+                        <ChatPreviewLine chat={chat} />
                       )}
                       <div className="flex shrink-0 items-center gap-1">
                         {chat.isPinned &&

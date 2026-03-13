@@ -1,13 +1,6 @@
-import type { Td, UIChatContext, UIMessageItem, UISearchResult, UIUser } from '@/lib/types';
-import {
-  enrichReplyPreviews,
-  toUIChat,
-  toUIMessage,
-  toUIPendingMessage,
-  toUISearchResult,
-  toUIUser,
-} from '@/lib/types';
-import { formatLastSeen } from '../format';
+import { formatLastSeen } from '../../lib/format';
+import type { Td, UIChatContext, UIMessage, UISearchResult, UIUser } from '../types';
+import { groupAndConvert, hydrateMessage, toUIChat, toUISearchResult, toUIUser } from '../types';
 import { createSelector } from './create-selector';
 import type { ChatState, HeaderStatus } from './types';
 
@@ -15,10 +8,10 @@ import type { ChatState, HeaderStatus } from './types';
 // Constants
 // ---------------------------------------------------------------------------
 
-const EMPTY_UI_MESSAGES: UIMessageItem[] = [];
+const EMPTY_UI_MESSAGES: UIMessage[] = [];
 
 // ---------------------------------------------------------------------------
-// selectChatMessages — PURE, no side effects
+// selectChatMessages — compositional UIMessage[], no side effects
 // ---------------------------------------------------------------------------
 
 export const selectChatMessages = createSelector(
@@ -31,6 +24,10 @@ export const selectChatMessages = createSelector(
         null,
         null as Map<number, Td.user> | null,
         0,
+        null,
+        null,
+        null,
+        null,
         null,
         null,
         null,
@@ -50,6 +47,10 @@ export const selectChatMessages = createSelector(
       s.pinnedPreviews,
       s.chats,
       s.archivedChats,
+      s.mediaUrls,
+      s.thumbUrls,
+      s.profilePhotos,
+      s.customEmojiUrls,
     ] as const;
   },
   ([
@@ -62,112 +63,29 @@ export const selectChatMessages = createSelector(
     pinnedPreviews,
     chats,
     archivedChats,
+    mediaUrls,
+    thumbUrls,
+    profilePhotos,
+    customEmojiUrls,
   ]) => {
     if (!chatId || !real || !users) return EMPTY_UI_MESSAGES;
 
     const allChats = [...(chats ?? []), ...(archivedChats ?? [])];
-    const converted = enrichReplyPreviews(
-      real.map((msg: Td.message) => toUIMessage(msg, users, lastReadOutboxId, allChats)),
+    const messages = groupAndConvert(real, pending ?? [], users, lastReadOutboxId, allChats);
+
+    // Hydrate all messages with media URLs
+    return messages.map((m) =>
+      hydrateMessage(
+        m,
+        mediaUrls ?? {},
+        thumbUrls ?? {},
+        profilePhotos ?? {},
+        customEmojiUrls ?? {},
+        replyPreviews ?? {},
+        pinnedPreviews ?? {},
+      ),
     );
-
-    // Backfill cached reply previews (pure — reads from store state, no fetches)
-    for (const m of converted) {
-      if (m.replyToMessageId === 0) continue;
-      if (m.replyPreview) continue;
-      const key = `${m.chatId}_${m.replyToMessageId}`;
-      const cached = replyPreviews?.[key];
-      if (cached) {
-        m.replyPreview = { ...cached, quoteText: m.replyQuoteText || cached.quoteText };
-      }
-    }
-
-    // Backfill cached pinned previews (pure)
-    for (let i = 0; i < converted.length; i++) {
-      const m = converted[i];
-      if (m.servicePinnedMessageId === 0) continue;
-      const key = `${m.chatId}_${m.servicePinnedMessageId}`;
-      const cached = pinnedPreviews?.[key];
-      if (typeof cached === 'string') {
-        const text = m.senderName ? `${m.senderName} pinned ${cached}` : `pinned ${cached}`;
-        converted[i] = { ...m, serviceText: text };
-      } else if (cached === null) {
-        const fallback = m.senderName ? `${m.senderName} pinned a message` : 'pinned a message';
-        converted[i] = { ...m, serviceText: fallback };
-      }
-      // cached === undefined → not yet resolved. Component's useEffect will trigger the fetch.
-    }
-
-    const uiMessages: UIMessageItem[] = converted;
-    if (pending?.length) {
-      for (const p of pending) uiMessages.push(toUIPendingMessage(p));
-    }
-
-    return uiMessages.length > 0 ? uiMessages : EMPTY_UI_MESSAGES;
   },
-);
-
-// ---------------------------------------------------------------------------
-// selectUnresolvedReplies — tells the component what to fetch
-// ---------------------------------------------------------------------------
-
-type UnresolvedItem = { chatId: number; messageId: number };
-
-function unresolvedItemsEqual(a: UnresolvedItem[], b: UnresolvedItem[]): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i].chatId !== b[i].chatId || a[i].messageId !== b[i].messageId) return false;
-  }
-  return true;
-}
-
-export const selectUnresolvedReplies = createSelector(
-  (s: ChatState) => {
-    const chatId = s.selectedChatId;
-    if (!chatId) return [null, null] as const;
-    return [s.messagesByChat[chatId] ?? null, s.replyPreviews] as const;
-  },
-  ([msgs, replyPreviews]) => {
-    if (!msgs || !replyPreviews) return [];
-    const result: UnresolvedItem[] = [];
-    for (const m of msgs) {
-      if (!m.reply_to) continue;
-      const replyToId = m.reply_to._ === 'messageReplyToMessage' ? m.reply_to.message_id : 0;
-      if (!replyToId) continue;
-      const key = `${m.chat_id}_${replyToId}`;
-      if (replyPreviews[key] === undefined) {
-        result.push({ chatId: m.chat_id, messageId: replyToId });
-      }
-    }
-    return result;
-  },
-  unresolvedItemsEqual,
-);
-
-// ---------------------------------------------------------------------------
-// selectUnresolvedPinnedPreviews
-// ---------------------------------------------------------------------------
-
-export const selectUnresolvedPinnedPreviews = createSelector(
-  (s: ChatState) => {
-    const chatId = s.selectedChatId;
-    if (!chatId) return [null, null] as const;
-    return [s.messagesByChat[chatId] ?? null, s.pinnedPreviews] as const;
-  },
-  ([msgs, pinnedPreviews]) => {
-    if (!msgs || !pinnedPreviews) return [];
-    const result: UnresolvedItem[] = [];
-    for (const m of msgs) {
-      if (m.content._ !== 'messagePinMessage') continue;
-      const pinnedId = (m.content as { message_id: number }).message_id;
-      if (!pinnedId) continue;
-      const key = `${m.chat_id}_${pinnedId}`;
-      if (pinnedPreviews[key] === undefined) {
-        result.push({ chatId: m.chat_id, messageId: pinnedId });
-      }
-    }
-    return result;
-  },
-  unresolvedItemsEqual,
 );
 
 // ---------------------------------------------------------------------------
@@ -200,6 +118,7 @@ export const selectSelectedChat = createSelector(
       isOnline: status?._ === 'userStatusOnline',
       myUserId,
       users: state.users,
+      avatarUrl: photo,
     });
   },
 );
@@ -341,25 +260,80 @@ export const selectHeaderStatus = createSelector(
 // selectUIChats / selectUIArchivedChats
 // ---------------------------------------------------------------------------
 
+function formatTypingText(
+  chatId: number,
+  chatKind: string,
+  typingByChat: ChatState['typingByChat'],
+  users: Map<number, Td.user>,
+): string | null {
+  const chatTyping = typingByChat[chatId];
+  if (!chatTyping || Object.keys(chatTyping).length === 0) return null;
+
+  const isPrivate = chatKind === 'chatTypePrivate';
+  if (isPrivate) {
+    const entry = Object.values(chatTyping)[0] as { action: Td.ChatAction; expiresAt: number };
+    return actionLabel(entry.action);
+  }
+
+  const entries = Object.keys(chatTyping).map((uid) => ({
+    name: users.get(Number(uid))?.first_name ?? 'Someone',
+    label: actionLabel(chatTyping[Number(uid)].action),
+  }));
+  const byLabel = new Map<string, string[]>();
+  for (const e of entries) {
+    const arr = byLabel.get(e.label);
+    if (arr) arr.push(e.name);
+    else byLabel.set(e.label, [e.name]);
+  }
+  const parts: string[] = [];
+  for (const [label, names] of byLabel) {
+    const verb = names.length === 1 ? 'is' : 'are';
+    parts.push(`${names.join(', ')} ${verb} ${label}`);
+  }
+  return parts.join(', ');
+}
+
 function chatContext(c: Td.chat, state: ChatState): UIChatContext {
   const userId = c.type._ === 'chatTypePrivate' ? c.type.user_id : 0;
+  const lastMsgId = c.last_message?.id ?? 0;
+  const thumbKey = `${c.id}_${lastMsgId}`;
   return {
     photoUrl: state.profilePhotos[c.id] ?? null,
     user: userId ? state.users.get(userId) : undefined,
     isOnline: userId ? state.userStatuses[userId]?._ === 'userStatusOnline' : false,
     myUserId: state.myUserId,
     users: state.users,
+    avatarUrl: state.profilePhotos[c.id],
+    lastMessageThumbUrl: lastMsgId ? (state.thumbUrls[thumbKey] ?? null) : null,
+    typingText: formatTypingText(c.id, c.type._, state.typingByChat, state.users),
   };
 }
 
 export const selectUIChats = createSelector(
-  (s: ChatState) => [s.chats, s.profilePhotos, s.users, s.userStatuses, s.myUserId] as const,
+  (s: ChatState) =>
+    [
+      s.chats,
+      s.profilePhotos,
+      s.users,
+      s.userStatuses,
+      s.myUserId,
+      s.thumbUrls,
+      s.typingByChat,
+    ] as const,
   (_deps, state) => state.chats.map((c: Td.chat) => toUIChat(c, chatContext(c, state))),
 );
 
 export const selectUIArchivedChats = createSelector(
   (s: ChatState) =>
-    [s.archivedChats, s.profilePhotos, s.users, s.userStatuses, s.myUserId] as const,
+    [
+      s.archivedChats,
+      s.profilePhotos,
+      s.users,
+      s.userStatuses,
+      s.myUserId,
+      s.thumbUrls,
+      s.typingByChat,
+    ] as const,
   (_deps, state) => state.archivedChats.map((c: Td.chat) => toUIChat(c, chatContext(c, state))),
 );
 
@@ -400,16 +374,34 @@ export const selectSearchResults = createSelector(
 );
 
 // ---------------------------------------------------------------------------
+// selectContactPhotos — profile photos for contact search results
+// ---------------------------------------------------------------------------
+
+const EMPTY_CONTACT_PHOTOS: Record<number, string> = {};
+
+export const selectContactPhotos = createSelector(
+  (s: ChatState) => [s.contactResults, s.profilePhotos] as const,
+  ([contacts, profilePhotos]): Record<number, string> => {
+    if (contacts.length === 0) return EMPTY_CONTACT_PHOTOS;
+    const photos: Record<number, string> = {};
+    for (const peer of contacts) {
+      const url = profilePhotos[peer.id];
+      if (url) photos[peer.id] = url;
+    }
+    return photos;
+  },
+);
+
+// ---------------------------------------------------------------------------
 // Reset all selector caches (for tests)
 // ---------------------------------------------------------------------------
 
 export function resetSelectors(): void {
   selectChatMessages.reset();
-  selectUnresolvedReplies.reset();
-  selectUnresolvedPinnedPreviews.reset();
   selectSelectedChat.reset();
   selectHeaderStatus.reset();
   selectUIChats.reset();
   selectUIArchivedChats.reset();
   selectSearchResults.reset();
+  selectContactPhotos.reset();
 }

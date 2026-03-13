@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Td } from '@/lib/types';
+import type { Td } from '../types';
 
 // Mock modules before importing store
-vi.mock('../log', () => {
+vi.mock('../../lib/log', () => {
   const noop = () => {};
   return {
     log: { debug: noop, info: noop, warn: noop, error: noop },
@@ -73,20 +73,17 @@ import {
   sendMessage,
   sendReaction,
 } from '../telegram';
+import type { PendingMessage } from '../types';
 import {
   _resetForTests,
-  actionLabel,
-  type PendingMessage,
   selectChatMessages,
   selectHeaderStatus,
   selectSelectedChat,
   selectUIArchivedChats,
   selectUIChats,
-  selectUIUser,
-  selectUnresolvedPinnedPreviews,
-  selectUnresolvedReplies,
   useChatStore,
 } from './';
+import { actionLabel, selectUIUser } from './selectors';
 
 // --- Factories ---
 
@@ -980,7 +977,7 @@ describe('selectChatMessages', () => {
     useChatStore.setState({ selectedChatId: 42, messagesByChat: { 42: msgs } });
     const result = selectChatMessages(useChatStore.getState());
     expect(result.length).toBe(1);
-    expect((result[0] as { id: number }).id).toBe(1);
+    expect(result[0]?.kind === 'message' && result[0].id).toBe(1);
   });
 
   it('merges real + pending', () => {
@@ -995,147 +992,7 @@ describe('selectChatMessages', () => {
     });
     const result = selectChatMessages(useChatStore.getState());
     expect(result).toHaveLength(2);
-  });
-});
-
-describe('selectUnresolvedReplies', () => {
-  const replyPreview = {
-    senderName: 'Test',
-    text: 'hello',
-    mediaLabel: '',
-    contentKind: 'text' as const,
-    hasWebPreview: false,
-    quoteText: '',
-  };
-
-  it('returns empty when no chat selected', () => {
-    expect(selectUnresolvedReplies(useChatStore.getState())).toEqual([]);
-  });
-
-  it('returns unresolved reply message ids', () => {
-    const msgs = [
-      makeMessage({
-        id: 1,
-        chat_id: 42,
-        reply_to: {
-          _: 'messageReplyToMessage',
-          chat_id: 42,
-          message_id: 100,
-          checklist_task_id: 0,
-          origin_send_date: 0,
-        },
-      }),
-      makeMessage({ id: 2, chat_id: 42 }), // no reply
-    ];
-    useChatStore.setState({ selectedChatId: 42, messagesByChat: { 42: msgs }, replyPreviews: {} });
-    const result = selectUnresolvedReplies(useChatStore.getState());
-    expect(result).toEqual([{ chatId: 42, messageId: 100 }]);
-  });
-
-  it('excludes already-resolved replies', () => {
-    const msgs = [
-      makeMessage({
-        id: 1,
-        chat_id: 42,
-        reply_to: {
-          _: 'messageReplyToMessage',
-          chat_id: 42,
-          message_id: 100,
-          checklist_task_id: 0,
-          origin_send_date: 0,
-        },
-      }),
-    ];
-    useChatStore.setState({
-      selectedChatId: 42,
-      messagesByChat: { 42: msgs },
-      replyPreviews: { '42_100': replyPreview },
-    });
-    expect(selectUnresolvedReplies(useChatStore.getState())).toEqual([]);
-  });
-
-  it('returns stable reference when replyPreviews changes but unresolved set is the same', () => {
-    const msgs = [
-      makeMessage({
-        id: 1,
-        chat_id: 42,
-        reply_to: {
-          _: 'messageReplyToMessage',
-          chat_id: 42,
-          message_id: 100,
-          checklist_task_id: 0,
-          origin_send_date: 0,
-        },
-      }),
-      makeMessage({
-        id: 2,
-        chat_id: 42,
-        reply_to: {
-          _: 'messageReplyToMessage',
-          chat_id: 42,
-          message_id: 200,
-          checklist_task_id: 0,
-          origin_send_date: 0,
-        },
-      }),
-    ];
-    useChatStore.setState({ selectedChatId: 42, messagesByChat: { 42: msgs }, replyPreviews: {} });
-    const first = selectUnresolvedReplies(useChatStore.getState());
-    expect(first).toHaveLength(2);
-
-    // Resolve one reply — replyPreviews object changes, unresolved set shrinks
-    useChatStore.setState({
-      replyPreviews: { '42_100': replyPreview },
-    });
-    const second = selectUnresolvedReplies(useChatStore.getState());
-    expect(second).toHaveLength(1);
-    expect(second).toEqual([{ chatId: 42, messageId: 200 }]);
-
-    // Resolve the other too — set shrinks to empty
-    useChatStore.setState({
-      replyPreviews: { '42_100': replyPreview, '42_200': { ...replyPreview, senderName: 'Foo' } },
-    });
-    const third = selectUnresolvedReplies(useChatStore.getState());
-    expect(third).toHaveLength(0);
-
-    // Adding an UNRELATED key to replyPreviews should NOT change the reference
-    // This is the key test: the selector must return the same [] reference
-    const beforeUnrelated = selectUnresolvedReplies(useChatStore.getState());
-    useChatStore.setState({
-      replyPreviews: {
-        '42_100': replyPreview,
-        '42_200': { ...replyPreview, senderName: 'Foo' },
-        '42_999': { ...replyPreview, senderName: 'X' },
-      },
-    });
-    const afterUnrelated = selectUnresolvedReplies(useChatStore.getState());
-    expect(afterUnrelated).toBe(beforeUnrelated); // same reference — no unnecessary re-render
-  });
-});
-
-describe('selectUnresolvedPinnedPreviews', () => {
-  it('returns stable reference when pinnedPreviews changes but set is the same', () => {
-    const msgs = [
-      makeMessage({
-        id: 1,
-        chat_id: 42,
-        content: { _: 'messagePinMessage', message_id: 500 } as unknown as Td.MessageContent,
-      }),
-    ];
-    useChatStore.setState({ selectedChatId: 42, messagesByChat: { 42: msgs }, pinnedPreviews: {} });
-    const first = selectUnresolvedPinnedPreviews(useChatStore.getState());
-    expect(first).toEqual([{ chatId: 42, messageId: 500 }]);
-
-    // Resolve it
-    useChatStore.setState({ pinnedPreviews: { '42_500': 'pinned text' } });
-    const second = selectUnresolvedPinnedPreviews(useChatStore.getState());
-    expect(second).toHaveLength(0);
-
-    // Unrelated change — same reference
-    const before = selectUnresolvedPinnedPreviews(useChatStore.getState());
-    useChatStore.setState({ pinnedPreviews: { '42_500': 'pinned text', '42_999': 'other' } });
-    const after = selectUnresolvedPinnedPreviews(useChatStore.getState());
-    expect(after).toBe(before);
+    expect(result[1]?.kind).toBe('pending');
   });
 });
 

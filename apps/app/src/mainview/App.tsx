@@ -2,7 +2,7 @@ import { Agentation } from 'agentation';
 import { useEffect, useState } from 'react';
 import { AuthScreen } from '@/components/auth/AuthScreen';
 import { ChatLayout } from '@/components/chat/ChatLayout';
-import { initialize, isAuthorized, logout } from '@/lib/telegram';
+import { initialize, isAuthorized, logout } from '@/data/telegram';
 
 type Screen = 'loading' | 'auth' | 'chat';
 

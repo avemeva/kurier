@@ -1,7 +1,5 @@
 import { create } from 'zustand';
-import type { PendingMessage, Td } from '@/lib/types';
-import { buildReplyPreview, extractMediaLabel, extractText } from '@/lib/types';
-import { log } from '../log';
+import { log } from '../../lib/log';
 import {
   clearMediaCache,
   closeTdChat,
@@ -34,6 +32,8 @@ import {
   recognizeSpeech as tdRecognizeSpeech,
   viewMessages,
 } from '../telegram';
+import type { PendingMessage, Td } from '../types';
+import { buildReplyPreview, extractMediaLabel, extractText } from '../types';
 import * as requests from './request-tracker';
 import { resetSelectors } from './selectors';
 import * as timers from './timer-registry';

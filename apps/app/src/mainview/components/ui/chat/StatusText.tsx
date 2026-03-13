@@ -1,4 +1,4 @@
-import type { HeaderStatus } from '@/lib/store';
+import type { HeaderStatus } from '@/data';
 import { cn } from '@/lib/utils';
 import { PureTypingIndicator } from './TypingIndicator';
 

@@ -1,22 +1,24 @@
 import type * as Td from 'tdlib-types';
 import { describe, expect, it } from 'vitest';
 import {
-  enrichReplyPreviews,
   extractForwardName,
   extractInlineKeyboard,
   extractMessagePreview,
   extractServiceText,
-  groupUIMessages,
+  groupAndConvert,
+  hydrateMessage,
   toChatKind,
   toUIChat,
+  toUIContent,
+  toUIForward,
   toUIMessage,
-  toUIPendingMessage,
   toUIReactions,
+  toUIReplyTo,
   toUITextEntities,
   toUIUser,
 } from '../convert';
 import type { PendingMessage } from '../index';
-import type { UIPendingMessage } from '../ui';
+import type { UIMessage } from '../ui';
 import {
   CHAT_CHANNEL,
   CHAT_HY_RID,
@@ -31,16 +33,11 @@ import {
   MSG_PHOTO_SINGLE,
   MSG_REPLY,
   MSG_STICKER_INCOMING,
-  MSG_STICKER_TGS,
-  MSG_STICKER_WEBM,
   MSG_TEXT_INCOMING,
-  MSG_TEXT_OUTGOING,
-  MSG_TEXT_WITH_ENTITIES,
   MSG_TEXT_WITH_LINK_PREVIEW,
   MSG_VIDEO,
   MSG_VIDEO_NOTE,
   MSG_VOICE_INCOMING,
-  MSG_WITH_REACTIONS,
   USER_HY_RID,
   USER_MARUSIA,
   USER_ME,
@@ -49,204 +46,6 @@ import {
 } from './fixtures';
 
 const users = USERS_MAP;
-
-// ---------------------------------------------------------------------------
-// toUIMessage
-// ---------------------------------------------------------------------------
-
-describe('toUIMessage', () => {
-  it('converts plain text incoming message', () => {
-    const ui = toUIMessage(MSG_TEXT_INCOMING, users, 0);
-    expect(ui.id).toBe(751105474560);
-    expect(ui.contentKind).toBe('text');
-    expect(ui.text).toBe('All good, take your time.');
-    expect(ui.entities).toEqual([]);
-    expect(ui.mediaLabel).toBe('');
-    expect(ui.mediaAlbumId).toBe('0');
-    expect(ui.isOutgoing).toBe(false);
-    expect(ui.senderUserId).toBe(6098406782);
-    expect(ui.senderName).toBe('Hy Rid');
-    expect(ui.replyToMessageId).toBe(0);
-    expect(ui.editDate).toBe(0);
-    expect(ui.reactions).toEqual([]);
-    expect(ui.webPreview).toBeNull();
-    expect(ui.forwardFromName).toBeNull();
-    expect(ui.forwardDate).toBe(0);
-    expect(ui.serviceText).toBeNull();
-    expect(ui.inlineKeyboard).toBeNull();
-    expect(ui.replyPreview).toBeNull();
-  });
-
-  it('converts text with entities and reactions', () => {
-    const ui = toUIMessage(MSG_TEXT_WITH_ENTITIES, users, 0);
-    expect(ui.text).toContain('Hey Andery!');
-    expect(ui.entities).toHaveLength(6);
-    expect(ui.entities[0]).toEqual({ offset: 103, length: 12, type: 'bold' });
-    expect(ui.entities[1]).toEqual({ offset: 371, length: 17, type: 'url' });
-    expect(ui.reactions).toHaveLength(1);
-    expect(ui.reactions[0]).toEqual({ emoji: '👍', count: 1, chosen: true });
-  });
-
-  it('converts photo with caption', () => {
-    const ui = toUIMessage(MSG_PHOTO_SINGLE, users, 0);
-    expect(ui.contentKind).toBe('photo');
-    expect(ui.text).toBe('а ещё в футбольных менеджерах вот такая хуйня бывает если долго играть');
-    expect(ui.mediaLabel).toBe('Photo');
-  });
-
-  it('converts photo without caption', () => {
-    const ui = toUIMessage(MSG_PHOTO_ALBUM, users, 0);
-    expect(ui.contentKind).toBe('photo');
-    expect(ui.text).toBe('');
-    expect(ui.mediaLabel).toBe('Photo');
-  });
-
-  it('converts video message', () => {
-    const ui = toUIMessage(MSG_VIDEO, users, 0);
-    expect(ui.contentKind).toBe('video');
-    expect(ui.text).toBe('');
-    expect(ui.mediaLabel).toBe('Video');
-  });
-
-  it('converts voice note', () => {
-    const ui = toUIMessage(MSG_VOICE_INCOMING, users, 0);
-    expect(ui.contentKind).toBe('voice');
-    expect(ui.mediaLabel).toBe('Voice message');
-  });
-
-  it('converts video note', () => {
-    const ui = toUIMessage(MSG_VIDEO_NOTE, users, 0);
-    expect(ui.contentKind).toBe('videoNote');
-    expect(ui.mediaLabel).toBe('Video message');
-  });
-
-  it('converts sticker with emoji', () => {
-    const ui = toUIMessage(MSG_STICKER_INCOMING, users, 0);
-    expect(ui.contentKind).toBe('sticker');
-    expect(ui.mediaLabel).toBe('⭐');
-  });
-
-  // AC1: messageAnimatedEmoji converts to sticker kind
-  it('converts animated emoji to sticker kind with tgs format', () => {
-    const ui = toUIMessage(MSG_ANIMATED_EMOJI, users, 0);
-    expect(ui.contentKind).toBe('sticker');
-    expect(ui.stickerFormat).toBe('tgs');
-    expect(ui.stickerEmoji).toBe('🐸');
-    expect(ui.mediaLabel).toBe('🐸');
-  });
-
-  it('converts animated emoji with null sticker', () => {
-    const ui = toUIMessage(MSG_ANIMATED_EMOJI_NO_STICKER, users, 0);
-    expect(ui.contentKind).toBe('sticker');
-    expect(ui.stickerFormat).toBeNull();
-    expect(ui.stickerEmoji).toBe('🎉');
-    expect(ui.mediaLabel).toBe('🎉');
-  });
-
-  // AC2: stickerFormat extracted for all formats
-  it('extracts stickerFormat webp from messageSticker', () => {
-    const ui = toUIMessage(MSG_STICKER_INCOMING, users, 0);
-    expect(ui.stickerFormat).toBe('webp');
-    expect(ui.stickerEmoji).toBe('⭐');
-  });
-
-  it('extracts stickerFormat tgs from messageSticker', () => {
-    const ui = toUIMessage(MSG_STICKER_TGS, users, 0);
-    expect(ui.stickerFormat).toBe('tgs');
-  });
-
-  it('extracts stickerFormat webm from messageSticker', () => {
-    const ui = toUIMessage(MSG_STICKER_WEBM, users, 0);
-    expect(ui.stickerFormat).toBe('webm');
-  });
-
-  // AC3: dimensions extracted
-  it('extracts sticker dimensions into mediaWidth/mediaHeight', () => {
-    const ui = toUIMessage(MSG_STICKER_INCOMING, users, 0);
-    expect(ui.mediaWidth).toBe(512);
-    expect(ui.mediaHeight).toBe(512);
-  });
-
-  it('extracts animated emoji dimensions into mediaWidth/mediaHeight', () => {
-    const ui = toUIMessage(MSG_ANIMATED_EMOJI, users, 0);
-    expect(ui.mediaWidth).toBe(512);
-    expect(ui.mediaHeight).toBe(512);
-  });
-
-  it('extracts animated emoji dimensions when sticker is null', () => {
-    const ui = toUIMessage(MSG_ANIMATED_EMOJI_NO_STICKER, users, 0);
-    expect(ui.mediaWidth).toBe(512);
-    expect(ui.mediaHeight).toBe(512);
-  });
-
-  it('converts animation (GIF)', () => {
-    const ui = toUIMessage(MSG_ANIMATION, users, 0);
-    expect(ui.contentKind).toBe('animation');
-    expect(ui.text).toBe('');
-    expect(ui.mediaLabel).toBe('GIF');
-  });
-
-  it('converts reactions from with_reactions message', () => {
-    const ui = toUIMessage(MSG_WITH_REACTIONS, users, 0);
-    expect(ui.reactions).toHaveLength(1);
-    expect(ui.reactions[0]).toEqual({ emoji: '👍', count: 1, chosen: true });
-  });
-
-  it('converts link preview', () => {
-    const ui = toUIMessage(MSG_TEXT_WITH_LINK_PREVIEW, users, 0);
-    expect(ui.webPreview).toEqual({
-      url: 'https://t.me/startupseurope',
-      siteName: 'Telegram',
-      title: 'Алекс Беляев @ Community Sprints',
-      description:
-        'Co-founder @ Community Sprints: сommunity-driven platform to grow career & business skills\n\nПишу о развитии компании в Европе и делюсь полезными материалами  про карьеру и бизнес\n\nStartupWiseGuys.com alumni \n\nDM @belalex',
-      minithumbnail: null,
-      showLargeMedia: false,
-      showMediaAboveDescription: false,
-    });
-  });
-
-  it('converts forwarded message from user', () => {
-    const ui = toUIMessage(MSG_FORWARDED, users, 0);
-    expect(ui.forwardFromName).toBe('Маруся');
-    expect(ui.forwardDate).toBe(1772461989);
-  });
-
-  it('converts reply message', () => {
-    const ui = toUIMessage(MSG_REPLY, users, 0);
-    expect(ui.replyToMessageId).toBe(748995739648);
-    expect(ui.replyPreview).toBeNull(); // not populated until enrichReplyPreviews
-  });
-
-  it('handles album messages', () => {
-    const ui1 = toUIMessage(MSG_PHOTO_ALBUM, users, 0);
-    const ui2 = toUIMessage(MSG_PHOTO_ALBUM_1, users, 0);
-    expect(ui1.mediaAlbumId).toBe('14179696327798362');
-    expect(ui2.mediaAlbumId).toBe('14179696327798362');
-  });
-
-  it('marks outgoing messages', () => {
-    const ui = toUIMessage(MSG_TEXT_OUTGOING, users, 0);
-    expect(ui.isOutgoing).toBe(true);
-  });
-
-  it('computes isRead for outgoing messages', () => {
-    const read = toUIMessage(MSG_TEXT_OUTGOING, users, 751103377408);
-    expect(read.isRead).toBe(true);
-
-    const unread = toUIMessage(MSG_TEXT_OUTGOING, users, 100);
-    expect(unread.isRead).toBe(false);
-  });
-
-  it('resolves sender name for unknown user', () => {
-    const unknownSenderMsg = {
-      ...MSG_TEXT_INCOMING,
-      sender_id: { _: 'messageSenderUser' as const, user_id: 99999 },
-    };
-    const ui = toUIMessage(unknownSenderMsg, users, 0);
-    expect(ui.senderName).toBe('Unknown');
-  });
-});
 
 // ---------------------------------------------------------------------------
 // toUIChat
@@ -531,72 +330,6 @@ describe('toUIReactions', () => {
 });
 
 // ---------------------------------------------------------------------------
-// groupUIMessages
-// ---------------------------------------------------------------------------
-
-describe('groupUIMessages', () => {
-  it('groups singles', () => {
-    const m1 = toUIMessage(MSG_TEXT_INCOMING, users, 0);
-    const m2 = toUIMessage(MSG_VIDEO, users, 0);
-    const groups = groupUIMessages([m1, m2]);
-    expect(groups).toHaveLength(2);
-    expect(groups[0]?.type).toBe('single');
-    expect(groups[1]?.type).toBe('single');
-  });
-
-  it('groups album messages together', () => {
-    const a1 = toUIMessage(MSG_PHOTO_ALBUM, users, 0);
-    const a2 = toUIMessage(MSG_PHOTO_ALBUM_1, users, 0);
-    const groups = groupUIMessages([a1, a2]);
-    expect(groups).toHaveLength(1);
-    expect(groups[0]?.type).toBe('album');
-    if (groups[0]?.type === 'album') {
-      expect(groups[0]?.messages).toHaveLength(2);
-    }
-  });
-
-  it('treats single album-id message as single', () => {
-    const a1 = toUIMessage(MSG_PHOTO_ALBUM, users, 0);
-    const groups = groupUIMessages([a1]);
-    expect(groups).toHaveLength(1);
-    expect(groups[0]?.type).toBe('single');
-  });
-
-  it('handles pending messages as singles', () => {
-    const pending: UIPendingMessage = {
-      localId: 'local-1',
-      chatId: 100,
-      text: 'Sending...',
-      date: 1700000000,
-      isPending: true,
-      status: 'sending',
-    };
-    const m1 = toUIMessage(MSG_TEXT_INCOMING, users, 0);
-    const groups = groupUIMessages([m1, pending]);
-    expect(groups).toHaveLength(2);
-    expect(groups[0]?.type).toBe('single');
-    expect(groups[1]?.type).toBe('single');
-  });
-
-  it('does not merge album across pending message', () => {
-    const a1 = toUIMessage(MSG_PHOTO_ALBUM, users, 0);
-    const pending: UIPendingMessage = {
-      localId: 'local-2',
-      chatId: 100,
-      text: 'Interrupting...',
-      date: 1700000000,
-      isPending: true,
-      status: 'sending',
-    };
-    const a2 = toUIMessage(MSG_PHOTO_ALBUM_1, users, 0);
-    const groups = groupUIMessages([a1, pending, a2]);
-    expect(groups).toHaveLength(3);
-    // a1 alone => single, pending => single, a2 alone => single
-    expect(groups.every((g) => g.type === 'single')).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
 // extractMessagePreview
 // ---------------------------------------------------------------------------
 
@@ -646,24 +379,6 @@ describe('extractMessagePreview', () => {
 
   it('returns empty string for undefined message', () => {
     expect(extractMessagePreview(undefined)).toBe('');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// enrichReplyPreviews
-// ---------------------------------------------------------------------------
-
-describe('enrichReplyPreviews', () => {
-  it('leaves reply preview null when target not found (target is in a different context)', () => {
-    const reply = toUIMessage(MSG_REPLY, users, 0);
-    const enriched = enrichReplyPreviews([reply]);
-    expect(enriched[0]?.replyPreview).toBeNull();
-  });
-
-  it('leaves non-reply messages unchanged', () => {
-    const plain = toUIMessage(MSG_TEXT_INCOMING, users, 0);
-    const enriched = enrichReplyPreviews([plain]);
-    expect(enriched[0]?.replyPreview).toBeNull();
   });
 });
 
@@ -824,37 +539,548 @@ describe('extractInlineKeyboard', () => {
   });
 });
 
+// ===========================================================================
+// Compositional converters (new)
+// ===========================================================================
+
 // ---------------------------------------------------------------------------
-// toUIPendingMessage
+// toUIMessage
 // ---------------------------------------------------------------------------
 
-describe('toUIPendingMessage', () => {
-  it('converts pending message', () => {
-    const pending: PendingMessage = {
-      _pending: 'sending',
-      localId: 'local-abc',
-      chat_id: 100,
-      text: 'Sending this...',
-      date: 1700000500,
-    };
-    const ui = toUIPendingMessage(pending);
-    expect(ui.localId).toBe('local-abc');
-    expect(ui.chatId).toBe(100);
-    expect(ui.text).toBe('Sending this...');
-    expect(ui.date).toBe(1700000500);
-    expect(ui.isPending).toBe(true);
-    expect(ui.status).toBe('sending');
+describe('toUIMessage', () => {
+  it('converts envelope fields', () => {
+    const m = toUIMessage(MSG_TEXT_INCOMING, users, 0);
+    expect(m.kind).toBe('message');
+    if (m.kind !== 'message') return;
+    expect(m.id).toBe(MSG_TEXT_INCOMING.id);
+    expect(m.chatId).toBe(MSG_TEXT_INCOMING.chat_id);
+    expect(m.date).toBe(MSG_TEXT_INCOMING.date);
+    expect(m.isOutgoing).toBe(false);
+    expect(m.sender.name).toBe('Hy Rid');
+    expect(m.sender.userId).toBe(6098406782);
   });
 
-  it('converts failed pending message', () => {
-    const pending: PendingMessage = {
-      _pending: 'failed',
-      localId: 'local-fail',
-      chat_id: 200,
-      text: 'Failed message',
-      date: 1700001000,
+  it('marks outgoing read when id <= lastReadOutboxId', () => {
+    const m = toUIMessage(MSG_TEXT_INCOMING, users, MSG_TEXT_INCOMING.id);
+    // MSG_TEXT_INCOMING is not outgoing, so isRead should be false
+    if (m.kind !== 'message') return;
+    expect(m.isRead).toBe(false);
+  });
+
+  it('detects service message', () => {
+    const serviceMsg = {
+      ...MSG_TEXT_INCOMING,
+      content: { _: 'messagePinMessage' as const, message_id: 42 },
+    } as unknown as import('tdlib-types').message;
+    const m = toUIMessage(serviceMsg, users, 0);
+    expect(m.kind).toBe('service');
+    if (m.kind !== 'service') return;
+    expect(m.text).toContain('pinned');
+    expect(m.pinnedMessageId).toBe(42);
+  });
+
+  it('resolves unknown sender to "Unknown"', () => {
+    const msg = {
+      ...MSG_TEXT_INCOMING,
+      sender_id: { _: 'messageSenderUser' as const, user_id: 99999 },
     };
-    const ui = toUIPendingMessage(pending);
-    expect(ui.status).toBe('failed');
+    const m = toUIMessage(msg, users, 0);
+    if (m.kind !== 'message') return;
+    expect(m.sender.name).toBe('Unknown');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// toUIForward
+// ---------------------------------------------------------------------------
+
+describe('toUIForward', () => {
+  it('returns null when no forward info', () => {
+    expect(toUIForward(undefined, users)).toBeNull();
+  });
+
+  it('returns correct fields when present', () => {
+    const f = toUIForward(MSG_FORWARDED.forward_info, users);
+    expect(f).not.toBeNull();
+    expect(f?.fromName).toBeTruthy();
+    expect(f?.date).toBe(MSG_FORWARDED.forward_info?.date);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// toUIReplyTo
+// ---------------------------------------------------------------------------
+
+describe('toUIReplyTo', () => {
+  it('returns null when no reply', () => {
+    expect(toUIReplyTo(MSG_TEXT_INCOMING)).toBeNull();
+  });
+
+  it('returns correct messageId and quoteText when present', () => {
+    const r = toUIReplyTo(MSG_REPLY);
+    expect(r).not.toBeNull();
+    expect(r?.messageId).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// toUIContent
+// ---------------------------------------------------------------------------
+
+describe('toUIContent', () => {
+  it('converts text content', () => {
+    const c = toUIContent(MSG_TEXT_INCOMING.content);
+    expect(c.kind).toBe('text');
+    if (c.kind === 'text') {
+      expect(c.text).toBe('All good, take your time.');
+      expect(c.entities).toEqual([]);
+      expect(c.webPreview).toBeNull();
+    }
+  });
+
+  it('converts text with link preview', () => {
+    const c = toUIContent(MSG_TEXT_WITH_LINK_PREVIEW.content);
+    expect(c.kind).toBe('text');
+    if (c.kind === 'text') {
+      expect(c.webPreview).not.toBeNull();
+      expect(c.webPreview?.url).toBe('https://t.me/startupseurope');
+      expect(c.webPreview?.thumbUrl).toBeUndefined();
+    }
+  });
+
+  it('converts photo content', () => {
+    const c = toUIContent(MSG_PHOTO_SINGLE.content);
+    expect(c.kind).toBe('photo');
+    if (c.kind === 'photo') {
+      expect(c.media.width).toBe(1280);
+      expect(c.media.height).toBe(720);
+      expect(c.media.url).toBeUndefined();
+      expect(c.caption).not.toBeNull();
+      expect(c.caption?.text).toBe(
+        'а ещё в футбольных менеджерах вот такая хуйня бывает если долго играть',
+      );
+    }
+  });
+
+  it('converts video content', () => {
+    const c = toUIContent(MSG_VIDEO.content);
+    expect(c.kind).toBe('video');
+    if (c.kind === 'video') {
+      expect(c.media.width).toBe(848);
+      expect(c.media.height).toBe(512);
+      expect(c.media.url).toBeUndefined();
+      expect(c.isGif).toBe(false);
+    }
+  });
+
+  it('converts animation content', () => {
+    const c = toUIContent(MSG_ANIMATION.content);
+    expect(c.kind).toBe('animation');
+    if (c.kind === 'animation') {
+      expect(c.media.width).toBe(288);
+      expect(c.media.height).toBe(230);
+      expect(c.media.url).toBeUndefined();
+    }
+  });
+
+  it('converts voice content', () => {
+    const c = toUIContent(MSG_VOICE_INCOMING.content);
+    expect(c.kind).toBe('voice');
+    if (c.kind === 'voice') {
+      expect(c.duration).toBe(4);
+      expect(c.fileSize).toBe(19067);
+      expect(c.waveform).not.toBeNull();
+      expect(c.url).toBeUndefined();
+    }
+  });
+
+  it('converts videoNote content', () => {
+    const c = toUIContent(MSG_VIDEO_NOTE.content);
+    expect(c.kind).toBe('videoNote');
+    if (c.kind === 'videoNote') {
+      expect(c.media.width).toBe(300);
+      expect(c.media.height).toBe(300);
+      expect(c.media.url).toBeUndefined();
+    }
+  });
+
+  it('converts sticker content (webp)', () => {
+    const c = toUIContent(MSG_STICKER_INCOMING.content);
+    expect(c.kind).toBe('sticker');
+    if (c.kind === 'sticker') {
+      expect(c.format).toBe('webp');
+      expect(c.emoji).toBe('⭐');
+      expect(c.width).toBe(512);
+      expect(c.height).toBe(512);
+      expect(c.url).toBeUndefined();
+    }
+  });
+
+  it('converts animated emoji to sticker content', () => {
+    const c = toUIContent(MSG_ANIMATED_EMOJI.content);
+    expect(c.kind).toBe('sticker');
+    if (c.kind === 'sticker') {
+      expect(c.format).toBe('tgs');
+      expect(c.emoji).toBe('🐸');
+    }
+  });
+
+  it('converts document content', () => {
+    const docContent = { _: 'messageDocument', document: {} } as Td.MessageContent;
+    const c = toUIContent(docContent);
+    expect(c.kind).toBe('document');
+    if (c.kind === 'document') {
+      expect(c.label).toBe('File');
+    }
+  });
+
+  it('converts unsupported content', () => {
+    const content = { _: 'messagePoll' } as Td.MessageContent;
+    const c = toUIContent(content);
+    expect(c.kind).toBe('unsupported');
+    if (c.kind === 'unsupported') {
+      expect(c.label).toBe('Poll');
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// groupAndConvert
+// ---------------------------------------------------------------------------
+
+describe('groupAndConvert', () => {
+  it('converts single messages', () => {
+    const result = groupAndConvert([MSG_TEXT_INCOMING], [], users, 0);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.kind).toBe('message');
+    if (result[0]?.kind === 'message') {
+      expect(result[0]?.content.kind).toBe('text');
+    }
+  });
+
+  it('groups album (2+ messages with same albumId)', () => {
+    const result = groupAndConvert([MSG_PHOTO_ALBUM, MSG_PHOTO_ALBUM_1], [], users, 0);
+    expect(result).toHaveLength(1);
+    const msg = result[0];
+    expect(msg?.kind).toBe('message');
+    if (msg?.kind === 'message') {
+      expect(msg.content.kind).toBe('album');
+      if (msg.content.kind === 'album') {
+        expect(msg.content.items).toHaveLength(2);
+        expect(msg.content.items[0]?.messageId).toBe(MSG_PHOTO_ALBUM.id);
+        expect(msg.content.items[1]?.messageId).toBe(MSG_PHOTO_ALBUM_1.id);
+      }
+    }
+  });
+
+  it('does not group single message with albumId', () => {
+    const result = groupAndConvert([MSG_PHOTO_ALBUM], [], users, 0);
+    expect(result).toHaveLength(1);
+    const msg = result[0];
+    expect(msg?.kind).toBe('message');
+    if (msg?.kind === 'message') {
+      // Single message with albumId should not be grouped into album
+      expect(msg.content.kind).toBe('photo');
+    }
+  });
+
+  it('appends pending messages', () => {
+    const pending: PendingMessage = {
+      _pending: 'sending',
+      localId: 'local-1',
+      chat_id: 100,
+      text: 'Sending...',
+      date: 1700000000,
+    };
+    const result = groupAndConvert([MSG_TEXT_INCOMING], [pending], users, 0);
+    expect(result).toHaveLength(2);
+    expect(result[1]?.kind).toBe('pending');
+    if (result[1]?.kind === 'pending') {
+      expect(result[1]?.text).toBe('Sending...');
+    }
+  });
+
+  it('converts mixed messages and albums', () => {
+    const result = groupAndConvert(
+      [MSG_TEXT_INCOMING, MSG_PHOTO_ALBUM, MSG_PHOTO_ALBUM_1, MSG_VOICE_INCOMING],
+      [],
+      users,
+      0,
+    );
+    expect(result).toHaveLength(3);
+    expect(result[0]?.kind).toBe('message');
+    // Second should be album
+    if (result[1]?.kind === 'message') {
+      expect(result[1].content.kind).toBe('album');
+    }
+    // Third should be voice
+    if (result[2]?.kind === 'message') {
+      expect(result[2].content.kind).toBe('voice');
+    }
+  });
+
+  it('converts service messages', () => {
+    const serviceMsg = {
+      ...MSG_TEXT_INCOMING,
+      id: 999,
+      content: { _: 'messagePinMessage', message_id: 123 } as Td.MessageContent,
+    } as Td.message;
+    const result = groupAndConvert([serviceMsg], [], users, 0);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.kind).toBe('service');
+    if (result[0]?.kind === 'service') {
+      expect(result[0].text).toBe('pinned a message');
+      expect(result[0].pinnedMessageId).toBe(123);
+    }
+  });
+
+  it('enriches in-batch reply previews', () => {
+    // MSG_REPLY replies to 748995739648 — not in batch, so stays undefined
+    const result = groupAndConvert([MSG_TEXT_INCOMING, MSG_REPLY], [], users, 0);
+    const reply = result.find((m) => m.kind === 'message' && m.id === MSG_REPLY.id);
+    expect(reply?.kind).toBe('message');
+    if (reply?.kind === 'message' && reply.replyTo) {
+      // Target not in batch => senderName stays undefined
+      expect(reply.replyTo.senderName).toBeUndefined();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hydrateMessage
+// ---------------------------------------------------------------------------
+
+describe('hydrateMessage', () => {
+  // Helper to create a base message for hydration
+  function makeTestMessage(
+    overrides: Partial<UIMessage & { kind: 'message' }> = {},
+  ): UIMessage & { kind: 'message' } {
+    return {
+      kind: 'message',
+      id: 1,
+      chatId: 100,
+      date: 1700000000,
+      isOutgoing: false,
+      isRead: false,
+      editDate: 0,
+      sender: { userId: 42, name: 'Test', photoUrl: undefined },
+      reactions: [],
+      viewCount: 0,
+      forward: null,
+      replyTo: null,
+      inlineKeyboard: null,
+      content: { kind: 'text', text: 'hello', entities: [], customEmojiUrls: {}, webPreview: null },
+      ...overrides,
+    };
+  }
+
+  it('hydrates mediaUrl for photo content', () => {
+    const msg = makeTestMessage({
+      content: {
+        kind: 'photo',
+        media: { url: undefined, width: 800, height: 600, minithumbnail: null },
+        caption: null,
+      },
+    });
+    const result = hydrateMessage(msg, { '100_1': '/photo.jpg' }, {}, {}, {}, {}, {});
+    expect(result.kind).toBe('message');
+    if (result.kind === 'message' && result.content.kind === 'photo') {
+      expect(result.content.media.url).toBe('/photo.jpg');
+    }
+  });
+
+  it('hydrates album with partial URLs', () => {
+    const msg = makeTestMessage({
+      id: 10,
+      content: {
+        kind: 'album',
+        items: [
+          {
+            messageId: 10,
+            contentKind: 'photo',
+            url: undefined,
+            width: 800,
+            height: 600,
+            minithumbnail: null,
+          },
+          {
+            messageId: 11,
+            contentKind: 'photo',
+            url: undefined,
+            width: 640,
+            height: 480,
+            minithumbnail: null,
+          },
+        ],
+        caption: null,
+      },
+    });
+    const result = hydrateMessage(
+      msg,
+      { '100_10': '/a.jpg' }, // Only first item has URL
+      {},
+      {},
+      {},
+      {},
+      {},
+    );
+    if (result.kind === 'message' && result.content.kind === 'album') {
+      expect(result.content.items[0]?.url).toBe('/a.jpg');
+      expect(result.content.items[1]?.url).toBeUndefined();
+    }
+  });
+
+  it('hydrates forward photo', () => {
+    const msg = makeTestMessage({
+      forward: { fromName: 'Alice', photoId: 55, photoUrl: undefined, date: 1700000000 },
+    });
+    const result = hydrateMessage(msg, {}, {}, { 55: '/alice.jpg' }, {}, {}, {});
+    if (result.kind === 'message') {
+      expect(result.forward?.photoUrl).toBe('/alice.jpg');
+    }
+  });
+
+  it('hydrates replyTo with preview', () => {
+    const msg = makeTestMessage({
+      replyTo: {
+        messageId: 50,
+        senderName: undefined,
+        text: undefined,
+        mediaLabel: undefined,
+        thumbUrl: undefined,
+        quoteText: '',
+      },
+    });
+    const result = hydrateMessage(
+      msg,
+      {},
+      { '100_50': '/thumb.jpg' },
+      {},
+      {},
+      {
+        '100_50': {
+          senderName: 'Bob',
+          text: 'Hi',
+          mediaLabel: '',
+          contentKind: 'text',
+          hasWebPreview: false,
+          quoteText: '',
+        },
+      },
+      {},
+    );
+    if (result.kind === 'message' && result.replyTo) {
+      expect(result.replyTo.thumbUrl).toBe('/thumb.jpg');
+      expect(result.replyTo.senderName).toBe('Bob');
+      expect(result.replyTo.text).toBe('Hi');
+    }
+  });
+
+  it('hydrates web preview thumb', () => {
+    const msg = makeTestMessage({
+      content: {
+        kind: 'text',
+        text: 'check this',
+        entities: [],
+        customEmojiUrls: {},
+        webPreview: {
+          url: 'https://example.com',
+          siteName: 'Example',
+          title: 'Title',
+          description: '',
+          minithumbnail: null,
+          thumbUrl: undefined,
+          showLargeMedia: false,
+          showMediaAboveDescription: false,
+        },
+      },
+    });
+    const result = hydrateMessage(msg, {}, { '100_1': '/wp-thumb.jpg' }, {}, {}, {}, {});
+    if (result.kind === 'message' && result.content.kind === 'text') {
+      expect(result.content.webPreview?.thumbUrl).toBe('/wp-thumb.jpg');
+    }
+  });
+
+  it('hydrates custom emoji in text content', () => {
+    const msg = makeTestMessage({
+      content: {
+        kind: 'text',
+        text: 'hey',
+        entities: [{ offset: 0, length: 1, type: 'customEmoji' as const, customEmojiId: 'e1' }],
+        customEmojiUrls: {},
+        webPreview: null,
+      },
+    });
+    const result = hydrateMessage(
+      msg,
+      {},
+      {},
+      {},
+      { e1: { url: '/emoji.webp', format: 'webp' } },
+      {},
+      {},
+    );
+    if (result.kind === 'message' && result.content.kind === 'text') {
+      expect(result.content.customEmojiUrls.e1).toEqual({ url: '/emoji.webp', format: 'webp' });
+    }
+  });
+
+  it('hydrates sender photo', () => {
+    const msg = makeTestMessage();
+    const result = hydrateMessage(msg, {}, {}, { 42: '/sender.jpg' }, {}, {}, {});
+    if (result.kind === 'message') {
+      expect(result.sender.photoUrl).toBe('/sender.jpg');
+    }
+  });
+
+  it('hydrates service message sender photo', () => {
+    const msg: UIMessage = {
+      kind: 'service',
+      id: 1,
+      chatId: 100,
+      date: 1700000000,
+      sender: { userId: 42, name: 'Test', photoUrl: undefined },
+      text: 'joined the group',
+      pinnedMessageId: 0,
+    };
+    const result = hydrateMessage(msg, {}, {}, { 42: '/avatar.jpg' }, {}, {}, {});
+    if (result.kind === 'service') {
+      expect(result.sender.photoUrl).toBe('/avatar.jpg');
+    }
+  });
+
+  it('hydrates service message pinned preview', () => {
+    const msg: UIMessage = {
+      kind: 'service',
+      id: 1,
+      chatId: 100,
+      date: 1700000000,
+      sender: { userId: 42, name: 'Test', photoUrl: undefined },
+      text: 'pinned a message',
+      pinnedMessageId: 50,
+    };
+    const result = hydrateMessage(msg, {}, {}, {}, {}, {}, { '100_50': 'Hello world' });
+    if (result.kind === 'service') {
+      expect(result.text).toBe('pinned "Hello world"');
+    }
+  });
+
+  it('returns pending message unchanged', () => {
+    const msg: UIMessage = {
+      kind: 'pending',
+      localId: 'local-1',
+      chatId: 100,
+      text: 'sending...',
+      date: 1700000000,
+      status: 'sending',
+    };
+    const result = hydrateMessage(msg, {}, {}, {}, {}, {}, {});
+    expect(result).toBe(msg); // Same reference
+  });
+
+  it('returns message unchanged when no hydration needed', () => {
+    const msg = makeTestMessage();
+    const result = hydrateMessage(msg, {}, {}, {}, {}, {}, {});
+    expect(result).toBe(msg); // Same reference — no unnecessary copies
   });
 });

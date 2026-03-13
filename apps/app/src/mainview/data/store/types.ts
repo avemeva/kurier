@@ -1,11 +1,5 @@
-import type {
-  PeerInfo,
-  PendingMessage,
-  Td,
-  TelegramUpdateEvent,
-  UIReplyPreview,
-} from '@/lib/types';
 import type { ChatInfoResult, CustomEmojiInfo } from '../telegram';
+import type { PeerInfo, PendingMessage, Td, TelegramUpdateEvent, UIReplyPreview } from '../types';
 
 // ---------------------------------------------------------------------------
 // Derived types

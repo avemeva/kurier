@@ -20,7 +20,7 @@ export function setSessionRPC(r: SessionRPC) {
 }
 
 export async function readSession(): Promise<string> {
-  const { telegramLog } = await import('./log');
+  const { telegramLog } = await import('../lib/log');
   try {
     let data: string;
     if (rpc) {
@@ -40,7 +40,7 @@ export async function readSession(): Promise<string> {
 }
 
 export async function writeSession(data: string): Promise<void> {
-  const { telegramLog } = await import('./log');
+  const { telegramLog } = await import('../lib/log');
   telegramLog.info(`writeSession: ${data.length} chars (via ${rpc ? 'rpc' : 'fetch'})`);
   try {
     if (rpc) {
@@ -55,7 +55,7 @@ export async function writeSession(data: string): Promise<void> {
 }
 
 export async function clearSession(): Promise<void> {
-  const { telegramLog } = await import('./log');
+  const { telegramLog } = await import('../lib/log');
   telegramLog.warn('clearSession: deleting session');
   try {
     if (rpc) {

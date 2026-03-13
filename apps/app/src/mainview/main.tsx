@@ -1,6 +1,5 @@
-import { lazy, StrictMode, Suspense } from 'react';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter, Route, Routes } from 'react-router';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { log } from '@/lib/log';
 import type { AppRPCSchema } from '../shared/rpc-schema';
@@ -13,8 +12,6 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
   log.error('Unhandled rejection:', event.reason);
 });
-
-const DevPage = lazy(() => import('./pages/DevPage'));
 
 // Wrap in async IIFE so the Electrobun RPC is wired up before React renders,
 // without requiring top-level await (unsupported by the production build target).
@@ -30,25 +27,7 @@ const DevPage = lazy(() => import('./pages/DevPage'));
     createRoot(root).render(
       <StrictMode>
         <TooltipProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<App />} />
-              <Route
-                path="/dev"
-                element={
-                  <Suspense
-                    fallback={
-                      <div className="flex min-h-screen items-center justify-center bg-background">
-                        <p className="animate-pulse text-text-secondary">Loading dev page...</p>
-                      </div>
-                    }
-                  >
-                    <DevPage />
-                  </Suspense>
-                }
-              />
-            </Routes>
-          </BrowserRouter>
+          <App />
         </TooltipProvider>
       </StrictMode>,
     );

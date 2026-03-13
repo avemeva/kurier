@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { PhoneInput } from '@/components/ui/phone-input';
-import { telegramLog } from '@/lib/log';
 import {
   type AuthStep,
   formatTelegramError,
@@ -14,7 +13,8 @@ import {
   submitCode,
   submitPassword,
   submitPhone,
-} from '@/lib/telegram';
+} from '@/data/telegram';
+import { telegramLog } from '@/lib/log';
 
 type Step = 'connecting' | AuthStep;
 

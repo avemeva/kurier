@@ -1,5 +1,6 @@
 import { PurePhotoView } from '@/components/ui/chat/PhotoView';
 import { PureVideoView } from '@/components/ui/chat/VideoView';
+import type { UIAlbumItem } from '@/data';
 import {
   ALBUM_SPACING,
   type Corners,
@@ -8,28 +9,24 @@ import {
   MIN_MEDIA_SIZE,
   type Rect,
 } from '@/lib/media-sizing';
-import type { UIMessage } from '@/lib/types';
 
 type PureAlbumGridProps = {
-  messages: UIMessage[];
-  albumMedia?: Array<{ url: string | null; loading: boolean }>;
+  items: UIAlbumItem[];
   maxWidth: number;
 };
 
 type PureAlbumCellProps = {
-  msg: UIMessage;
-  url: string | null;
-  loading: boolean;
+  item: UIAlbumItem;
   geometry: Rect;
   corners: Corners;
 };
 
-function PureAlbumCell({ msg, url, loading, geometry, corners }: PureAlbumCellProps) {
+function PureAlbumCell({ item, geometry, corners }: PureAlbumCellProps) {
   const lg = '12px';
   const none = '0px';
   const borderRadius = `${corners.topLeft ? lg : none} ${corners.topRight ? lg : none} ${corners.bottomRight ? lg : none} ${corners.bottomLeft ? lg : none}`;
 
-  const isVideo = msg.contentKind === 'video' || msg.contentKind === 'animation';
+  const isVideo = item.contentKind === 'video' || item.contentKind === 'animation';
 
   return (
     <div
@@ -43,18 +40,28 @@ function PureAlbumCell({ msg, url, loading, geometry, corners }: PureAlbumCellPr
       }}
     >
       {isVideo ? (
-        <PureVideoView url={url} loading={loading} isGif={msg.contentKind === 'animation'} cover />
+        <PureVideoView
+          url={item.url ?? null}
+          loading={item.url === undefined}
+          isGif={item.contentKind === 'animation'}
+          cover
+        />
       ) : (
-        <PurePhotoView url={url} loading={loading} cover minithumbnail={msg.minithumbnail} />
+        <PurePhotoView
+          url={item.url ?? null}
+          loading={item.url === undefined}
+          cover
+          minithumbnail={item.minithumbnail}
+        />
       )}
     </div>
   );
 }
 
-export function PureAlbumGrid({ messages, albumMedia, maxWidth }: PureAlbumGridProps) {
-  const sizes = messages.map((m) => ({
-    width: m.mediaWidth || 100,
-    height: m.mediaHeight || 100,
+export function PureAlbumGrid({ items, maxWidth }: PureAlbumGridProps) {
+  const sizes = items.map((item) => ({
+    width: item.width || 100,
+    height: item.height || 100,
   }));
   const layout = computeAlbumLayout(sizes, maxWidth, MIN_MEDIA_SIZE, ALBUM_SPACING);
 
@@ -69,17 +76,15 @@ export function PureAlbumGrid({ messages, albumMedia, maxWidth }: PureAlbumGridP
       className="relative overflow-hidden"
       style={{ width: containerWidth, height: containerHeight }}
     >
-      {messages.map((msg, i) => {
-        const item = layout[i];
-        if (!item) return null;
-        const corners = cornersFromSides(item.sides);
+      {items.map((item, i) => {
+        const layoutItem = layout[i];
+        if (!layoutItem) return null;
+        const corners = cornersFromSides(layoutItem.sides);
         return (
           <PureAlbumCell
-            key={msg.id}
-            msg={msg}
-            url={albumMedia?.[i]?.url ?? null}
-            loading={albumMedia?.[i]?.loading ?? false}
-            geometry={item.geometry}
+            key={item.messageId}
+            item={item}
+            geometry={layoutItem.geometry}
             corners={corners}
           />
         );

@@ -148,47 +148,6 @@ export const appTest = base.extend<{}, AppWorkerFixtures>({
 });
 
 // ---------------------------------------------------------------------------
-// Dev test fixture — all worker-scoped
-// ---------------------------------------------------------------------------
-
-type DevWorkerFixtures = {
-  devPage: Page;
-  errors: string[];
-  exceptions: string[];
-};
-
-// biome-ignore lint/complexity/noBannedTypes: Playwright's extend API requires {} for no test-scoped fixtures
-export const devTest = base.extend<{}, DevWorkerFixtures>({
-  devPage: [
-    async ({ browser }, use) => {
-      const context = await browser.newContext();
-      const page = await context.newPage();
-      await use(page);
-      await context.close();
-    },
-    { scope: 'worker' },
-  ],
-  errors: [
-    async ({ devPage }, use) => {
-      const errors: string[] = [];
-      devPage.on('console', (msg) => {
-        if (msg.type() === 'error') errors.push(msg.text());
-      });
-      await use(errors);
-    },
-    { scope: 'worker' },
-  ],
-  exceptions: [
-    async ({ devPage }, use) => {
-      const exceptions: string[] = [];
-      devPage.on('pageerror', (err) => exceptions.push(err.message));
-      await use(exceptions);
-    },
-    { scope: 'worker' },
-  ],
-});
-
-// ---------------------------------------------------------------------------
 // Perf test fixture — worker-scoped page, no auto-navigation
 // ---------------------------------------------------------------------------
 
