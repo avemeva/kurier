@@ -1,15 +1,19 @@
 import { ArrowLeft, Bookmark, Search, Star } from 'lucide-react';
+import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { PureStatusText } from '@/components/ui/chat/StatusText';
 import { UserAvatar } from '@/components/ui/user-avatar';
-import { selectHeaderStatus, selectSelectedChat, selectUIUser, useChatStore } from '@/lib/store';
+import { selectHeaderStatus, selectSelectedChat, useChatStore } from '@/lib/store';
+import { toUIUser } from '@/lib/types';
 import { EmojiStatusBadge } from './EmojiStatusBadge';
 
 export function ChatHeader() {
   const selectedChat = useChatStore(selectSelectedChat);
   const headerStatus = useChatStore(selectHeaderStatus);
   const openChatSearch = useChatStore((s) => s.openChatSearch);
-  const user = useChatStore((s) => selectUIUser(s, selectedChat?.userId ?? 0));
+  const userId = selectedChat?.userId ?? 0;
+  const rawUser = useChatStore((s) => (userId ? s.users.get(userId) : undefined));
+  const user = useMemo(() => (rawUser ? toUIUser(rawUser) : null), [rawUser]);
   const avatarId = selectedChat?.userId || selectedChat?.id;
   const avatarSrc = useChatStore((s) => (avatarId ? s.profilePhotos[avatarId] : undefined));
 

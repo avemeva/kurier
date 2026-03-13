@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Td, UISearchResult } from '@/lib/types';
+import type { Td } from '@/lib/types';
 
 // Mock modules before importing store
-vi.mock('./log', () => {
+vi.mock('../log', () => {
   const noop = () => {};
   return {
     log: { debug: noop, info: noop, warn: noop, error: noop },
@@ -10,7 +10,7 @@ vi.mock('./log', () => {
   };
 });
 
-vi.mock('./telegram', () => ({
+vi.mock('../telegram', () => ({
   getDialogs: vi.fn(),
   getMessages: vi.fn(),
   getNewerMessages: vi.fn(),
@@ -55,18 +55,6 @@ vi.mock('./telegram', () => ({
 }));
 
 import {
-  _resetForTests,
-  actionLabel,
-  type PendingMessage,
-  selectChatMessages,
-  selectHeaderStatus,
-  selectSelectedChat,
-  selectUIArchivedChats,
-  selectUIChats,
-  selectUIUser,
-  useChatStore,
-} from './store';
-import {
   clearMediaCache,
   downloadMedia,
   downloadThumbnail,
@@ -84,7 +72,21 @@ import {
   searchInChat,
   sendMessage,
   sendReaction,
-} from './telegram';
+} from '../telegram';
+import {
+  _resetForTests,
+  actionLabel,
+  type PendingMessage,
+  selectChatMessages,
+  selectHeaderStatus,
+  selectSelectedChat,
+  selectUIArchivedChats,
+  selectUIChats,
+  selectUIUser,
+  selectUnresolvedPinnedPreviews,
+  selectUnresolvedReplies,
+  useChatStore,
+} from './';
 
 // --- Factories ---
 
@@ -996,6 +998,147 @@ describe('selectChatMessages', () => {
   });
 });
 
+describe('selectUnresolvedReplies', () => {
+  const replyPreview = {
+    senderName: 'Test',
+    text: 'hello',
+    mediaLabel: '',
+    contentKind: 'text' as const,
+    hasWebPreview: false,
+    quoteText: '',
+  };
+
+  it('returns empty when no chat selected', () => {
+    expect(selectUnresolvedReplies(useChatStore.getState())).toEqual([]);
+  });
+
+  it('returns unresolved reply message ids', () => {
+    const msgs = [
+      makeMessage({
+        id: 1,
+        chat_id: 42,
+        reply_to: {
+          _: 'messageReplyToMessage',
+          chat_id: 42,
+          message_id: 100,
+          checklist_task_id: 0,
+          origin_send_date: 0,
+        },
+      }),
+      makeMessage({ id: 2, chat_id: 42 }), // no reply
+    ];
+    useChatStore.setState({ selectedChatId: 42, messagesByChat: { 42: msgs }, replyPreviews: {} });
+    const result = selectUnresolvedReplies(useChatStore.getState());
+    expect(result).toEqual([{ chatId: 42, messageId: 100 }]);
+  });
+
+  it('excludes already-resolved replies', () => {
+    const msgs = [
+      makeMessage({
+        id: 1,
+        chat_id: 42,
+        reply_to: {
+          _: 'messageReplyToMessage',
+          chat_id: 42,
+          message_id: 100,
+          checklist_task_id: 0,
+          origin_send_date: 0,
+        },
+      }),
+    ];
+    useChatStore.setState({
+      selectedChatId: 42,
+      messagesByChat: { 42: msgs },
+      replyPreviews: { '42_100': replyPreview },
+    });
+    expect(selectUnresolvedReplies(useChatStore.getState())).toEqual([]);
+  });
+
+  it('returns stable reference when replyPreviews changes but unresolved set is the same', () => {
+    const msgs = [
+      makeMessage({
+        id: 1,
+        chat_id: 42,
+        reply_to: {
+          _: 'messageReplyToMessage',
+          chat_id: 42,
+          message_id: 100,
+          checklist_task_id: 0,
+          origin_send_date: 0,
+        },
+      }),
+      makeMessage({
+        id: 2,
+        chat_id: 42,
+        reply_to: {
+          _: 'messageReplyToMessage',
+          chat_id: 42,
+          message_id: 200,
+          checklist_task_id: 0,
+          origin_send_date: 0,
+        },
+      }),
+    ];
+    useChatStore.setState({ selectedChatId: 42, messagesByChat: { 42: msgs }, replyPreviews: {} });
+    const first = selectUnresolvedReplies(useChatStore.getState());
+    expect(first).toHaveLength(2);
+
+    // Resolve one reply — replyPreviews object changes, unresolved set shrinks
+    useChatStore.setState({
+      replyPreviews: { '42_100': replyPreview },
+    });
+    const second = selectUnresolvedReplies(useChatStore.getState());
+    expect(second).toHaveLength(1);
+    expect(second).toEqual([{ chatId: 42, messageId: 200 }]);
+
+    // Resolve the other too — set shrinks to empty
+    useChatStore.setState({
+      replyPreviews: { '42_100': replyPreview, '42_200': { ...replyPreview, senderName: 'Foo' } },
+    });
+    const third = selectUnresolvedReplies(useChatStore.getState());
+    expect(third).toHaveLength(0);
+
+    // Adding an UNRELATED key to replyPreviews should NOT change the reference
+    // This is the key test: the selector must return the same [] reference
+    const beforeUnrelated = selectUnresolvedReplies(useChatStore.getState());
+    useChatStore.setState({
+      replyPreviews: {
+        '42_100': replyPreview,
+        '42_200': { ...replyPreview, senderName: 'Foo' },
+        '42_999': { ...replyPreview, senderName: 'X' },
+      },
+    });
+    const afterUnrelated = selectUnresolvedReplies(useChatStore.getState());
+    expect(afterUnrelated).toBe(beforeUnrelated); // same reference — no unnecessary re-render
+  });
+});
+
+describe('selectUnresolvedPinnedPreviews', () => {
+  it('returns stable reference when pinnedPreviews changes but set is the same', () => {
+    const msgs = [
+      makeMessage({
+        id: 1,
+        chat_id: 42,
+        content: { _: 'messagePinMessage', message_id: 500 } as unknown as Td.MessageContent,
+      }),
+    ];
+    useChatStore.setState({ selectedChatId: 42, messagesByChat: { 42: msgs }, pinnedPreviews: {} });
+    const first = selectUnresolvedPinnedPreviews(useChatStore.getState());
+    expect(first).toEqual([{ chatId: 42, messageId: 500 }]);
+
+    // Resolve it
+    useChatStore.setState({ pinnedPreviews: { '42_500': 'pinned text' } });
+    const second = selectUnresolvedPinnedPreviews(useChatStore.getState());
+    expect(second).toHaveLength(0);
+
+    // Unrelated change — same reference
+    const before = selectUnresolvedPinnedPreviews(useChatStore.getState());
+    useChatStore.setState({ pinnedPreviews: { '42_500': 'pinned text', '42_999': 'other' } });
+    const after = selectUnresolvedPinnedPreviews(useChatStore.getState());
+    expect(after).toBe(before);
+  });
+});
+
 describe('selectSelectedChat', () => {
   it('returns null when nothing selected', () => {
     expect(selectSelectedChat(useChatStore.getState())).toBeNull();
@@ -1435,7 +1578,7 @@ describe('openChatById', () => {
   });
 
   it('closes previous chat when opening by ID directly', async () => {
-    const { closeTdChat } = await import('./telegram');
+    const { closeTdChat } = await import('../telegram');
     useChatStore.setState({ selectedChatId: 10 });
     vi.mocked(getMessages).mockResolvedValueOnce({ messages: [], hasMore: false });
     await useChatStore.getState().openChatById(99);
@@ -2121,7 +2264,7 @@ describe('openGlobalSearch / closeGlobalSearch', () => {
 
 describe('executeGlobalSearch', () => {
   it('clears results for empty query', async () => {
-    useChatStore.setState({ searchResults: [{ id: 1 }] as unknown as UISearchResult[] });
+    useChatStore.setState({ searchResults: [{ id: 1 }] as unknown as Td.message[] });
     await useChatStore.getState().executeGlobalSearch('  ');
     expect(useChatStore.getState().searchResults).toEqual([]);
     expect(useChatStore.getState().searchLoading).toBe(false);
@@ -2177,7 +2320,7 @@ describe('loadMoreGlobalResults', () => {
       searchHasMore: true,
       searchNextCursor: 'cursor1',
       searchLoading: false,
-      searchResults: [{ id: 1 }] as unknown as UISearchResult[],
+      searchResults: [{ id: 1 }] as unknown as Td.message[],
     });
     vi.mocked(searchGlobal).mockResolvedValueOnce({
       messages: [makeMessage({ id: 2, chat_id: 10 })],
@@ -2701,13 +2844,15 @@ describe('selectUIUser', () => {
     expect(result).not.toBeNull();
   });
 
-  it('memoizes for same user', () => {
+  it('returns equal result for same user', () => {
     const users = new Map<number, Td.user>();
     users.set(42, { id: 42, first_name: 'Alice' } as Td.user);
     useChatStore.setState({ users });
     const r1 = selectUIUser(useChatStore.getState(), 42);
     const r2 = selectUIUser(useChatStore.getState(), 42);
-    expect(r1).toBe(r2);
+    // selectUIUser is intentionally NOT memoized at module level (takes a parameter),
+    // so we check deep equality, not referential identity.
+    expect(r1).toStrictEqual(r2);
   });
 });
 
@@ -2740,7 +2885,7 @@ describe('openChat (additional)', () => {
   });
 
   it('closes previous chat before opening new', async () => {
-    const { closeTdChat } = await import('./telegram');
+    const { closeTdChat } = await import('../telegram');
     useChatStore.setState({ selectedChatId: 10 });
     const chat = makeChat({ id: 42 });
     vi.mocked(getMessages).mockResolvedValueOnce({ messages: [], hasMore: false });
@@ -3105,7 +3250,7 @@ describe('handleUpdate edge cases', () => {
 
 describe('openChat chatInfo fetching', () => {
   it('fetches chat info when not cached', async () => {
-    const { getChatInfo } = await import('./telegram');
+    const { getChatInfo } = await import('../telegram');
     vi.mocked(getChatInfo).mockResolvedValueOnce({ memberCount: 100, isChannel: false });
     const chat = makeChat({ id: 42 });
     vi.mocked(getMessages).mockResolvedValueOnce({ messages: [], hasMore: false });
@@ -3117,7 +3262,7 @@ describe('openChat chatInfo fetching', () => {
   });
 
   it('does not fetch chat info when already cached', async () => {
-    const { getChatInfo } = await import('./telegram');
+    const { getChatInfo } = await import('../telegram');
     useChatStore.setState({
       chatInfoCache: { 42: { memberCount: 50, isChannel: false } },
       messagesByChat: { 42: [makeMessage()] },
@@ -3152,7 +3297,7 @@ describe('loadCustomEmojiUrl', () => {
 
 describe('recognizeSpeech', () => {
   it('calls the telegram recognizeSpeech function', async () => {
-    const telegram = await import('./telegram');
+    const telegram = await import('../telegram');
     const spy = vi.mocked(telegram.recognizeSpeech as (...args: unknown[]) => Promise<void>);
     spy.mockResolvedValueOnce(undefined);
     useChatStore.getState().recognizeSpeech(42, 10);
@@ -3259,7 +3404,7 @@ describe('loadDialogs thumbnails', () => {
 
 describe('openChat fetches missing users', () => {
   it('triggers user fetch for message senders', async () => {
-    const { getUser } = await import('./telegram');
+    const { getUser } = await import('../telegram');
     const chat = makeChat({ id: 42 });
     const msg = makeMessage({
       id: 10,
@@ -3284,7 +3429,7 @@ describe('openChat fetches missing users', () => {
 
 describe('loadDialogs fetches missing preview users', () => {
   it('fetches sender users for group chat last messages', async () => {
-    const { getUser } = await import('./telegram');
+    const { getUser } = await import('../telegram');
     const groupChat = makeChat({
       id: 1,
       type: { _: 'chatTypeBasicGroup', basic_group_id: 1 },
@@ -3491,7 +3636,7 @@ describe('chat_last_message triggers thumbnails', () => {
 
 describe('fetchMissingUsers resolves forward origin users', () => {
   it('fetches forward origin user from openChat', async () => {
-    const { getUser } = await import('./telegram');
+    const { getUser } = await import('../telegram');
     const chat = makeChat({ id: 42 });
     const msg = makeMessage({
       id: 10,

@@ -27,7 +27,13 @@ import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import { UserAvatar } from '@/components/ui/user-avatar';
 import { formatTime } from '@/lib/format';
 import { log } from '@/lib/log';
-import { actionLabel, selectUIArchivedChats, selectUIChats, useChatStore } from '@/lib/store';
+import {
+  actionLabel,
+  selectSearchResults,
+  selectUIArchivedChats,
+  selectUIChats,
+  useChatStore,
+} from '@/lib/store';
 import type { PeerInfo, UIChat, UISearchResult } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { EmojiStatusBadge } from './EmojiStatusBadge';
@@ -344,7 +350,7 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
 
   const searchMode = useChatStore((s) => s.searchMode);
   const searchQuery = useChatStore((s) => s.searchQuery);
-  const searchResults = useChatStore((s) => s.searchResults);
+  const searchResults = useChatStore(selectSearchResults);
   const searchLoading = useChatStore((s) => s.searchLoading);
   const contactResults = useChatStore((s) => s.contactResults);
   const contactsLoading = useChatStore((s) => s.contactsLoading);
@@ -369,12 +375,15 @@ export function ChatSidebar({ onLogout }: { onLogout: () => void }) {
     return allChats.filter((c) => c.title.toLowerCase().includes(q)).slice(0, 10);
   }, [searchQuery, chats, archivedChats]);
 
+  // Load profile photos. Uses raw chats (not UIChats) to avoid the cycle:
+  // photo loads → profilePhotos change → selectUIChats recomputes → useEffect fires → repeat.
+  const rawChats = useChatStore((s) => (tab === 'all' ? s.chats : s.archivedChats));
   // biome-ignore lint/correctness/useExhaustiveDependencies: loadProfilePhoto deduplicates internally
   useEffect(() => {
-    for (const c of displayedChats) {
+    for (const c of rawChats) {
       loadProfilePhoto(c.id);
     }
-  }, [displayedChats]);
+  }, [rawChats]);
 
   // Focus search input when search mode opens
   useEffect(() => {

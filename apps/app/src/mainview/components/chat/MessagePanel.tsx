@@ -5,7 +5,13 @@ import { PureMessageInput } from '@/components/ui/chat/MessageInput';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { useStickToBottom } from '@/hooks/useStickToBottom';
 import { scrollToMessage } from '@/lib/scrollToMessage';
-import { selectChatMessages, selectSelectedChat, useChatStore } from '@/lib/store';
+import {
+  selectChatMessages,
+  selectSelectedChat,
+  selectUnresolvedPinnedPreviews,
+  selectUnresolvedReplies,
+  useChatStore,
+} from '@/lib/store';
 import type { UIMessage, UIPendingMessage } from '@/lib/types';
 import { groupUIMessages } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -57,6 +63,25 @@ export function MessagePanel() {
   const profilePhotos = useChatStore((s) => s.profilePhotos);
   const goToNextUnreadMention = useChatStore((s) => s.goToNextUnreadMention);
   const goToNextUnreadReaction = useChatStore((s) => s.goToNextUnreadReaction);
+
+  // Resolve reply previews and thumbnails for messages that need them
+  const unresolvedReplies = useChatStore(selectUnresolvedReplies);
+  const unresolvedPinned = useChatStore(selectUnresolvedPinnedPreviews);
+
+  useEffect(() => {
+    const { resolveReplyPreview, loadReplyThumb } = useChatStore.getState();
+    for (const { chatId, messageId } of unresolvedReplies) {
+      resolveReplyPreview(chatId, messageId);
+      loadReplyThumb(chatId, messageId);
+    }
+  }, [unresolvedReplies]);
+
+  useEffect(() => {
+    const { resolvePinnedPreview } = useChatStore.getState();
+    for (const { chatId, messageId } of unresolvedPinned) {
+      resolvePinnedPreview(chatId, messageId);
+    }
+  }, [unresolvedPinned]);
 
   // Merge refs: useStickToBottom needs its callback ref, useInfiniteScroll needs a ref object
   const combinedRef = useCallback(
