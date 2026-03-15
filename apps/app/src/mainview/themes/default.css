@@ -1,0 +1,155 @@
+/*
+ * Default theme — neutral gray (shadcn-inspired)
+ */
+
+/* Radix color imports — used by sand/blue/red/plum/green scales */
+@import "@radix-ui/colors/sand.css";
+@import "@radix-ui/colors/sand-dark.css";
+@import "@radix-ui/colors/blue.css";
+@import "@radix-ui/colors/blue-dark.css";
+@import "@radix-ui/colors/red.css";
+@import "@radix-ui/colors/red-dark.css";
+@import "@radix-ui/colors/plum.css";
+@import "@radix-ui/colors/plum-dark.css";
+@import "@radix-ui/colors/green.css";
+@import "@radix-ui/colors/green-dark.css";
+
+[data-color-theme="default"] {
+  /* Typography */
+  --theme-font-sans: "Open Sans", ui-sans-serif, system-ui, sans-serif;
+  --theme-font-mono: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Layout */
+  --radius: 0.625rem;
+  --theme-radius-2xl: 1.125rem;
+  --theme-radius-3xl: 1.375rem;
+  --theme-radius-4xl: 1.75rem;
+  --bubble-r-sm: 4px;
+  --bubble-r-lg: 12px;
+
+  /* Surfaces */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+
+  /* Interactive */
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+
+  /* Neutral */
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+
+  /* Status */
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: white;
+
+  /* Chrome */
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+
+  /* Telegram-specific */
+  --message-own: oklch(0.93 0.02 250);
+  --message-own-hover: oklch(0.9 0.03 250);
+  --message-peer: oklch(0.97 0 0);
+  --online: oklch(0.723 0.191 149.579);
+  --unread: oklch(0.546 0.245 262.881);
+  --accent-brand: oklch(0.546 0.245 263);
+  --accent-brand-subtle: oklch(0.93 0.02 250);
+  --forward: oklch(0.723 0.191 149);
+  --code-bg: oklch(0.95 0 0);
+  --error-text: oklch(0.55 0.2 25);
+  --avatar-1: oklch(0.55 0.2 260);
+  --avatar-2: oklch(0.55 0.2 320);
+  --avatar-3: oklch(0.65 0.2 150);
+  --avatar-4: oklch(0.6 0.2 25);
+  --avatar-5: oklch(0.6 0.05 80);
+  --draft: oklch(0.577 0.245 27.325);
+  --badge-muted: oklch(0.588 0 0);
+
+  /* Text hierarchy */
+  --text-primary: var(--sand-12);
+  --text-secondary: var(--sand-11);
+  --text-tertiary: var(--sand-10);
+  --text-quaternary: var(--sand-9);
+
+  /* Palette scales */
+  --palette-sand-1: var(--sand-1);
+  --palette-sand-2: var(--sand-2);
+  --palette-sand-3: var(--sand-3);
+  --palette-sand-4: var(--sand-4);
+  --palette-sand-5: var(--sand-5);
+  --palette-sand-6: var(--sand-6);
+  --palette-sand-7: var(--sand-7);
+  --palette-sand-8: var(--sand-8);
+  --palette-sand-9: var(--sand-9);
+  --palette-sand-10: var(--sand-10);
+  --palette-sand-11: var(--sand-11);
+  --palette-sand-12: var(--sand-12);
+
+  --palette-blue-1: var(--blue-1);
+  --palette-blue-2: var(--blue-2);
+  --palette-blue-3: var(--blue-3);
+  --palette-blue-4: var(--blue-4);
+  --palette-blue-5: var(--blue-5);
+  --palette-blue-6: var(--blue-6);
+  --palette-blue-7: var(--blue-7);
+  --palette-blue-8: var(--blue-8);
+  --palette-blue-9: var(--blue-9);
+  --palette-blue-10: var(--blue-10);
+  --palette-blue-11: var(--blue-11);
+  --palette-blue-12: var(--blue-12);
+
+  --palette-red-9: var(--red-9);
+  --palette-red-11: var(--red-11);
+  --palette-plum-9: var(--plum-9);
+  --palette-green-9: var(--green-9);
+}
+
+[data-color-theme="default"].dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: white;
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+
+  --message-own: oklch(0.25 0.03 250);
+  --message-own-hover: oklch(0.28 0.04 250);
+  --message-peer: oklch(0.269 0 0);
+  --online: oklch(0.723 0.191 149.579);
+  --unread: oklch(0.488 0.243 264.376);
+  --accent-brand: oklch(0.488 0.243 264);
+  --accent-brand-subtle: oklch(0.25 0.03 250);
+  --forward: oklch(0.723 0.191 149);
+  --code-bg: oklch(0.22 0 0);
+  --error-text: oklch(0.75 0.15 22);
+  --avatar-1: oklch(0.55 0.2 260);
+  --avatar-2: oklch(0.55 0.2 320);
+  --avatar-3: oklch(0.65 0.2 150);
+  --avatar-4: oklch(0.6 0.2 25);
+  --avatar-5: oklch(0.6 0.05 80);
+  --draft: oklch(0.704 0.191 22.216);
+  --badge-muted: oklch(0.45 0 0);
+}

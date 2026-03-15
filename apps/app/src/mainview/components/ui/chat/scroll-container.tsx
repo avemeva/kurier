@@ -79,7 +79,6 @@ export const ScrollContainer = forwardRef<ScrollContainerHandle, ScrollContainer
     }
 
     // Phase 2: after DOM commit, adjust scrollTop so the user's viewport stays put.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: snapshot ref is intentionally read from render phase
     useLayoutEffect(() => {
       const el = scrollContainerRef.current;
       const snapshot = scrollSnapshotRef.current;

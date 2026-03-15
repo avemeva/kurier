@@ -3,11 +3,16 @@ import { create } from 'zustand';
 type ThemeMode = 'light' | 'dark' | 'system';
 type ResolvedTheme = 'light' | 'dark';
 
+export const COLOR_THEMES = ['default', 'catppuccin', 'catppuccin-v1'] as const;
+export type ColorTheme = (typeof COLOR_THEMES)[number];
+
 interface ThemeState {
   theme: ThemeMode;
   resolved: ResolvedTheme;
+  colorTheme: ColorTheme;
   setTheme: (theme: ThemeMode) => void;
   cycleTheme: () => void;
+  setColorTheme: (colorTheme: ColorTheme) => void;
 }
 
 function getSystemTheme(): ResolvedTheme {
@@ -21,6 +26,10 @@ function applyTheme(resolved: ResolvedTheme) {
   root.setAttribute('data-theme', resolved);
 }
 
+function applyColorTheme(colorTheme: ColorTheme) {
+  document.documentElement.setAttribute('data-color-theme', colorTheme);
+}
+
 function resolveTheme(mode: ThemeMode): ResolvedTheme {
   return mode === 'system' ? getSystemTheme() : mode;
 }
@@ -30,9 +39,15 @@ const stored = (typeof localStorage !== 'undefined' &&
 const initial: ThemeMode =
   stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'light';
 
+const storedColorTheme = (typeof localStorage !== 'undefined' &&
+  localStorage.getItem('color-theme')) as ColorTheme | null;
+const initialColorTheme: ColorTheme =
+  storedColorTheme && COLOR_THEMES.includes(storedColorTheme) ? storedColorTheme : 'default';
+
 export const useThemeStore = create<ThemeState>((set, get) => ({
   theme: initial,
   resolved: resolveTheme(initial),
+  colorTheme: initialColorTheme,
 
   setTheme(theme: ThemeMode) {
     const resolved = resolveTheme(theme);
@@ -57,11 +72,27 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     const next = order[(idx + 1) % order.length];
     get().setTheme(next);
   },
+
+  setColorTheme(colorTheme: ColorTheme) {
+    localStorage.setItem('color-theme', colorTheme);
+    if (typeof document !== 'undefined' && 'startViewTransition' in document) {
+      (
+        document as unknown as { startViewTransition: (cb: () => void) => void }
+      ).startViewTransition(() => {
+        applyColorTheme(colorTheme);
+        set({ colorTheme });
+      });
+    } else {
+      applyColorTheme(colorTheme);
+      set({ colorTheme });
+    }
+  },
 }));
 
 // Apply initial theme
 if (typeof document !== 'undefined') {
   applyTheme(resolveTheme(initial));
+  applyColorTheme(initialColorTheme);
 }
 
 // Listen for system theme changes
