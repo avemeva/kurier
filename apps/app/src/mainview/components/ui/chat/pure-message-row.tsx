@@ -178,22 +178,32 @@ function PureStickerLayout({
         emoji={state.stickerEmoji}
         loading={state.stickerUrl === undefined}
       />
-      {hasReactions && (
+      {hasReactions ? (
         <PureReactionBar
           reactions={toReactionInfos(msg.reactions)}
           onReact={(e, c) => onReact(msg.id, e, c)}
-        />
+        >
+          <PureMessageTime
+            date={msg.date}
+            out={msg.isOutgoing}
+            read={msg.isRead}
+            edited={msg.editDate > 0}
+            views={msg.viewCount || undefined}
+            displayType="background"
+          />
+        </PureReactionBar>
+      ) : (
+        <span className="mt-0.5 flex justify-end">
+          <PureMessageTime
+            date={msg.date}
+            out={msg.isOutgoing}
+            read={msg.isRead}
+            edited={msg.editDate > 0}
+            views={msg.viewCount || undefined}
+            displayType="background"
+          />
+        </span>
       )}
-      <span className="mt-0.5 flex justify-end">
-        <PureMessageTime
-          date={msg.date}
-          out={msg.isOutgoing}
-          read={msg.isRead}
-          edited={msg.editDate > 0}
-          views={msg.viewCount || undefined}
-          displayType="background"
-        />
-      </span>
     </PureBubble>
   );
 }
@@ -210,10 +220,17 @@ function PureMediaLayout({
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
 }) {
   const { msg, bubbleVariant, displayWidth, displayHeight } = state;
-  const content = msg.content as TGPhotoContent | TGVideoContent | TGAnimationContent;
+  const content = msg.content as
+    | TGPhotoContent
+    | TGVideoContent
+    | TGAnimationContent
+    | TGVideoNoteContent;
   const hasReactions = msg.reactions.length > 0;
-  const isVideo = content.kind === 'video' || content.kind === 'animation';
-  const text = content.caption?.text ?? '';
+  const isVideoNote = content.kind === 'videoNote';
+  const isVideo = content.kind === 'video' || content.kind === 'animation' || isVideoNote;
+  const text = isVideoNote
+    ? ''
+    : ((content as TGPhotoContent | TGVideoContent | TGAnimationContent).caption?.text ?? '');
 
   return (
     <PureBubble
@@ -232,13 +249,13 @@ function PureMediaLayout({
         </div>
       )}
       {bubbleVariant === 'framed' && msg.forward && (
-        <div className="px-3">
+        <div className="px-3 py-1.5">
           <PureForwardHeader fromName={msg.forward.fromName} photoUrl={msg.forward.photoUrl} />
         </div>
       )}
       {bubbleVariant === 'framed' &&
         (msg.replyTo?.senderName !== undefined ? (
-          <div className="px-3">
+          <div className="px-3 py-1.5">
             <PureReplyHeader
               senderName={msg.replyTo.senderName ?? ''}
               text={msg.replyTo.text ?? ''}
@@ -249,7 +266,7 @@ function PureMediaLayout({
         ) : (
           msg.replyTo &&
           msg.replyTo.messageId > 0 && (
-            <div className="px-3">
+            <div className="px-3 py-1.5">
               <PureReplyHeader
                 senderName=""
                 text={`Reply to message #${msg.replyTo.messageId}`}
@@ -263,7 +280,7 @@ function PureMediaLayout({
         <PureVideoView
           url={content.media.url ?? null}
           loading={content.media.url === undefined}
-          isCircle={false}
+          isCircle={content.kind === 'videoNote'}
           isGif={content.kind === 'animation'}
           width={displayWidth}
           height={displayHeight}
@@ -278,13 +295,19 @@ function PureMediaLayout({
           minithumbnail={content.media.minithumbnail}
         />
       )}
-      {text && (
+      {text && !isVideoNote && (
         <div className="px-3 py-1.5">
           <p className="whitespace-pre-wrap break-words tg-text-chat text-text-primary">
             <PureFormattedText
               text={text}
-              entities={content.caption?.entities ?? []}
-              customEmojiUrls={content.caption?.customEmojiUrls}
+              entities={
+                (content as TGPhotoContent | TGVideoContent | TGAnimationContent).caption
+                  ?.entities ?? []
+              }
+              customEmojiUrls={
+                (content as TGPhotoContent | TGVideoContent | TGAnimationContent).caption
+                  ?.customEmojiUrls
+              }
             />
             <span
               className={cn('float-right h-[1.125rem]', msg.editDate > 0 ? 'w-[5.5rem]' : 'w-12')}
@@ -293,13 +316,22 @@ function PureMediaLayout({
           </p>
         </div>
       )}
-      {hasReactions && (
+      {hasReactions ? (
         <PureReactionBar
           reactions={toReactionInfos(msg.reactions)}
           onReact={(e, c) => onReact(msg.id, e, c)}
-        />
-      )}
-      {state.isMediaOnly ? (
+          className="px-3 pb-1.5"
+        >
+          <PureMessageTime
+            date={msg.date}
+            out={msg.isOutgoing}
+            read={msg.isRead}
+            edited={msg.editDate > 0}
+            views={msg.viewCount || undefined}
+            displayType="default"
+          />
+        </PureReactionBar>
+      ) : state.isMediaOnly ? (
         <span className="absolute bottom-2 right-2">
           <PureMessageTime
             date={msg.date}
@@ -410,7 +442,6 @@ function PureBubbleLayout({
       showAvatar={state.showAvatar}
       senderName={msg.sender.name}
       senderPhotoUrl={msg.sender.photoUrl}
-      hasReactions={hasReactions}
     >
       <PureReactionPicker onReact={(e, c) => onReact(msg.id, e, c)} />
       {state.showSenderName && (
@@ -512,48 +543,60 @@ function PureBubbleLayout({
         <p className="tg-text-chat italic text-text-quaternary">Unsupported message</p>
       )}
       {hasReactions && (
-        <PureReactionBar
-          reactions={toReactionInfos(msg.reactions)}
-          onReact={(e, c) => onReact(msg.id, e, c)}
-        />
+        <div className="mt-1 flex items-end gap-1">
+          <PureReactionBar
+            reactions={toReactionInfos(msg.reactions)}
+            onReact={(e, c) => onReact(msg.id, e, c)}
+            className="mt-0 flex-1"
+          />
+          <PureMessageTime
+            date={msg.date}
+            out={msg.isOutgoing}
+            read={msg.isRead}
+            edited={msg.editDate > 0}
+            views={msg.viewCount || undefined}
+            displayType={displayType}
+          />
+        </div>
       )}
       {msg.inlineKeyboard && (
         <PureBotKeyboard rows={msg.inlineKeyboard.map((row) => ({ buttons: row }))} />
       )}
-      {isMediaOnly ? (
-        <span className="absolute bottom-2 right-2">
-          <PureMessageTime
-            date={msg.date}
-            out={msg.isOutgoing}
-            read={msg.isRead}
-            edited={msg.editDate > 0}
-            views={msg.viewCount || undefined}
-            displayType={displayType}
-          />
-        </span>
-      ) : webPreview ? (
-        <span className="mt-1 flex justify-end">
-          <PureMessageTime
-            date={msg.date}
-            out={msg.isOutgoing}
-            read={msg.isRead}
-            edited={msg.editDate > 0}
-            views={msg.viewCount || undefined}
-            displayType={displayType}
-          />
-        </span>
-      ) : (
-        <span className="absolute bottom-1 right-2">
-          <PureMessageTime
-            date={msg.date}
-            out={msg.isOutgoing}
-            read={msg.isRead}
-            edited={msg.editDate > 0}
-            views={msg.viewCount || undefined}
-            displayType={displayType}
-          />
-        </span>
-      )}
+      {!hasReactions &&
+        (isMediaOnly ? (
+          <span className="absolute bottom-2 right-2">
+            <PureMessageTime
+              date={msg.date}
+              out={msg.isOutgoing}
+              read={msg.isRead}
+              edited={msg.editDate > 0}
+              views={msg.viewCount || undefined}
+              displayType={displayType}
+            />
+          </span>
+        ) : webPreview ? (
+          <span className="mt-1 flex justify-end">
+            <PureMessageTime
+              date={msg.date}
+              out={msg.isOutgoing}
+              read={msg.isRead}
+              edited={msg.editDate > 0}
+              views={msg.viewCount || undefined}
+              displayType={displayType}
+            />
+          </span>
+        ) : (
+          <span className="absolute bottom-1 right-2">
+            <PureMessageTime
+              date={msg.date}
+              out={msg.isOutgoing}
+              read={msg.isRead}
+              edited={msg.editDate > 0}
+              views={msg.viewCount || undefined}
+              displayType={displayType}
+            />
+          </span>
+        ))}
     </PureBubble>
   );
 }
@@ -634,13 +677,22 @@ function PureAlbumLayout({
           </p>
         </div>
       )}
-      {hasReactions && (
+      {hasReactions ? (
         <PureReactionBar
           reactions={toReactionInfos(msg.reactions)}
           onReact={(e, c) => onReact(msg.id, e, c)}
-        />
-      )}
-      {text ? (
+          className="px-3 pb-1.5"
+        >
+          <PureMessageTime
+            date={msg.date}
+            out={msg.isOutgoing}
+            read={msg.isRead}
+            edited={msg.editDate > 0}
+            views={msg.viewCount || undefined}
+            displayType="default"
+          />
+        </PureReactionBar>
+      ) : text ? (
         <span className="absolute bottom-1 right-2">
           <PureMessageTime
             date={msg.date}

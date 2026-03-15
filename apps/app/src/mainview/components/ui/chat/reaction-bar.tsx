@@ -13,13 +13,15 @@ export function PureReactionBar({
   reactions,
   onReact,
   className,
+  children,
 }: {
   reactions: ReactionInfo[];
   onReact: (emoticon: string, chosen: boolean) => void;
   className?: string;
+  children?: React.ReactNode;
 }) {
   return (
-    <div className={cn('mt-1 flex flex-wrap gap-1', className)}>
+    <div className={cn('mt-1 flex flex-wrap items-center gap-1', className)}>
       {reactions.map((r) => (
         <button
           key={r.emoticon}
@@ -36,6 +38,7 @@ export function PureReactionBar({
           <span className="text-xs leading-none font-medium">{r.count}</span>
         </button>
       ))}
+      {children && <span className="ml-auto">{children}</span>}
     </div>
   );
 }

@@ -368,10 +368,10 @@ export function PureVoiceView({
                 type="button"
                 onClick={handleTranscribe}
                 disabled={isTranscribing}
-                className={`flex shrink-0 items-center justify-center rounded transition-opacity hover:opacity-80 ${
+                className={`flex size-6 shrink-0 items-center justify-center rounded transition-opacity hover:opacity-80 ${
                   hasTranscription
-                    ? 'size-6 bg-accent-brand text-white'
-                    : 'bg-accent-brand/10 px-1 py-0.5 text-accent-brand'
+                    ? 'bg-accent-brand text-white'
+                    : 'bg-accent-brand/10 text-accent-brand'
                 } ${isTranscribing ? 'cursor-default opacity-70' : ''}`}
                 aria-label={
                   isTranscribing
@@ -407,7 +407,10 @@ export function PureVoiceView({
 
       {/* Transcription text (when expanded) */}
       {hasTranscription && expanded && (
-        <p className="mt-1.5 tg-text-chat text-text-primary">{speechText}</p>
+        <p className="mt-1.5 tg-text-chat text-text-primary">
+          {speechText}
+          <span className="float-right h-[1.125rem] w-12" aria-hidden="true" />
+        </p>
       )}
     </div>
   );

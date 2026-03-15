@@ -123,7 +123,7 @@ export function FixtureIndex({ navigate }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 overflow-y-auto bg-background">
+    <div className="min-h-screen bg-background">
       <div className="sticky top-0 z-10 border-b border-border-primary bg-background px-6 py-3">
         <h1 className="text-lg font-bold text-text-primary">
           Dev Harness
@@ -185,12 +185,15 @@ export function FixtureIndex({ navigate }: Props) {
 
             // Message fixtures — existing rendering
             const allMessages: TGMessage[] = [];
+            const messageLabels = new Map<string | number, string>();
             const chatKind = (entries[0] as LoadedMessageFixture).chatKind;
 
             for (const f of entries) {
               if (f.type === 'message') {
                 for (const msg of f.messages) {
                   allMessages.push(msg);
+                  const key = msg.kind === 'pending' ? msg.localId : msg.id;
+                  messageLabels.set(key, f.name);
                 }
               }
             }
@@ -217,6 +220,7 @@ export function FixtureIndex({ navigate }: Props) {
                   <PureChatView
                     messages={allMessages}
                     chatKind={chatKind}
+                    messageLabels={messageLabels}
                     onReact={noop}
                     onReplyClick={noop}
                     onTranscribe={noop}

@@ -191,8 +191,13 @@ export function computeMessageState(
     };
   }
 
-  // Media layout (photos, videos, animations — NOT videoNote which goes to bubble)
-  if (content.kind === 'photo' || content.kind === 'video' || content.kind === 'animation') {
+  // Media layout (photos, videos, animations, video notes)
+  if (
+    content.kind === 'photo' ||
+    content.kind === 'video' ||
+    content.kind === 'animation' ||
+    content.kind === 'videoNote'
+  ) {
     const showAvatar = ctx.showSender && !msg.isOutgoing;
     const showSenderName = ctx.showSender && !msg.isOutgoing;
     const needsBubble = !!text || !!msg.replyTo || !!msg.forward || showSenderName;

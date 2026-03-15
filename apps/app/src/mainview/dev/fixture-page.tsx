@@ -149,7 +149,11 @@ export function FixturePage({ name, navigate }: Props) {
       </div>
 
       <ResizableChat>
-        <div data-testid="fixture-message" className="flex-1 overflow-y-auto bg-chat-bg px-4 py-6">
+        <div
+          data-testid="fixture-message"
+          className="flex-1 overflow-y-auto bg-chat-bg px-4 py-6"
+          style={{ zoom: 2 }}
+        >
           <PureChatView
             messages={fixture.messages}
             chatKind={fixture.chatKind}

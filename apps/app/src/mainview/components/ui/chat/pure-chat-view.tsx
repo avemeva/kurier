@@ -6,6 +6,8 @@ import { PureMessageRow } from './pure-message-row';
 export type PureChatViewProps = {
   messages: TGMessage[];
   chatKind: ChatKind;
+  /** Map message key → semantic name. Used for id, data-testid, and data-element on wrappers. */
+  messageLabels?: Map<string | number, string>;
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
   onReplyClick?: (messageId: number) => void;
   onTranscribe?: (chatId: number, msgId: number) => void;
@@ -46,6 +48,7 @@ function getGroupPosition(messages: TGMessage[], index: number, chatKind: ChatKi
 export function PureChatView({
   messages,
   chatKind,
+  messageLabels,
   onReact,
   onReplyClick,
   onTranscribe,
@@ -58,11 +61,15 @@ export function PureChatView({
       {messages.map((msg, index) => {
         const isOut = getIsOutgoing(msg, chatKind);
         const isService = msg.kind === 'service';
+        const key = getKey(msg);
+        const label = messageLabels?.get(key);
 
         return (
           <div
-            key={getKey(msg)}
-            id={`msg-${getKey(msg)}`}
+            key={key}
+            id={`msg-${label ?? key}`}
+            data-testid={label ? `msg-${label}` : undefined}
+            data-element={label ?? undefined}
             className={cn(
               'flex',
               isService ? 'justify-center' : isOut ? 'sm:justify-end' : 'justify-start',
