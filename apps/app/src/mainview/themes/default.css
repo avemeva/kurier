@@ -67,6 +67,15 @@
   --forward: oklch(0.723 0.191 149);
   --code-bg: oklch(0.95 0 0);
   --error-text: oklch(0.55 0.2 25);
+
+  /* Reactions */
+  --reaction-bg: oklch(0.93 0.02 250);
+  --reaction-bg-chosen: oklch(0.9 0.05 260);
+  --reaction-border: oklch(0.85 0.03 250);
+  --reaction-border-chosen: oklch(0.7 0.15 263);
+  --reaction-text: var(--sand-12);
+  --reaction-text-chosen: oklch(0.546 0.245 263);
+
   --avatar-1: oklch(0.55 0.2 260);
   --avatar-2: oklch(0.55 0.2 320);
   --avatar-3: oklch(0.65 0.2 150);
@@ -145,6 +154,15 @@
   --forward: oklch(0.723 0.191 149);
   --code-bg: oklch(0.22 0 0);
   --error-text: oklch(0.75 0.15 22);
+
+  /* Reactions */
+  --reaction-bg: oklch(0.25 0.04 263);
+  --reaction-bg-chosen: oklch(0.33 0.07 263);
+  --reaction-border: oklch(0.35 0.08 263);
+  --reaction-border-chosen: oklch(0.45 0.15 263);
+  --reaction-text: oklch(0.9 0 0);
+  --reaction-text-chosen: oklch(0.9 0 0);
+
   --avatar-1: oklch(0.55 0.2 260);
   --avatar-2: oklch(0.55 0.2 320);
   --avatar-3: oklch(0.65 0.2 150);

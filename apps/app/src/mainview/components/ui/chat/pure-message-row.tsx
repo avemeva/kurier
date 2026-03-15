@@ -543,12 +543,10 @@ function PureBubbleLayout({
         <p className="tg-text-chat italic text-text-quaternary">Unsupported message</p>
       )}
       {hasReactions && (
-        <div className="mt-1 flex items-end gap-1">
-          <PureReactionBar
-            reactions={toReactionInfos(msg.reactions)}
-            onReact={(e, c) => onReact(msg.id, e, c)}
-            className="mt-0 flex-1"
-          />
+        <PureReactionBar
+          reactions={toReactionInfos(msg.reactions)}
+          onReact={(e, c) => onReact(msg.id, e, c)}
+        >
           <PureMessageTime
             date={msg.date}
             out={msg.isOutgoing}
@@ -557,7 +555,7 @@ function PureBubbleLayout({
             views={msg.viewCount || undefined}
             displayType={displayType}
           />
-        </div>
+        </PureReactionBar>
       )}
       {msg.inlineKeyboard && (
         <PureBotKeyboard rows={msg.inlineKeyboard.map((row) => ({ buttons: row }))} />

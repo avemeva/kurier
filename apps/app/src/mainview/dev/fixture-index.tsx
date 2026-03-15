@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { PureChatItem } from '@/components/ui/chat/pure-chat-item';
 import { PureChatView } from '@/components/ui/chat/pure-chat-view';
+import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import type { ChatKind, TGChat, TGMessage } from '@/data';
 
 type FixtureEntry = {
@@ -125,14 +126,19 @@ export function FixtureIndex({ navigate }: Props) {
   return (
     <div className="min-h-screen bg-background">
       <div className="sticky top-0 z-10 border-b border-border-primary bg-background px-6 py-3">
-        <h1 className="text-lg font-bold text-text-primary">
-          Dev Harness
-          {!loading && (
-            <span className="ml-2 text-sm font-normal text-text-tertiary">
-              {fixtures.length} fixtures
-            </span>
-          )}
-        </h1>
+        <div className="flex items-center">
+          <h1 className="text-lg font-bold text-text-primary">
+            Dev Harness
+            {!loading && (
+              <span className="ml-2 text-sm font-normal text-text-tertiary">
+                {fixtures.length} fixtures
+              </span>
+            )}
+          </h1>
+          <div className="ml-auto">
+            <ThemeSwitcher />
+          </div>
+        </div>
       </div>
       {loading && <p className="p-8 text-text-secondary">Loading fixtures...</p>}
       {error && <p className="p-8 text-red-500">Failed to load manifest: {error}</p>}

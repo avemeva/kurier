@@ -28,14 +28,14 @@ export function PureReactionBar({
           type="button"
           onClick={() => onReact(r.emoticon, r.chosen)}
           className={cn(
-            'flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 leading-none transition-colors',
+            'flex items-center gap-1 rounded-full border px-2 py-1 leading-none transition-colors',
             r.chosen
-              ? 'border-accent-brand/40 bg-accent-brand/15 text-accent-brand'
-              : 'border-border/50 bg-accent/60 text-text-secondary hover:bg-accent/80',
+              ? 'border-reaction-border-chosen bg-reaction-bg-chosen text-reaction-text-chosen'
+              : 'border-reaction-border bg-reaction-bg text-reaction-text hover:brightness-95',
           )}
         >
           <span className="text-[15px] leading-none">{r.emoticon}</span>
-          <span className="text-xs leading-none font-medium">{r.count}</span>
+          <span className="text-xs leading-none font-extrabold">{r.count}</span>
         </button>
       ))}
       {children && <span className="ml-auto">{children}</span>}

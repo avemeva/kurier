@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { PureChatItem } from '@/components/ui/chat/pure-chat-item';
 import { PureChatView } from '@/components/ui/chat/pure-chat-view';
+import { ThemeSwitcher } from '@/components/ui/theme-switcher';
 import type { ChatKind, TGChat, TGMessage } from '@/data';
 
 type FixtureData = {
@@ -144,6 +145,7 @@ export function FixturePage({ name, navigate }: Props) {
             <span>{contentKind}</span>
             <span>{direction}</span>
             <span>{fixture.chatKind}</span>
+            <ThemeSwitcher />
           </div>
         </div>
       </div>
