@@ -1,0 +1,31 @@
+{
+  "chats": [
+    {
+      "id": 100020,
+      "title": "Active Group",
+      "kind": "supergroup",
+      "userId": 0,
+      "unreadCount": 42,
+      "isPinned": false,
+      "lastMessagePreview": "Hey, how are you?",
+      "lastMessageSenderName": null,
+      "lastMessageContentKind": "text",
+      "lastMessageIsForwarded": false,
+      "lastMessageId": 900001,
+      "lastMessageDate": 1772464607,
+      "lastMessageStatus": "none",
+      "photoUrl": null,
+      "isMuted": false,
+      "unreadMentionCount": 1,
+      "unreadReactionCount": 5,
+      "draftText": null,
+      "isBot": false,
+      "isOnline": false,
+      "isSavedMessages": false,
+      "user": null,
+      "lastMessageThumbUrl": null,
+      "typingText": null
+    }
+  ],
+  "chatKind": "sidebar"
+}

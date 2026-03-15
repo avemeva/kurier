@@ -1,0 +1,39 @@
+{
+  "chats": [
+    {
+      "id": 100027,
+      "title": "Premium User",
+      "kind": "private",
+      "userId": 6098406782,
+      "unreadCount": 0,
+      "isPinned": false,
+      "lastMessagePreview": "Hey, how are you?",
+      "lastMessageSenderName": null,
+      "lastMessageContentKind": "text",
+      "lastMessageIsForwarded": false,
+      "lastMessageId": 900001,
+      "lastMessageDate": 1772464607,
+      "lastMessageStatus": "none",
+      "photoUrl": "/dev/photos/6098406782.jpg",
+      "isMuted": false,
+      "unreadMentionCount": 0,
+      "unreadReactionCount": 0,
+      "draftText": null,
+      "isBot": false,
+      "isOnline": false,
+      "isSavedMessages": false,
+      "user": {
+        "id": 1,
+        "firstName": "Premium",
+        "lastName": "User",
+        "fullName": "Premium User",
+        "username": null,
+        "isPremium": true,
+        "emojiStatusId": null
+      },
+      "lastMessageThumbUrl": null,
+      "typingText": null
+    }
+  ],
+  "chatKind": "sidebar"
+}

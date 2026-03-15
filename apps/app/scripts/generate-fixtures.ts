@@ -1192,8 +1192,12 @@ const fixtures: Fixture[] = [
       chatId: GROUP_CHAT_ID,
       date: BASE_DATE,
       sender: senderAlice,
-      text: 'Alice pinned "Meeting moved to Thursday at 3pm"',
-      pinnedMessageId: 718750,
+      action: {
+        type: 'pin',
+        messageId: 718750,
+        previewText: 'Meeting moved to Thursday at 3pm',
+        contentKind: null,
+      },
     },
   },
   {
@@ -1209,8 +1213,7 @@ const fixtures: Fixture[] = [
       chatId: GROUP_CHAT_ID,
       date: BASE_DATE + 60,
       sender: senderCharlie,
-      text: 'Charlie pinned a photo',
-      pinnedMessageId: 718751,
+      action: { type: 'pin', messageId: 718751, previewText: null, contentKind: 'photo' },
     },
   },
   {
@@ -1226,8 +1229,7 @@ const fixtures: Fixture[] = [
       chatId: GROUP_CHAT_ID,
       date: BASE_DATE + 120,
       sender: senderAlice,
-      text: 'Alice pinned a video',
-      pinnedMessageId: 718752,
+      action: { type: 'pin', messageId: 718752, previewText: null, contentKind: 'video' },
     },
   },
   {
@@ -1243,8 +1245,7 @@ const fixtures: Fixture[] = [
       chatId: GROUP_CHAT_ID,
       date: BASE_DATE + 180,
       sender: senderCharlie,
-      text: 'Charlie pinned a voice message',
-      pinnedMessageId: 718753,
+      action: { type: 'pin', messageId: 718753, previewText: null, contentKind: 'voice' },
     },
   },
   {
@@ -1260,8 +1261,7 @@ const fixtures: Fixture[] = [
       chatId: GROUP_CHAT_ID,
       date: BASE_DATE + 240,
       sender: senderBot,
-      text: 'QuizBot joined the group',
-      pinnedMessageId: 0,
+      action: { type: 'join' },
     },
   },
   {
@@ -1277,8 +1277,7 @@ const fixtures: Fixture[] = [
       chatId: GROUP_CHAT_ID,
       date: BASE_DATE + 300,
       sender: senderBot,
-      text: 'QuizBot left the group',
-      pinnedMessageId: 0,
+      action: { type: 'leave' },
     },
   },
   {
@@ -1294,8 +1293,7 @@ const fixtures: Fixture[] = [
       chatId: GROUP_CHAT_ID,
       date: BASE_DATE + 360,
       sender: senderAlice,
-      text: 'Alice changed the group name to "Weekend Trip Planning"',
-      pinnedMessageId: 0,
+      action: { type: 'changeTitle', title: 'Weekend Trip Planning' },
     },
   },
   {
@@ -1311,8 +1309,7 @@ const fixtures: Fixture[] = [
       chatId: GROUP_CHAT_ID,
       date: BASE_DATE + 420,
       sender: senderCharlie,
-      text: 'Charlie changed the group photo',
-      pinnedMessageId: 0,
+      action: { type: 'changePhoto' },
     },
   },
 
@@ -1396,6 +1393,564 @@ const fixtures: Fixture[] = [
   },
 ];
 
+// ===========================================================================
+// Sidebar Fixtures (TGChat objects)
+// ===========================================================================
+
+type SidebarFixture = {
+  name: string;
+  description: string;
+  contentKind: string;
+  chat: Record<string, unknown>;
+};
+
+let nextChatId = 100000;
+function chatId() {
+  return nextChatId++;
+}
+
+function baseChat(overrides: Record<string, unknown>) {
+  return {
+    id: chatId(),
+    title: 'Alice',
+    kind: 'private',
+    userId: 6098406782,
+    unreadCount: 0,
+    isPinned: false,
+    lastMessagePreview: 'Hey, how are you?',
+    lastMessageSenderName: null,
+    lastMessageContentKind: 'text',
+    lastMessageIsForwarded: false,
+    lastMessageId: 900001,
+    lastMessageDate: BASE_DATE,
+    lastMessageStatus: 'none',
+    photoUrl: '/dev/photos/6098406782.jpg',
+    isMuted: false,
+    unreadMentionCount: 0,
+    unreadReactionCount: 0,
+    draftText: null,
+    isBot: false,
+    isOnline: false,
+    isSavedMessages: false,
+    user: null,
+    avatarUrl: undefined,
+    lastMessageThumbUrl: null,
+    typingText: null,
+    ...overrides,
+  };
+}
+
+const sidebarFixtures: SidebarFixture[] = [
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Private chats
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'sidebar-private-text-unread',
+    description: 'Private chat with unread text messages',
+    contentKind: 'sidebar-private',
+    chat: baseChat({ title: 'Alice', unreadCount: 3 }),
+  },
+  {
+    name: 'sidebar-private-read',
+    description: 'Private chat, all read',
+    contentKind: 'sidebar-private',
+    chat: baseChat({ title: 'Bob', lastMessageStatus: 'read' }),
+  },
+  {
+    name: 'sidebar-private-online',
+    description: 'Private chat, user online',
+    contentKind: 'sidebar-private',
+    chat: baseChat({ title: 'Charlie', isOnline: true, photoUrl: '/dev/photos/346928206.jpg' }),
+  },
+  {
+    name: 'sidebar-private-draft',
+    description: 'Private chat with draft text',
+    contentKind: 'sidebar-private',
+    chat: baseChat({ title: 'Diana', draftText: 'I was thinking about...' }),
+  },
+  {
+    name: 'sidebar-private-photo',
+    description: 'Private chat, last message is photo',
+    contentKind: 'sidebar-private',
+    chat: baseChat({
+      title: 'Eve',
+      lastMessagePreview: 'Photo',
+      lastMessageContentKind: 'photo',
+    }),
+  },
+  {
+    name: 'sidebar-private-photo-thumb',
+    description: 'Private chat, photo with thumbnail',
+    contentKind: 'sidebar-private',
+    chat: baseChat({
+      title: 'Frank',
+      lastMessagePreview: 'Look at this view!',
+      lastMessageContentKind: 'photo',
+      lastMessageThumbUrl: '/dev/media/sunset-mountain.jpg',
+    }),
+  },
+  {
+    name: 'sidebar-private-voice',
+    description: 'Private chat, last message is voice',
+    contentKind: 'sidebar-private',
+    chat: baseChat({
+      title: 'Grace',
+      lastMessagePreview: 'Voice message',
+      lastMessageContentKind: 'voice',
+    }),
+  },
+  {
+    name: 'sidebar-private-video',
+    description: 'Private chat, last message is video',
+    contentKind: 'sidebar-private',
+    chat: baseChat({
+      title: 'Hank',
+      lastMessagePreview: 'Video',
+      lastMessageContentKind: 'video',
+    }),
+  },
+  {
+    name: 'sidebar-private-sticker',
+    description: 'Private chat, last message is sticker',
+    contentKind: 'sidebar-private',
+    chat: baseChat({
+      title: 'Ivy',
+      lastMessagePreview: '\u{1F60A}',
+      lastMessageContentKind: 'sticker',
+    }),
+  },
+  {
+    name: 'sidebar-private-forwarded',
+    description: 'Private chat, forwarded message',
+    contentKind: 'sidebar-private',
+    chat: baseChat({
+      title: 'Jake',
+      lastMessagePreview: 'Breaking: TypeScript 6.0 released',
+      lastMessageIsForwarded: true,
+    }),
+  },
+  {
+    name: 'sidebar-private-document',
+    description: 'Private chat, document message',
+    contentKind: 'sidebar-private',
+    chat: baseChat({
+      title: 'Karen',
+      lastMessagePreview: 'quarterly-report.pdf',
+      lastMessageContentKind: 'document',
+    }),
+  },
+  {
+    name: 'sidebar-private-pinned',
+    description: 'Private chat, pinned, no unread',
+    contentKind: 'sidebar-private',
+    chat: baseChat({ title: 'Leo', isPinned: true }),
+  },
+  {
+    name: 'sidebar-private-muted-unread',
+    description: 'Private chat, muted with unread',
+    contentKind: 'sidebar-private',
+    chat: baseChat({ title: 'Mia', isMuted: true, unreadCount: 12 }),
+  },
+  {
+    name: 'sidebar-private-bot',
+    description: 'Private chat with a bot',
+    contentKind: 'sidebar-private',
+    chat: baseChat({
+      title: 'QuizBot',
+      isBot: true,
+      photoUrl: '/dev/photos/226578990.jpg',
+      lastMessagePreview: 'What language do you prefer?',
+    }),
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Groups
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'sidebar-group-sender-name',
+    description: 'Group with sender name in preview',
+    contentKind: 'sidebar-group',
+    chat: baseChat({
+      title: 'Weekend Trip Planning',
+      kind: 'supergroup',
+      userId: 0,
+      lastMessageSenderName: 'Charlie',
+      lastMessagePreview: 'Has anyone tried the new coffee place?',
+      photoUrl: null,
+    }),
+  },
+  {
+    name: 'sidebar-group-sender-you',
+    description: 'Group where you sent the last message',
+    contentKind: 'sidebar-group',
+    chat: baseChat({
+      title: 'Project Alpha',
+      kind: 'supergroup',
+      userId: 0,
+      lastMessageSenderName: 'You',
+      lastMessagePreview: 'I pushed the fix, check CI',
+      lastMessageStatus: 'sent',
+      photoUrl: null,
+    }),
+  },
+  {
+    name: 'sidebar-group-typing-single',
+    description: 'Group with one user typing',
+    contentKind: 'sidebar-group',
+    chat: baseChat({
+      title: 'Design Team',
+      kind: 'supergroup',
+      userId: 0,
+      typingText: 'Alice is typing...',
+      photoUrl: null,
+    }),
+  },
+  {
+    name: 'sidebar-group-typing-multiple',
+    description: 'Group with multiple users typing',
+    contentKind: 'sidebar-group',
+    chat: baseChat({
+      title: 'Dev Chat',
+      kind: 'supergroup',
+      userId: 0,
+      typingText: 'Alice and Bob are typing...',
+      photoUrl: null,
+    }),
+  },
+  {
+    name: 'sidebar-group-mention-badge',
+    description: 'Group with mention badge',
+    contentKind: 'sidebar-group',
+    chat: baseChat({
+      title: 'Announcements',
+      kind: 'supergroup',
+      userId: 0,
+      unreadCount: 5,
+      unreadMentionCount: 2,
+      photoUrl: null,
+    }),
+  },
+  {
+    name: 'sidebar-group-reaction-badge',
+    description: 'Group with reaction badge',
+    contentKind: 'sidebar-group',
+    chat: baseChat({
+      title: 'Memes',
+      kind: 'supergroup',
+      userId: 0,
+      unreadReactionCount: 3,
+      photoUrl: null,
+    }),
+  },
+  {
+    name: 'sidebar-group-all-badges',
+    description: 'Group with all badge types',
+    contentKind: 'sidebar-group',
+    chat: baseChat({
+      title: 'Active Group',
+      kind: 'supergroup',
+      userId: 0,
+      unreadCount: 42,
+      unreadMentionCount: 1,
+      unreadReactionCount: 5,
+      photoUrl: null,
+    }),
+  },
+  {
+    name: 'sidebar-group-muted',
+    description: 'Muted group',
+    contentKind: 'sidebar-group',
+    chat: baseChat({
+      title: 'Noisy Group',
+      kind: 'supergroup',
+      userId: 0,
+      isMuted: true,
+      unreadCount: 99,
+      photoUrl: null,
+    }),
+  },
+  {
+    name: 'sidebar-group-supergroup',
+    description: 'Basic supergroup',
+    contentKind: 'sidebar-group',
+    chat: baseChat({
+      title: 'Rust Enthusiasts',
+      kind: 'supergroup',
+      userId: 0,
+      lastMessageSenderName: 'Bob',
+      lastMessagePreview: 'Just shipped v0.2!',
+      photoUrl: null,
+    }),
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Channels
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'sidebar-channel-basic',
+    description: 'Basic channel',
+    contentKind: 'sidebar-channel',
+    chat: baseChat({
+      title: 'Tech News',
+      kind: 'channel',
+      userId: 0,
+      lastMessagePreview: 'Version 2.4 available. Update your apps.',
+      photoUrl: '/dev/photos/1042690371.jpg',
+    }),
+  },
+  {
+    name: 'sidebar-channel-forwarded',
+    description: 'Channel with forwarded message',
+    contentKind: 'sidebar-channel',
+    chat: baseChat({
+      title: 'Crypto Daily',
+      kind: 'channel',
+      userId: 0,
+      lastMessagePreview: 'BTC hits new ATH',
+      lastMessageIsForwarded: true,
+      photoUrl: null,
+    }),
+  },
+  {
+    name: 'sidebar-channel-photo-thumb',
+    description: 'Channel with photo thumbnail',
+    contentKind: 'sidebar-channel',
+    chat: baseChat({
+      title: 'Travel Photography',
+      kind: 'channel',
+      userId: 0,
+      lastMessagePreview: 'Sunset in Santorini',
+      lastMessageContentKind: 'photo',
+      lastMessageThumbUrl: '/dev/media/sunset-mountain.jpg',
+      photoUrl: null,
+    }),
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Special
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'sidebar-saved-messages',
+    description: 'Saved Messages (special avatar)',
+    contentKind: 'sidebar-special',
+    chat: baseChat({
+      title: 'Saved Messages',
+      isSavedMessages: true,
+      lastMessagePreview: 'Remember to buy groceries',
+    }),
+  },
+  {
+    name: 'sidebar-premium-star',
+    description: 'User with premium star',
+    contentKind: 'sidebar-special',
+    chat: baseChat({
+      title: 'Premium User',
+      user: {
+        id: 1,
+        firstName: 'Premium',
+        lastName: 'User',
+        fullName: 'Premium User',
+        username: null,
+        isPremium: true,
+        emojiStatusId: null,
+      },
+    }),
+  },
+  {
+    name: 'sidebar-premium-emoji-status',
+    description: 'User with custom emoji status',
+    contentKind: 'sidebar-special',
+    chat: baseChat({
+      title: '\u041C\u0430\u0440\u0443\u0441\u044F',
+      user: {
+        id: 2,
+        firstName: '\u041C\u0430\u0440\u0443\u0441\u044F',
+        lastName: '',
+        fullName: '\u041C\u0430\u0440\u0443\u0441\u044F',
+        username: 'naluneteplo',
+        isPremium: true,
+        emojiStatusId: '5316659463606796443',
+      },
+    }),
+  },
+  {
+    name: 'sidebar-selected',
+    description: 'Currently selected chat',
+    contentKind: 'sidebar-special',
+    chat: baseChat({ title: 'Selected Chat' }),
+  },
+  {
+    name: 'sidebar-long-title',
+    description: 'Chat with very long title that truncates',
+    contentKind: 'sidebar-special',
+    chat: baseChat({
+      title: 'This Is A Very Long Chat Title That Should Definitely Be Truncated In The Sidebar',
+    }),
+  },
+  {
+    name: 'sidebar-long-preview',
+    description: 'Chat with very long message preview',
+    contentKind: 'sidebar-special',
+    chat: baseChat({
+      title: 'Verbose Friend',
+      lastMessagePreview:
+        'So about this weekend I was thinking we could finally do that day trip to the coast because the weather forecast looks perfect and there is a seafood place on the pier',
+    }),
+  },
+  {
+    name: 'sidebar-no-last-message',
+    description: 'Chat with no last message',
+    contentKind: 'sidebar-special',
+    chat: baseChat({
+      title: 'New Chat',
+      lastMessagePreview: '',
+      lastMessageDate: 0,
+      lastMessageId: 0,
+      lastMessageContentKind: null,
+    }),
+  },
+  {
+    name: 'sidebar-no-photo',
+    description: 'Chat with no profile photo (letter avatar)',
+    contentKind: 'sidebar-special',
+    chat: baseChat({ title: 'Zara', photoUrl: null }),
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Status
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'sidebar-status-sent',
+    description: 'Message with sent checkmark',
+    contentKind: 'sidebar-status',
+    chat: baseChat({ title: 'Sent Example', lastMessageStatus: 'sent' }),
+  },
+  {
+    name: 'sidebar-status-read',
+    description: 'Message with read double checkmark',
+    contentKind: 'sidebar-status',
+    chat: baseChat({ title: 'Read Example', lastMessageStatus: 'read' }),
+  },
+  {
+    name: 'sidebar-status-none',
+    description: 'Incoming message (no checkmark)',
+    contentKind: 'sidebar-status',
+    chat: baseChat({ title: 'Incoming Example', lastMessageStatus: 'none' }),
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Content icons
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'sidebar-icon-photo',
+    description: 'Photo icon in preview',
+    contentKind: 'sidebar-icons',
+    chat: baseChat({
+      title: 'Photo Sender',
+      lastMessagePreview: 'Photo',
+      lastMessageContentKind: 'photo',
+    }),
+  },
+  {
+    name: 'sidebar-icon-video',
+    description: 'Video icon in preview',
+    contentKind: 'sidebar-icons',
+    chat: baseChat({
+      title: 'Video Sender',
+      lastMessagePreview: 'Video',
+      lastMessageContentKind: 'video',
+    }),
+  },
+  {
+    name: 'sidebar-icon-voice',
+    description: 'Voice icon in preview',
+    contentKind: 'sidebar-icons',
+    chat: baseChat({
+      title: 'Voice Sender',
+      lastMessagePreview: 'Voice message',
+      lastMessageContentKind: 'voice',
+    }),
+  },
+  {
+    name: 'sidebar-icon-document',
+    description: 'Document icon in preview',
+    contentKind: 'sidebar-icons',
+    chat: baseChat({
+      title: 'Doc Sender',
+      lastMessagePreview: 'report.pdf',
+      lastMessageContentKind: 'document',
+    }),
+  },
+  {
+    name: 'sidebar-icon-thumb-overrides',
+    description: 'Thumbnail overrides content icon',
+    contentKind: 'sidebar-icons',
+    chat: baseChat({
+      title: 'Thumb Override',
+      lastMessagePreview: 'Check this sunset!',
+      lastMessageContentKind: 'photo',
+      lastMessageThumbUrl: '/dev/media/sunset-mountain.jpg',
+    }),
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Edge cases
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    name: 'sidebar-edge-pinned-with-unread',
+    description: 'Pinned chat with unread (no pin icon when unread)',
+    contentKind: 'sidebar-edge-cases',
+    chat: baseChat({ title: 'Pinned Unread', isPinned: true, unreadCount: 7 }),
+  },
+  {
+    name: 'sidebar-edge-forwarded-with-thumb',
+    description: 'Forwarded message with thumbnail',
+    contentKind: 'sidebar-edge-cases',
+    chat: baseChat({
+      title: 'Fwd + Thumb',
+      lastMessagePreview: 'Amazing photo from the trip',
+      lastMessageIsForwarded: true,
+      lastMessageContentKind: 'photo',
+      lastMessageThumbUrl: '/dev/media/food-plate.jpg',
+    }),
+  },
+  {
+    name: 'sidebar-edge-group-forwarded-sender',
+    description: 'Group with forwarded message and sender name',
+    contentKind: 'sidebar-edge-cases',
+    chat: baseChat({
+      title: 'Group Fwd',
+      kind: 'supergroup',
+      userId: 0,
+      lastMessageSenderName: 'Alice',
+      lastMessagePreview: 'Check this article',
+      lastMessageIsForwarded: true,
+      photoUrl: null,
+    }),
+  },
+  {
+    name: 'sidebar-edge-draft-overrides',
+    description: 'Draft overrides everything (preview, typing)',
+    contentKind: 'sidebar-edge-cases',
+    chat: baseChat({
+      title: 'Draft Priority',
+      draftText: 'Actually, let me rephrase...',
+      typingText: 'Someone is typing...',
+      lastMessagePreview: 'Original message here',
+    }),
+  },
+  {
+    name: 'sidebar-edge-typing-overrides',
+    description: 'Typing indicator overrides preview',
+    contentKind: 'sidebar-edge-cases',
+    chat: baseChat({
+      title: 'Typing Priority',
+      typingText: 'typing...',
+      lastMessagePreview: 'This should not be visible',
+    }),
+  },
+];
+
 // ---------------------------------------------------------------------------
 // Generate
 // ---------------------------------------------------------------------------
@@ -1415,7 +1970,7 @@ try {
 // Ensure the fixtures root exists
 mkdirSync(FIXTURES_DIR, { recursive: true });
 
-// Write each fixture
+// Write each message fixture
 for (const fixture of fixtures) {
   const dir = join(FIXTURES_DIR, fixture.name);
   mkdirSync(dir, { recursive: true });
@@ -1428,13 +1983,36 @@ for (const fixture of fixtures) {
   writeFileSync(join(dir, 'fixture.json'), `${JSON.stringify(fixtureJson, null, 2)}\n`);
 }
 
-// Write manifest
-const manifest = fixtures.map((f) => ({
-  name: f.name,
-  description: f.description,
-  contentKind: f.contentKind,
-}));
+// Write each sidebar fixture
+for (const fixture of sidebarFixtures) {
+  const dir = join(FIXTURES_DIR, fixture.name);
+  mkdirSync(dir, { recursive: true });
+
+  const fixtureJson = {
+    chats: [fixture.chat],
+    chatKind: 'sidebar',
+  };
+
+  writeFileSync(join(dir, 'fixture.json'), `${JSON.stringify(fixtureJson, null, 2)}\n`);
+}
+
+// Write manifest (both message and sidebar fixtures)
+const manifest = [
+  ...fixtures.map((f) => ({
+    name: f.name,
+    description: f.description,
+    contentKind: f.contentKind,
+  })),
+  ...sidebarFixtures.map((f) => ({
+    name: f.name,
+    description: f.description,
+    contentKind: f.contentKind,
+  })),
+];
 
 writeFileSync(join(FIXTURES_DIR, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 
-console.log(`Generated ${fixtures.length} fixtures + manifest.json in ${FIXTURES_DIR}`);
+const total = fixtures.length + sidebarFixtures.length;
+console.log(
+  `Generated ${total} fixtures (${fixtures.length} message + ${sidebarFixtures.length} sidebar) + manifest.json in ${FIXTURES_DIR}`,
+);

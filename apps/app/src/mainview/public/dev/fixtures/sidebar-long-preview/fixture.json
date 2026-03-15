@@ -1,0 +1,31 @@
+{
+  "chats": [
+    {
+      "id": 100031,
+      "title": "Verbose Friend",
+      "kind": "private",
+      "userId": 6098406782,
+      "unreadCount": 0,
+      "isPinned": false,
+      "lastMessagePreview": "So about this weekend I was thinking we could finally do that day trip to the coast because the weather forecast looks perfect and there is a seafood place on the pier",
+      "lastMessageSenderName": null,
+      "lastMessageContentKind": "text",
+      "lastMessageIsForwarded": false,
+      "lastMessageId": 900001,
+      "lastMessageDate": 1772464607,
+      "lastMessageStatus": "none",
+      "photoUrl": "/dev/photos/6098406782.jpg",
+      "isMuted": false,
+      "unreadMentionCount": 0,
+      "unreadReactionCount": 0,
+      "draftText": null,
+      "isBot": false,
+      "isOnline": false,
+      "isSavedMessages": false,
+      "user": null,
+      "lastMessageThumbUrl": null,
+      "typingText": null
+    }
+  ],
+  "chatKind": "sidebar"
+}

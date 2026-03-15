@@ -46,6 +46,7 @@ export type {
   TGReplyTo,
   TGSearchResult,
   TGSender,
+  TGServiceAction,
   TGServiceMessage,
   TGStickerContent,
   TGTextContent,

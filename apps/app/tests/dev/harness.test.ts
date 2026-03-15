@@ -91,7 +91,10 @@ devTest.describe('dev harness fixtures', () => {
 
       // Navigate to the fixture page
       await page.goto(`${url}/dev/fixture/${entry.name}`);
-      await page.waitForSelector("[data-testid='fixture-message']", { timeout: 10_000 });
+      // Wait for either message or sidebar fixture to render
+      await page.waitForSelector("[data-testid='fixture-message'], [data-testid='fixture-meta']", {
+        timeout: 10_000,
+      });
 
       // Take a screenshot with the fixture name
       // Video/animation fixtures may render different frames — allow some pixel diff

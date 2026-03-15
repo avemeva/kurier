@@ -20,6 +20,7 @@ import type {
   TGReplyTo,
   TGSearchResult,
   TGSender,
+  TGServiceAction,
   TGServiceMessage,
   TGTextEntity,
   TGUser,
@@ -272,34 +273,34 @@ export function extractForwardPhotoId(info: Td.messageForwardInfo | undefined): 
   }
 }
 
-// --- Service text ---
+// --- Service action ---
 
-export function extractServiceText(content: Td.MessageContent): string | null {
+export function extractServiceAction(content: Td.MessageContent): TGServiceAction | null {
   switch (content._) {
     case 'messageChatAddMembers':
-      return 'joined the group';
+      return { type: 'join' };
     case 'messageChatDeleteMember':
-      return 'left the group';
+      return { type: 'leave' };
     case 'messageChatChangeTitle':
-      return `changed group name to "${content.title}"`;
+      return { type: 'changeTitle', title: content.title };
     case 'messageChatChangePhoto':
-      return 'changed group photo';
+      return { type: 'changePhoto' };
     case 'messageChatDeletePhoto':
-      return 'removed group photo';
+      return { type: 'deletePhoto' };
     case 'messageBasicGroupChatCreate':
-      return `created group "${content.title}"`;
+      return { type: 'createGroup', title: content.title };
     case 'messageSupergroupChatCreate':
-      return `created group "${content.title}"`;
+      return { type: 'createGroup', title: content.title };
     case 'messagePinMessage':
-      return 'pinned a message';
+      return { type: 'pin', messageId: content.message_id, previewText: null, contentKind: null };
     case 'messageScreenshotTaken':
-      return 'took a screenshot';
+      return { type: 'screenshot' };
     case 'messageCustomServiceAction':
-      return content.text;
+      return { type: 'custom', text: content.text };
     case 'messageChatJoinByLink':
-      return 'joined via invite link';
+      return { type: 'joinByLink' };
     case 'messageChatJoinByRequest':
-      return 'was accepted to the group';
+      return { type: 'joinByRequest' };
     default:
       return null;
   }
@@ -686,17 +687,16 @@ export function toTGMessage(
   chats?: Td.chat[],
 ): (TGMessageBase & { kind: 'message' }) | TGServiceMessage {
   const sender = toTGSender(msg.sender_id, users);
-  const serviceText = extractServiceText(msg.content);
+  const action = extractServiceAction(msg.content);
 
-  if (serviceText !== null) {
+  if (action !== null) {
     return {
       kind: 'service',
       id: msg.id,
       chatId: msg.chat_id,
       date: msg.date,
       sender,
-      text: serviceText,
-      pinnedMessageId: msg.content._ === 'messagePinMessage' ? msg.content.message_id : 0,
+      action,
     };
   }
 
@@ -718,6 +718,37 @@ export function toTGMessage(
   };
 }
 
+// --- Service action text (for reply previews only) ---
+
+function serviceActionText(senderName: string, action: TGServiceAction): string {
+  switch (action.type) {
+    case 'pin':
+      return action.previewText
+        ? `${senderName} pinned "${action.previewText}"`
+        : `${senderName} pinned a message`;
+    case 'join':
+      return `${senderName} joined the group`;
+    case 'leave':
+      return `${senderName} left the group`;
+    case 'changeTitle':
+      return `${senderName} changed group name to "${action.title}"`;
+    case 'changePhoto':
+      return `${senderName} changed group photo`;
+    case 'deletePhoto':
+      return `${senderName} removed group photo`;
+    case 'createGroup':
+      return `${senderName} created group "${action.title}"`;
+    case 'screenshot':
+      return `${senderName} took a screenshot`;
+    case 'joinByLink':
+      return `${senderName} joined via invite link`;
+    case 'joinByRequest':
+      return `${senderName} was accepted to the group`;
+    case 'custom':
+      return action.text;
+  }
+}
+
 // --- enrichReplyPreviews ---
 
 export function enrichReplyPreviews(messages: TGMessage[]): TGMessage[] {
@@ -735,7 +766,7 @@ export function enrichReplyPreviews(messages: TGMessage[]): TGMessage[] {
         replyTo: {
           ...m.replyTo,
           senderName: target.sender.name,
-          text: target.text,
+          text: serviceActionText(target.sender.name, target.action),
           mediaLabel: '',
         },
       };
@@ -913,22 +944,22 @@ export function hydrateMessage(
 
   if (msg.kind === 'service') {
     const senderPhotoUrl = profilePhotos[msg.sender.userId];
-    let text = msg.text;
+    let action = msg.action;
 
-    if (msg.pinnedMessageId > 0) {
-      const key = `${msg.chatId}_${msg.pinnedMessageId}`;
+    if (action.type === 'pin') {
+      const key = `${msg.chatId}_${action.messageId}`;
       const preview = pinnedPreviews[key];
       if (preview !== undefined && preview !== null) {
-        text = `pinned "${preview}"`;
+        action = { ...action, previewText: preview };
       }
     }
 
-    if (senderPhotoUrl === undefined && text === msg.text) return msg;
+    if (senderPhotoUrl === undefined && action === msg.action) return msg;
     return {
       ...msg,
       sender:
         senderPhotoUrl !== undefined ? { ...msg.sender, photoUrl: senderPhotoUrl } : msg.sender,
-      text,
+      action,
     };
   }
 

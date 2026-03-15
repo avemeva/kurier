@@ -10,8 +10,12 @@
         "name": "Alice",
         "photoUrl": "/dev/photos/6098406782.jpg"
       },
-      "text": "Alice pinned \"Meeting moved to Thursday at 3pm\"",
-      "pinnedMessageId": 718750
+      "action": {
+        "type": "pin",
+        "messageId": 718750,
+        "previewText": "Meeting moved to Thursday at 3pm",
+        "contentKind": null
+      }
     }
   ],
   "chatKind": "supergroup"

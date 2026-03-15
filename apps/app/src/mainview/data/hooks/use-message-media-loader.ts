@@ -16,10 +16,10 @@ export function loadMessageMedia(msg: TGMessage, store: ChatState): void {
       store.loadProfilePhoto(msg.sender.userId);
     }
     // Pinned preview
-    if (msg.pinnedMessageId > 0) {
-      const key = `${msg.chatId}_${msg.pinnedMessageId}`;
+    if (msg.action.type === 'pin') {
+      const key = `${msg.chatId}_${msg.action.messageId}`;
       if (store.pinnedPreviews[key] === undefined) {
-        store.resolvePinnedPreview(msg.chatId, msg.pinnedMessageId);
+        store.resolvePinnedPreview(msg.chatId, msg.action.messageId);
       }
     }
     return;

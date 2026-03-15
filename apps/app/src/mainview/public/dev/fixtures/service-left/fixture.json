@@ -10,8 +10,9 @@
         "name": "QuizBot",
         "photoUrl": "/dev/photos/226578990.jpg"
       },
-      "text": "QuizBot left the group",
-      "pinnedMessageId": 0
+      "action": {
+        "type": "leave"
+      }
     }
   ],
   "chatKind": "supergroup"

@@ -1,0 +1,31 @@
+{
+  "chats": [
+    {
+      "id": 100023,
+      "title": "Tech News",
+      "kind": "channel",
+      "userId": 0,
+      "unreadCount": 0,
+      "isPinned": false,
+      "lastMessagePreview": "Version 2.4 available. Update your apps.",
+      "lastMessageSenderName": null,
+      "lastMessageContentKind": "text",
+      "lastMessageIsForwarded": false,
+      "lastMessageId": 900001,
+      "lastMessageDate": 1772464607,
+      "lastMessageStatus": "none",
+      "photoUrl": "/dev/photos/1042690371.jpg",
+      "isMuted": false,
+      "unreadMentionCount": 0,
+      "unreadReactionCount": 0,
+      "draftText": null,
+      "isBot": false,
+      "isOnline": false,
+      "isSavedMessages": false,
+      "user": null,
+      "lastMessageThumbUrl": null,
+      "typingText": null
+    }
+  ],
+  "chatKind": "sidebar"
+}

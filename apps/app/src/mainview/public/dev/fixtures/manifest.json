@@ -315,13 +315,238 @@
     "contentKind": "pending"
   },
   {
-    "name": "captured-104614330368-2026-03-15-14-01-24",
-    "description": "Captured: captured-104614330368-2026-03-15-14-01-24",
-    "contentKind": "unknown"
+    "name": "sidebar-private-text-unread",
+    "description": "Private chat with unread text messages",
+    "contentKind": "sidebar-private"
   },
   {
-    "name": "captured-104446558208-2026-03-15-14-01-55",
-    "description": "Captured: captured-104446558208-2026-03-15-14-01-55",
-    "contentKind": "unknown"
+    "name": "sidebar-private-read",
+    "description": "Private chat, all read",
+    "contentKind": "sidebar-private"
+  },
+  {
+    "name": "sidebar-private-online",
+    "description": "Private chat, user online",
+    "contentKind": "sidebar-private"
+  },
+  {
+    "name": "sidebar-private-draft",
+    "description": "Private chat with draft text",
+    "contentKind": "sidebar-private"
+  },
+  {
+    "name": "sidebar-private-photo",
+    "description": "Private chat, last message is photo",
+    "contentKind": "sidebar-private"
+  },
+  {
+    "name": "sidebar-private-photo-thumb",
+    "description": "Private chat, photo with thumbnail",
+    "contentKind": "sidebar-private"
+  },
+  {
+    "name": "sidebar-private-voice",
+    "description": "Private chat, last message is voice",
+    "contentKind": "sidebar-private"
+  },
+  {
+    "name": "sidebar-private-video",
+    "description": "Private chat, last message is video",
+    "contentKind": "sidebar-private"
+  },
+  {
+    "name": "sidebar-private-sticker",
+    "description": "Private chat, last message is sticker",
+    "contentKind": "sidebar-private"
+  },
+  {
+    "name": "sidebar-private-forwarded",
+    "description": "Private chat, forwarded message",
+    "contentKind": "sidebar-private"
+  },
+  {
+    "name": "sidebar-private-document",
+    "description": "Private chat, document message",
+    "contentKind": "sidebar-private"
+  },
+  {
+    "name": "sidebar-private-pinned",
+    "description": "Private chat, pinned, no unread",
+    "contentKind": "sidebar-private"
+  },
+  {
+    "name": "sidebar-private-muted-unread",
+    "description": "Private chat, muted with unread",
+    "contentKind": "sidebar-private"
+  },
+  {
+    "name": "sidebar-private-bot",
+    "description": "Private chat with a bot",
+    "contentKind": "sidebar-private"
+  },
+  {
+    "name": "sidebar-group-sender-name",
+    "description": "Group with sender name in preview",
+    "contentKind": "sidebar-group"
+  },
+  {
+    "name": "sidebar-group-sender-you",
+    "description": "Group where you sent the last message",
+    "contentKind": "sidebar-group"
+  },
+  {
+    "name": "sidebar-group-typing-single",
+    "description": "Group with one user typing",
+    "contentKind": "sidebar-group"
+  },
+  {
+    "name": "sidebar-group-typing-multiple",
+    "description": "Group with multiple users typing",
+    "contentKind": "sidebar-group"
+  },
+  {
+    "name": "sidebar-group-mention-badge",
+    "description": "Group with mention badge",
+    "contentKind": "sidebar-group"
+  },
+  {
+    "name": "sidebar-group-reaction-badge",
+    "description": "Group with reaction badge",
+    "contentKind": "sidebar-group"
+  },
+  {
+    "name": "sidebar-group-all-badges",
+    "description": "Group with all badge types",
+    "contentKind": "sidebar-group"
+  },
+  {
+    "name": "sidebar-group-muted",
+    "description": "Muted group",
+    "contentKind": "sidebar-group"
+  },
+  {
+    "name": "sidebar-group-supergroup",
+    "description": "Basic supergroup",
+    "contentKind": "sidebar-group"
+  },
+  {
+    "name": "sidebar-channel-basic",
+    "description": "Basic channel",
+    "contentKind": "sidebar-channel"
+  },
+  {
+    "name": "sidebar-channel-forwarded",
+    "description": "Channel with forwarded message",
+    "contentKind": "sidebar-channel"
+  },
+  {
+    "name": "sidebar-channel-photo-thumb",
+    "description": "Channel with photo thumbnail",
+    "contentKind": "sidebar-channel"
+  },
+  {
+    "name": "sidebar-saved-messages",
+    "description": "Saved Messages (special avatar)",
+    "contentKind": "sidebar-special"
+  },
+  {
+    "name": "sidebar-premium-star",
+    "description": "User with premium star",
+    "contentKind": "sidebar-special"
+  },
+  {
+    "name": "sidebar-premium-emoji-status",
+    "description": "User with custom emoji status",
+    "contentKind": "sidebar-special"
+  },
+  {
+    "name": "sidebar-selected",
+    "description": "Currently selected chat",
+    "contentKind": "sidebar-special"
+  },
+  {
+    "name": "sidebar-long-title",
+    "description": "Chat with very long title that truncates",
+    "contentKind": "sidebar-special"
+  },
+  {
+    "name": "sidebar-long-preview",
+    "description": "Chat with very long message preview",
+    "contentKind": "sidebar-special"
+  },
+  {
+    "name": "sidebar-no-last-message",
+    "description": "Chat with no last message",
+    "contentKind": "sidebar-special"
+  },
+  {
+    "name": "sidebar-no-photo",
+    "description": "Chat with no profile photo (letter avatar)",
+    "contentKind": "sidebar-special"
+  },
+  {
+    "name": "sidebar-status-sent",
+    "description": "Message with sent checkmark",
+    "contentKind": "sidebar-status"
+  },
+  {
+    "name": "sidebar-status-read",
+    "description": "Message with read double checkmark",
+    "contentKind": "sidebar-status"
+  },
+  {
+    "name": "sidebar-status-none",
+    "description": "Incoming message (no checkmark)",
+    "contentKind": "sidebar-status"
+  },
+  {
+    "name": "sidebar-icon-photo",
+    "description": "Photo icon in preview",
+    "contentKind": "sidebar-icons"
+  },
+  {
+    "name": "sidebar-icon-video",
+    "description": "Video icon in preview",
+    "contentKind": "sidebar-icons"
+  },
+  {
+    "name": "sidebar-icon-voice",
+    "description": "Voice icon in preview",
+    "contentKind": "sidebar-icons"
+  },
+  {
+    "name": "sidebar-icon-document",
+    "description": "Document icon in preview",
+    "contentKind": "sidebar-icons"
+  },
+  {
+    "name": "sidebar-icon-thumb-overrides",
+    "description": "Thumbnail overrides content icon",
+    "contentKind": "sidebar-icons"
+  },
+  {
+    "name": "sidebar-edge-pinned-with-unread",
+    "description": "Pinned chat with unread (no pin icon when unread)",
+    "contentKind": "sidebar-edge-cases"
+  },
+  {
+    "name": "sidebar-edge-forwarded-with-thumb",
+    "description": "Forwarded message with thumbnail",
+    "contentKind": "sidebar-edge-cases"
+  },
+  {
+    "name": "sidebar-edge-group-forwarded-sender",
+    "description": "Group with forwarded message and sender name",
+    "contentKind": "sidebar-edge-cases"
+  },
+  {
+    "name": "sidebar-edge-draft-overrides",
+    "description": "Draft overrides everything (preview, typing)",
+    "contentKind": "sidebar-edge-cases"
+  },
+  {
+    "name": "sidebar-edge-typing-overrides",
+    "description": "Typing indicator overrides preview",
+    "contentKind": "sidebar-edge-cases"
   }
 ]

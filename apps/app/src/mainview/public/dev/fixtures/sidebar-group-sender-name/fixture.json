@@ -1,0 +1,31 @@
+{
+  "chats": [
+    {
+      "id": 100014,
+      "title": "Weekend Trip Planning",
+      "kind": "supergroup",
+      "userId": 0,
+      "unreadCount": 0,
+      "isPinned": false,
+      "lastMessagePreview": "Has anyone tried the new coffee place?",
+      "lastMessageSenderName": "Charlie",
+      "lastMessageContentKind": "text",
+      "lastMessageIsForwarded": false,
+      "lastMessageId": 900001,
+      "lastMessageDate": 1772464607,
+      "lastMessageStatus": "none",
+      "photoUrl": null,
+      "isMuted": false,
+      "unreadMentionCount": 0,
+      "unreadReactionCount": 0,
+      "draftText": null,
+      "isBot": false,
+      "isOnline": false,
+      "isSavedMessages": false,
+      "user": null,
+      "lastMessageThumbUrl": null,
+      "typingText": null
+    }
+  ],
+  "chatKind": "sidebar"
+}

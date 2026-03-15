@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { PureChatItem } from '@/components/ui/chat/pure-chat-item';
 import { PureChatView } from '@/components/ui/chat/pure-chat-view';
-import type { ChatKind, TGMessage } from '@/data';
+import type { ChatKind, TGChat, TGMessage } from '@/data';
 
 type FixtureEntry = {
   name: string;
@@ -8,13 +9,24 @@ type FixtureEntry = {
   contentKind: string;
 };
 
-type LoadedFixture = {
+type LoadedMessageFixture = {
+  type: 'message';
   name: string;
   description: string;
   contentKind: string;
   messages: TGMessage[];
   chatKind: ChatKind;
 };
+
+type LoadedSidebarFixture = {
+  type: 'sidebar';
+  name: string;
+  description: string;
+  contentKind: string;
+  chats: TGChat[];
+};
+
+type LoadedFixture = LoadedMessageFixture | LoadedSidebarFixture;
 
 type Props = {
   navigate: (e: React.MouseEvent<HTMLAnchorElement>) => void;
@@ -43,6 +55,13 @@ function sectionTitle(kind: string): string {
     grouping: 'Message Grouping',
     document: 'Documents',
     pending: 'Pending Messages',
+    'sidebar-private': 'Sidebar \u2014 Private Chats',
+    'sidebar-group': 'Sidebar \u2014 Groups',
+    'sidebar-channel': 'Sidebar \u2014 Channels',
+    'sidebar-special': 'Sidebar \u2014 Special',
+    'sidebar-status': 'Sidebar \u2014 Status',
+    'sidebar-icons': 'Sidebar \u2014 Content Icons',
+    'sidebar-edge-cases': 'Sidebar \u2014 Edge Cases',
   };
   return titles[kind] ?? kind.toUpperCase();
 }
@@ -66,10 +85,21 @@ export function FixtureIndex({ navigate }: Props) {
               const res = await fetch(`/dev/fixtures/${entry.name}/fixture.json`);
               if (!res.ok) return null;
               const data = await res.json();
+
+              // Sidebar fixture
+              if (data.chats) {
+                return {
+                  type: 'sidebar',
+                  ...entry,
+                  chats: data.chats as TGChat[],
+                } as LoadedSidebarFixture;
+              }
+
+              // Message fixture
               const messages: TGMessage[] = data.messages ?? (data.message ? [data.message] : []);
               const chatKind: ChatKind =
                 data.chatKind ?? (data.showSender ? 'supergroup' : 'private');
-              return { ...entry, messages, chatKind } as LoadedFixture;
+              return { type: 'message', ...entry, messages, chatKind } as LoadedMessageFixture;
             } catch {
               return null;
             }
@@ -109,15 +139,59 @@ export function FixtureIndex({ navigate }: Props) {
       {!loading && !error && (
         <div data-testid="fixture-list" className="space-y-8 p-6">
           {[...grouped.entries()].map(([kind, entries]) => {
-            // Concatenate all messages from fixtures of this kind into one list,
-            // interleaving fixture-name labels as service messages for visual separation.
+            const isSidebar = entries[0]?.type === 'sidebar';
+
+            if (isSidebar) {
+              // Render sidebar fixtures as a list of PureChatItem components
+              const allChats: TGChat[] = [];
+              for (const f of entries) {
+                if (f.type === 'sidebar') {
+                  for (const chat of f.chats) {
+                    allChats.push(chat);
+                  }
+                }
+              }
+
+              return (
+                <section key={kind}>
+                  <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-text-tertiary">
+                    {sectionTitle(kind)}
+                  </h2>
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {entries.map((f) => (
+                      <a
+                        key={f.name}
+                        href={`/dev/fixture/${f.name}`}
+                        onClick={navigate}
+                        className="rounded-md border border-border-primary px-2 py-0.5 text-xs text-text-tertiary transition-colors hover:bg-surface-hover hover:text-text-primary"
+                      >
+                        {f.name}
+                      </a>
+                    ))}
+                  </div>
+                  <div className="w-80 rounded-lg border border-border-primary bg-background px-2 py-1">
+                    {allChats.map((chat) => (
+                      <PureChatItem
+                        key={chat.id}
+                        chat={chat}
+                        isSelected={chat.title === 'Selected Chat'}
+                        onClick={noop}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            }
+
+            // Message fixtures — existing rendering
             const allMessages: TGMessage[] = [];
-            // Determine the dominant chatKind for the group (use first fixture's)
-            const chatKind = entries[0].chatKind;
+            const chatKind = (entries[0] as LoadedMessageFixture).chatKind;
 
             for (const f of entries) {
-              for (const msg of f.messages) {
-                allMessages.push(msg);
+              if (f.type === 'message') {
+                for (const msg of f.messages) {
+                  allMessages.push(msg);
+                }
               }
             }
 

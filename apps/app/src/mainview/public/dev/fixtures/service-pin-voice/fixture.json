@@ -10,8 +10,12 @@
         "name": "Charlie",
         "photoUrl": "/dev/photos/346928206.jpg"
       },
-      "text": "Charlie pinned a voice message",
-      "pinnedMessageId": 718753
+      "action": {
+        "type": "pin",
+        "messageId": 718753,
+        "previewText": null,
+        "contentKind": "voice"
+      }
     }
   ],
   "chatKind": "supergroup"

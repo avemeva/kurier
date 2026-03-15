@@ -10,8 +10,9 @@
         "name": "Charlie",
         "photoUrl": "/dev/photos/346928206.jpg"
       },
-      "text": "Charlie changed the group photo",
-      "pinnedMessageId": 0
+      "action": {
+        "type": "changePhoto"
+      }
     }
   ],
   "chatKind": "supergroup"

@@ -10,8 +10,12 @@
         "name": "Alice",
         "photoUrl": "/dev/photos/6098406782.jpg"
       },
-      "text": "Alice pinned a video",
-      "pinnedMessageId": 718752
+      "action": {
+        "type": "pin",
+        "messageId": 718752,
+        "previewText": null,
+        "contentKind": "video"
+      }
     }
   ],
   "chatKind": "supergroup"

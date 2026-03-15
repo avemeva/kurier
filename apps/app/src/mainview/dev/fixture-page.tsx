@@ -1,15 +1,21 @@
 import { useEffect, useState } from 'react';
+import { PureChatItem } from '@/components/ui/chat/pure-chat-item';
 import { PureChatView } from '@/components/ui/chat/pure-chat-view';
-import type { ChatKind, TGMessage } from '@/data';
+import type { ChatKind, TGChat, TGMessage } from '@/data';
 
 type FixtureData = {
-  messages: TGMessage[];
-  chatKind: ChatKind;
+  messages?: TGMessage[];
+  chats?: TGChat[];
+  chatKind: ChatKind | 'sidebar';
   // Legacy single-message format
   message?: TGMessage;
   showSender?: boolean;
   groupPosition?: string;
 };
+
+type MessageFixture = { type: 'message'; messages: TGMessage[]; chatKind: ChatKind };
+type SidebarFixture = { type: 'sidebar'; chats: TGChat[] };
+type ParsedFixture = MessageFixture | SidebarFixture;
 
 type Props = {
   name: string;
@@ -19,9 +25,7 @@ type Props = {
 const noop = () => {};
 
 export function FixturePage({ name, navigate }: Props) {
-  const [fixture, setFixture] = useState<{ messages: TGMessage[]; chatKind: ChatKind } | null>(
-    null,
-  );
+  const [fixture, setFixture] = useState<ParsedFixture | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,11 +37,21 @@ export function FixturePage({ name, navigate }: Props) {
         return res.json();
       })
       .then((data: FixtureData) => {
-        // Support both formats: { messages, chatKind } and legacy { message, showSender }
+        // Sidebar fixture
+        if (data.chats) {
+          setFixture({ type: 'sidebar', chats: data.chats });
+          return;
+        }
+        // Message fixture: { messages, chatKind } or legacy { message, showSender }
         if (data.messages) {
-          setFixture({ messages: data.messages, chatKind: data.chatKind ?? 'private' });
+          setFixture({
+            type: 'message',
+            messages: data.messages,
+            chatKind: (data.chatKind as ChatKind) ?? 'private',
+          });
         } else if (data.message) {
           setFixture({
+            type: 'message',
             messages: [data.message],
             chatKind: data.showSender ? 'supergroup' : 'private',
           });
@@ -72,6 +86,41 @@ export function FixturePage({ name, navigate }: Props) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <p className="text-text-secondary">Loading...</p>
+      </div>
+    );
+  }
+
+  if (fixture.type === 'sidebar') {
+    return (
+      <div className="flex h-screen flex-col bg-background">
+        <div
+          data-testid="fixture-meta"
+          className="shrink-0 border-b border-border-primary px-4 py-2"
+        >
+          <div className="flex items-center gap-4">
+            <a href="/dev" onClick={navigate} className="text-sm text-accent-brand hover:underline">
+              Back to index
+            </a>
+            <h1 className="text-sm font-semibold text-text-primary">{name}</h1>
+            <div
+              data-testid="fixture-state"
+              className="ml-auto flex gap-3 text-xs text-text-tertiary"
+            >
+              <span>sidebar</span>
+              <span>{fixture.chats[0]?.kind ?? 'n/a'}</span>
+            </div>
+          </div>
+        </div>
+        <div className="w-80 border-r border-border bg-background">
+          {fixture.chats.map((chat) => (
+            <PureChatItem
+              key={chat.id}
+              chat={chat}
+              isSelected={chat.title === 'Selected Chat'}
+              onClick={noop}
+            />
+          ))}
+        </div>
       </div>
     );
   }

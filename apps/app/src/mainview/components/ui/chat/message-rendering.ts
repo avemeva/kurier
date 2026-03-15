@@ -1,7 +1,7 @@
 // Rendering logic for messages — pure functions, no store dependency.
 // Lives alongside the consumer (PureMessageRow) instead of in @/data.
 
-import type { TGContent, TGMessage, TGMessageBase } from '@/data';
+import type { TGContent, TGMessage, TGMessageBase, TGServiceAction } from '@/data';
 import { computeMediaSize, MAX_MEDIA_SIZE, MIN_MEDIA_SIZE } from '@/lib/media-sizing';
 
 // --- Info display type (shared with MessageTime) ---
@@ -26,8 +26,8 @@ export type MessageContext = {
 
 export type ServiceRenderState = {
   layout: 'service';
-  text: string;
-  pinnedMessageId: number;
+  senderName: string;
+  action: TGServiceAction;
 };
 
 export type PendingRenderState = {
@@ -138,8 +138,8 @@ export function computeMessageState(
   if (msg.kind === 'service') {
     return {
       layout: 'service',
-      text: msg.text,
-      pinnedMessageId: msg.pinnedMessageId,
+      senderName: msg.sender.name,
+      action: msg.action,
     };
   }
 

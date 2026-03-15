@@ -281,14 +281,31 @@ export type TGMessageBase = {
   content: TGContent;
 };
 
+export type TGServiceAction =
+  | {
+      type: 'pin';
+      messageId: number;
+      previewText: string | null;
+      contentKind: MessageContentKind | null;
+    }
+  | { type: 'join' }
+  | { type: 'leave' }
+  | { type: 'changeTitle'; title: string }
+  | { type: 'changePhoto' }
+  | { type: 'deletePhoto' }
+  | { type: 'createGroup'; title: string }
+  | { type: 'screenshot' }
+  | { type: 'joinByLink' }
+  | { type: 'joinByRequest' }
+  | { type: 'custom'; text: string };
+
 export type TGServiceMessage = {
   kind: 'service';
   id: number;
   chatId: number;
   date: number;
   sender: TGSender;
-  text: string;
-  pinnedMessageId: number;
+  action: TGServiceAction;
 };
 
 export type TGPendingMessage = {

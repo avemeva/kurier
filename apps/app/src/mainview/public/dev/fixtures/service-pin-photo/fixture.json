@@ -10,8 +10,12 @@
         "name": "Charlie",
         "photoUrl": "/dev/photos/346928206.jpg"
       },
-      "text": "Charlie pinned a photo",
-      "pinnedMessageId": 718751
+      "action": {
+        "type": "pin",
+        "messageId": 718751,
+        "previewText": null,
+        "contentKind": "photo"
+      }
     }
   ],
   "chatKind": "supergroup"

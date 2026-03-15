@@ -4,7 +4,7 @@ import {
   extractForwardName,
   extractInlineKeyboard,
   extractMessagePreview,
-  extractServiceText,
+  extractServiceAction,
   groupAndConvert,
   hydrateMessage,
   toChatKind,
@@ -439,93 +439,101 @@ describe('extractForwardName', () => {
 });
 
 // ---------------------------------------------------------------------------
-// extractServiceText
+// extractServiceAction
 // ---------------------------------------------------------------------------
 
-describe('extractServiceText', () => {
+describe('extractServiceAction', () => {
   it('returns null for regular text content', () => {
-    expect(extractServiceText(MSG_TEXT_INCOMING.content)).toBeNull();
+    expect(extractServiceAction(MSG_TEXT_INCOMING.content)).toBeNull();
   });
 
   it('returns null for photo content', () => {
-    expect(extractServiceText(MSG_PHOTO_SINGLE.content)).toBeNull();
+    expect(extractServiceAction(MSG_PHOTO_SINGLE.content)).toBeNull();
   });
 
   // Service message tests with inline constructed content
-  it('messageChatAddMembers => joined the group', () => {
+  it('messageChatAddMembers => join', () => {
     const content = { _: 'messageChatAddMembers', member_user_ids: [200] } as Td.MessageContent;
-    expect(extractServiceText(content)).toBe('joined the group');
+    expect(extractServiceAction(content)).toEqual({ type: 'join' });
   });
 
-  it('messageChatDeleteMember => left the group', () => {
+  it('messageChatDeleteMember => leave', () => {
     const content = { _: 'messageChatDeleteMember', user_id: 300 } as Td.MessageContent;
-    expect(extractServiceText(content)).toBe('left the group');
+    expect(extractServiceAction(content)).toEqual({ type: 'leave' });
   });
 
-  it('messagePinMessage => pinned a message', () => {
+  it('messagePinMessage => pin', () => {
     const content = { _: 'messagePinMessage', message_id: 1001 } as Td.MessageContent;
-    expect(extractServiceText(content)).toBe('pinned a message');
+    expect(extractServiceAction(content)).toEqual({
+      type: 'pin',
+      messageId: 1001,
+      previewText: null,
+      contentKind: null,
+    });
   });
 
-  it('messageChatChangeTitle => changed group name to "..."', () => {
+  it('messageChatChangeTitle => changeTitle', () => {
     const content = {
       _: 'messageChatChangeTitle',
       title: 'New Group Name',
     } as Td.MessageContent;
-    expect(extractServiceText(content)).toBe('changed group name to "New Group Name"');
+    expect(extractServiceAction(content)).toEqual({ type: 'changeTitle', title: 'New Group Name' });
   });
 
-  it('messageChatChangePhoto => changed group photo', () => {
+  it('messageChatChangePhoto => changePhoto', () => {
     const content = {
       _: 'messageChatChangePhoto',
       photo: { _: 'chatPhoto' },
     } as Td.MessageContent;
-    expect(extractServiceText(content)).toBe('changed group photo');
+    expect(extractServiceAction(content)).toEqual({ type: 'changePhoto' });
   });
 
-  it('messageChatDeletePhoto => removed group photo', () => {
+  it('messageChatDeletePhoto => deletePhoto', () => {
     const content = { _: 'messageChatDeletePhoto' } as Td.MessageContent;
-    expect(extractServiceText(content)).toBe('removed group photo');
+    expect(extractServiceAction(content)).toEqual({ type: 'deletePhoto' });
   });
 
-  it('messageScreenshotTaken => took a screenshot', () => {
+  it('messageScreenshotTaken => screenshot', () => {
     const content = { _: 'messageScreenshotTaken' } as Td.MessageContent;
-    expect(extractServiceText(content)).toBe('took a screenshot');
+    expect(extractServiceAction(content)).toEqual({ type: 'screenshot' });
   });
 
-  it('messageCustomServiceAction => custom text', () => {
+  it('messageCustomServiceAction => custom', () => {
     const content = {
       _: 'messageCustomServiceAction',
       text: 'Custom action happened',
     } as Td.MessageContent;
-    expect(extractServiceText(content)).toBe('Custom action happened');
+    expect(extractServiceAction(content)).toEqual({
+      type: 'custom',
+      text: 'Custom action happened',
+    });
   });
 
-  it('messageChatJoinByLink => joined via invite link', () => {
+  it('messageChatJoinByLink => joinByLink', () => {
     const content = { _: 'messageChatJoinByLink' } as Td.MessageContent;
-    expect(extractServiceText(content)).toBe('joined via invite link');
+    expect(extractServiceAction(content)).toEqual({ type: 'joinByLink' });
   });
 
-  it('messageChatJoinByRequest => was accepted to the group', () => {
+  it('messageChatJoinByRequest => joinByRequest', () => {
     const content = { _: 'messageChatJoinByRequest' } as Td.MessageContent;
-    expect(extractServiceText(content)).toBe('was accepted to the group');
+    expect(extractServiceAction(content)).toEqual({ type: 'joinByRequest' });
   });
 
-  it('messageBasicGroupChatCreate => created group "..."', () => {
+  it('messageBasicGroupChatCreate => createGroup', () => {
     const content = {
       _: 'messageBasicGroupChatCreate',
       title: 'My Group',
       member_user_ids: [100, 200],
     } as Td.MessageContent;
-    expect(extractServiceText(content)).toBe('created group "My Group"');
+    expect(extractServiceAction(content)).toEqual({ type: 'createGroup', title: 'My Group' });
   });
 
-  it('messageSupergroupChatCreate => created group "..."', () => {
+  it('messageSupergroupChatCreate => createGroup', () => {
     const content = {
       _: 'messageSupergroupChatCreate',
       title: 'Super Group',
     } as Td.MessageContent;
-    expect(extractServiceText(content)).toBe('created group "Super Group"');
+    expect(extractServiceAction(content)).toEqual({ type: 'createGroup', title: 'Super Group' });
   });
 });
 
@@ -575,8 +583,10 @@ describe('toTGMessage', () => {
     const m = toTGMessage(serviceMsg, users, 0);
     expect(m.kind).toBe('service');
     if (m.kind !== 'service') return;
-    expect(m.text).toContain('pinned');
-    expect(m.pinnedMessageId).toBe(42);
+    expect(m.action.type).toBe('pin');
+    if (m.action.type === 'pin') {
+      expect(m.action.messageId).toBe(42);
+    }
   });
 
   it('resolves unknown sender to "Unknown"', () => {
@@ -829,8 +839,10 @@ describe('groupAndConvert', () => {
     expect(result).toHaveLength(1);
     expect(result[0]?.kind).toBe('service');
     if (result[0]?.kind === 'service') {
-      expect(result[0].text).toBe('pinned a message');
-      expect(result[0].pinnedMessageId).toBe(123);
+      expect(result[0].action.type).toBe('pin');
+      if (result[0].action.type === 'pin') {
+        expect(result[0].action.messageId).toBe(123);
+      }
     }
   });
 
@@ -1040,8 +1052,7 @@ describe('hydrateMessage', () => {
       chatId: 100,
       date: 1700000000,
       sender: { userId: 42, name: 'Test', photoUrl: undefined },
-      text: 'joined the group',
-      pinnedMessageId: 0,
+      action: { type: 'join' },
     };
     const result = hydrateMessage(msg, {}, {}, { 42: '/avatar.jpg' }, {}, {}, {});
     if (result.kind === 'service') {
@@ -1056,12 +1067,14 @@ describe('hydrateMessage', () => {
       chatId: 100,
       date: 1700000000,
       sender: { userId: 42, name: 'Test', photoUrl: undefined },
-      text: 'pinned a message',
-      pinnedMessageId: 50,
+      action: { type: 'pin', messageId: 50, previewText: null, contentKind: null },
     };
     const result = hydrateMessage(msg, {}, {}, {}, {}, {}, { '100_50': 'Hello world' });
     if (result.kind === 'service') {
-      expect(result.text).toBe('pinned "Hello world"');
+      expect(result.action.type).toBe('pin');
+      if (result.action.type === 'pin') {
+        expect(result.action.previewText).toBe('Hello world');
+      }
     }
   });
 

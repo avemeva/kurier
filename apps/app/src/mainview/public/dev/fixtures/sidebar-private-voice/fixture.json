@@ -1,0 +1,31 @@
+{
+  "chats": [
+    {
+      "id": 100006,
+      "title": "Grace",
+      "kind": "private",
+      "userId": 6098406782,
+      "unreadCount": 0,
+      "isPinned": false,
+      "lastMessagePreview": "Voice message",
+      "lastMessageSenderName": null,
+      "lastMessageContentKind": "voice",
+      "lastMessageIsForwarded": false,
+      "lastMessageId": 900001,
+      "lastMessageDate": 1772464607,
+      "lastMessageStatus": "none",
+      "photoUrl": "/dev/photos/6098406782.jpg",
+      "isMuted": false,
+      "unreadMentionCount": 0,
+      "unreadReactionCount": 0,
+      "draftText": null,
+      "isBot": false,
+      "isOnline": false,
+      "isSavedMessages": false,
+      "user": null,
+      "lastMessageThumbUrl": null,
+      "typingText": null
+    }
+  ],
+  "chatKind": "sidebar"
+}

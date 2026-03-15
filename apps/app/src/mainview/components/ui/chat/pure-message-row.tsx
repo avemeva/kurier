@@ -71,8 +71,13 @@ function PureMessageRowInner({
     case 'service':
       return (
         <PureServiceMessage
-          text={state.text}
-          onClick={state.pinnedMessageId ? () => onReplyClick?.(state.pinnedMessageId) : undefined}
+          senderName={state.senderName}
+          action={state.action}
+          onClick={
+            state.action.type === 'pin'
+              ? () => onReplyClick?.(state.action.type === 'pin' ? state.action.messageId : 0)
+              : undefined
+          }
         />
       );
     case 'pending':
