@@ -7,13 +7,18 @@
       "userId": 6098406782,
       "unreadCount": 0,
       "isPinned": false,
-      "lastMessagePreview": "Look at this view!",
-      "lastMessageSenderName": null,
-      "lastMessageContentKind": "photo",
-      "lastMessageIsForwarded": false,
-      "lastMessageId": 900001,
-      "lastMessageDate": 1772464607,
-      "lastMessageStatus": "none",
+      "lastMessage": {
+        "id": 900001,
+        "date": 1772464607,
+        "contentKind": "photo",
+        "text": "Look at this view!",
+        "isOutgoing": false,
+        "isForwarded": false,
+        "status": "none",
+        "senderName": null,
+        "isOwnMessage": false,
+        "thumbUrl": "/dev/media/sunset-mountain.jpg"
+      },
       "photoUrl": "/dev/photos/6098406782.jpg",
       "isMuted": false,
       "unreadMentionCount": 0,
@@ -23,8 +28,7 @@
       "isOnline": false,
       "isSavedMessages": false,
       "user": null,
-      "lastMessageThumbUrl": "/dev/media/sunset-mountain.jpg",
-      "typingText": null
+      "typing": null
     }
   ],
   "chatKind": "sidebar"

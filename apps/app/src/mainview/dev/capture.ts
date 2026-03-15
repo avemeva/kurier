@@ -398,5 +398,10 @@ export function initCapture() {
       enterCaptureMode();
     }
   });
+  // Expose store for dev inspection (agent-browser eval, console debugging)
+  (window as any).__DEV_STORE__ = useChatStore;
+  (window as any).__DEV_SELECTORS__ = { selectChatMessages, selectSelectedChat };
+
   console.log('[capture] Fixture capture ready — press Ctrl+Shift+C to capture a message');
+  console.log('[capture] Dev store exposed: __DEV_STORE__.getState(), __DEV_SELECTORS__');
 }

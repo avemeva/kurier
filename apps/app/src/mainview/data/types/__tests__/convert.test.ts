@@ -59,7 +59,8 @@ describe('toTGChat', () => {
     expect(ui.kind).toBe('private');
     expect(ui.userId).toBe(6098406782);
     expect(ui.unreadCount).toBe(0);
-    expect(ui.lastMessagePreview).toBe('All good, take your time.');
+    expect(ui.lastMessage).not.toBeNull();
+    expect(ui.lastMessage?.text).toBe('All good, take your time.');
     expect(ui.isMuted).toBe(false);
     expect(ui.isPinned).toBe(true);
     expect(ui.draftText).toBeNull();
@@ -81,7 +82,7 @@ describe('toTGChat', () => {
     expect(ui.isPinned).toBe(true);
     expect(ui.isMuted).toBe(false);
     expect(ui.photoUrl).toBe('https://photo.url/marusia.jpg');
-    expect(ui.lastMessagePreview).toBe('прошла неделя, а цвет уже изменился\nтак круто');
+    expect(ui.lastMessage?.text).toBe('прошла неделя, а цвет уже изменился\nтак круто');
     expect(ui.isBot).toBe(false);
     expect(ui.isOnline).toBe(true);
     expect(ui.user).not.toBeNull();
@@ -112,8 +113,7 @@ describe('toTGChat', () => {
     // Supergroup chat has no last_message set (we'll test with a constructed chat)
     const chatNoMsg = { ...CHAT_SUPERGROUP, last_message: undefined } as Td.chat;
     const ui = toTGChat(chatNoMsg, { photoUrl: null, user: undefined, isOnline: false });
-    expect(ui.lastMessagePreview).toBe('');
-    expect(ui.lastMessageDate).toBe(0);
+    expect(ui.lastMessage).toBeNull();
   });
 });
 

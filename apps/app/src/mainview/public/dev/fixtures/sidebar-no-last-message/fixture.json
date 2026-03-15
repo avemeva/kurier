@@ -7,13 +7,7 @@
       "userId": 6098406782,
       "unreadCount": 0,
       "isPinned": false,
-      "lastMessagePreview": "",
-      "lastMessageSenderName": null,
-      "lastMessageContentKind": null,
-      "lastMessageIsForwarded": false,
-      "lastMessageId": 0,
-      "lastMessageDate": 0,
-      "lastMessageStatus": "none",
+      "lastMessage": null,
       "photoUrl": "/dev/photos/6098406782.jpg",
       "isMuted": false,
       "unreadMentionCount": 0,
@@ -23,8 +17,7 @@
       "isOnline": false,
       "isSavedMessages": false,
       "user": null,
-      "lastMessageThumbUrl": null,
-      "typingText": null
+      "typing": null
     }
   ],
   "chatKind": "sidebar"

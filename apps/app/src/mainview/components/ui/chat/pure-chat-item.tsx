@@ -15,7 +15,7 @@ import {
   Star,
   Users,
 } from 'lucide-react';
-import type { TGChat } from '@/data';
+import type { MessageContentKind, TGChat, TGTypingUser } from '@/data';
 import { formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { EmojiStatusBadge } from '../../chat/emoji-status-badge';
@@ -38,7 +38,30 @@ function SavedMessagesAvatar({ className }: { className?: string }) {
   );
 }
 
-// --- Chat preview line (last message preview with media) ---
+// --- Media label from content kind ---
+
+const MEDIA_LABELS: Partial<Record<MessageContentKind, string>> = {
+  photo: 'Photo',
+  video: 'Video',
+  voice: 'Voice message',
+  videoNote: 'Video message',
+  sticker: 'Sticker',
+  document: 'File',
+  animation: 'GIF',
+  audio: 'Audio',
+  poll: 'Poll',
+  contact: 'Contact',
+  location: 'Location',
+  venue: 'Venue',
+  dice: 'Dice',
+};
+
+function mediaLabel(kind: MessageContentKind | null): string {
+  if (!kind) return '';
+  return MEDIA_LABELS[kind] ?? '';
+}
+
+// --- Content icon from content kind ---
 
 const MEDIA_ICON_KINDS = {
   photo: Camera,
@@ -47,8 +70,32 @@ const MEDIA_ICON_KINDS = {
   document: FileText,
 } as const;
 
+// --- Typing text from structured typing data ---
+
+function formatTypingText(typing: TGTypingUser[]): string {
+  if (typing.length === 0) return '';
+  // Private chat: single entry with empty name
+  if (typing.length === 1 && !typing[0].name) {
+    return typing[0].action;
+  }
+  // Group: group by action
+  const byAction = new Map<string, string[]>();
+  for (const t of typing) {
+    const arr = byAction.get(t.action);
+    if (arr) arr.push(t.name);
+    else byAction.set(t.action, [t.name]);
+  }
+  const parts: string[] = [];
+  for (const [action, names] of byAction) {
+    const verb = names.length === 1 ? 'is' : 'are';
+    parts.push(`${names.join(', ')} ${verb} ${action}`);
+  }
+  return parts.join(', ');
+}
+
+// --- Chat preview line (last message preview with media) ---
+
 function ChatPreviewLine({ chat }: { chat: TGChat }) {
-  const thumbUrl = chat.lastMessageThumbUrl;
   if (chat.draftText) {
     return (
       <span
@@ -62,26 +109,41 @@ function ChatPreviewLine({ chat }: { chat: TGChat }) {
       </span>
     );
   }
-  const kind = chat.lastMessageContentKind;
+  const lm = chat.lastMessage;
+  if (!lm) {
+    return (
+      <span
+        data-testid="dialog-preview"
+        className="flex min-w-0 items-center gap-1.5 tg-text-chat text-text-tertiary"
+      >
+        <span className="truncate">{'\u00A0'}</span>
+      </span>
+    );
+  }
+  const kind = lm.contentKind;
   const IconComponent = kind ? MEDIA_ICON_KINDS[kind as keyof typeof MEDIA_ICON_KINDS] : null;
-  const senderPrefix = chat.lastMessageSenderName;
+  // Sender prefix: "You" for own messages in groups, sender name for others in groups
+  const senderPrefix =
+    lm.isOwnMessage && (chat.kind === 'basicGroup' || chat.kind === 'supergroup')
+      ? 'You'
+      : lm.senderName;
+  // Display text: actual text if available, otherwise media label
+  const previewText = lm.text || mediaLabel(kind);
   return (
     <span
       data-testid="dialog-preview"
       className="flex min-w-0 items-center gap-1.5 tg-text-chat text-text-tertiary"
     >
-      {chat.lastMessageIsForwarded && (
-        <Forward size={14} className="shrink-0 text-text-quaternary" />
+      {lm.isForwarded && <Forward size={14} className="shrink-0 text-text-quaternary" />}
+      {lm.thumbUrl && (
+        <img src={lm.thumbUrl} alt="" className="size-5 shrink-0 rounded-[3px] object-cover" />
       )}
-      {thumbUrl && (
-        <img src={thumbUrl} alt="" className="size-5 shrink-0 rounded-[3px] object-cover" />
-      )}
-      {!thumbUrl && IconComponent && (
+      {!lm.thumbUrl && IconComponent && (
         <IconComponent size={14} className="shrink-0 text-text-quaternary" />
       )}
       <span className="truncate">
         {senderPrefix && <span className="font-medium text-text-primary">{senderPrefix}: </span>}
-        {chat.lastMessagePreview || '\u00A0'}
+        {previewText || '\u00A0'}
       </span>
     </span>
   );
@@ -140,19 +202,19 @@ export function PureChatItem({ chat, isSelected, onClick }: PureChatItemProps) {
               )
             )}
           </span>
-          {chat.lastMessageDate > 0 && (
+          {chat.lastMessage && chat.lastMessage.date > 0 && (
             <span className="flex shrink-0 items-center gap-0.5 text-xs text-text-quaternary">
-              {chat.lastMessageStatus === 'read' && (
+              {chat.lastMessage.status === 'read' && (
                 <CheckCheck size={14} className="text-unread" />
               )}
-              {chat.lastMessageStatus === 'sent' && <Check size={14} />}
-              {formatTime(chat.lastMessageDate)}
+              {chat.lastMessage.status === 'sent' && <Check size={14} />}
+              {formatTime(chat.lastMessage.date)}
             </span>
           )}
         </div>
         <div className="flex items-center justify-between gap-2">
-          {chat.typingText ? (
-            <PureTypingIndicator text={chat.typingText} />
+          {chat.typing && chat.typing.length > 0 ? (
+            <PureTypingIndicator text={formatTypingText(chat.typing)} />
           ) : (
             <ChatPreviewLine chat={chat} />
           )}

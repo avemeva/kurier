@@ -54,7 +54,7 @@ Components may only import from `@/data`. Everything else is internal.
 | `selectChatMessages` | `TGMessage[]` for the selected chat |
 | `selectSelectedChat` | `TGChat \| null` for the selected chat |
 | `selectHeaderStatus` | `HeaderStatus \| null` |
-| `selectChats` | `TGChat[]` main chat list with hydrated avatarUrl, lastMessageThumbUrl, typingText |
+| `selectChats` | `TGChat[]` main chat list with hydrated avatarUrl, lastMessage.thumbUrl, typing |
 | `selectArchivedChats` | `TGChat[]` archived chat list |
 | `selectSearchResults` | `TGSearchResult[]` |
 

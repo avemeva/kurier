@@ -201,8 +201,10 @@ function SearchResults({
                 <span className="truncate text-sm font-medium text-text-primary">
                   <HighlightedText text={chat.title} query={query} />
                 </span>
-                {chat.lastMessagePreview && (
-                  <p className="truncate text-xs text-text-tertiary">{chat.lastMessagePreview}</p>
+                {chat.lastMessage && (chat.lastMessage.text || chat.lastMessage.contentKind) && (
+                  <p className="truncate text-xs text-text-tertiary">
+                    {chat.lastMessage.text || ''}
+                  </p>
                 )}
               </div>
             </button>

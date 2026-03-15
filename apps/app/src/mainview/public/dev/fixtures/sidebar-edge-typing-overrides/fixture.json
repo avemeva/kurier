@@ -7,13 +7,18 @@
       "userId": 6098406782,
       "unreadCount": 0,
       "isPinned": false,
-      "lastMessagePreview": "This should not be visible",
-      "lastMessageSenderName": null,
-      "lastMessageContentKind": "text",
-      "lastMessageIsForwarded": false,
-      "lastMessageId": 900001,
-      "lastMessageDate": 1772464607,
-      "lastMessageStatus": "none",
+      "lastMessage": {
+        "id": 900001,
+        "date": 1772464607,
+        "contentKind": "text",
+        "text": "This should not be visible",
+        "isOutgoing": false,
+        "isForwarded": false,
+        "status": "none",
+        "senderName": null,
+        "isOwnMessage": false,
+        "thumbUrl": null
+      },
       "photoUrl": "/dev/photos/6098406782.jpg",
       "isMuted": false,
       "unreadMentionCount": 0,
@@ -23,8 +28,12 @@
       "isOnline": false,
       "isSavedMessages": false,
       "user": null,
-      "lastMessageThumbUrl": null,
-      "typingText": "typing..."
+      "typing": [
+        {
+          "name": "",
+          "action": "typing"
+        }
+      ]
     }
   ],
   "chatKind": "sidebar"

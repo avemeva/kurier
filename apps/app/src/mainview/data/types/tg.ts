@@ -65,6 +65,25 @@ export type MessageContentKind =
 
 export type ChatKind = 'private' | 'basicGroup' | 'supergroup' | 'channel';
 
+// Typing state — who is typing and what action
+export type TGTypingUser = {
+  name: string;
+  action: string; // 'typing', 'recording voice', 'uploading photo', etc.
+};
+
+export type TGChatLastMessage = {
+  id: number;
+  date: number;
+  contentKind: MessageContentKind | null;
+  text: string | null; // actual text content (for text messages, captions)
+  isOutgoing: boolean;
+  isForwarded: boolean;
+  status: 'none' | 'sent' | 'read';
+  senderName: string | null; // null for private chats, first_name for groups
+  isOwnMessage: boolean; // true if sent by current user (for "You:" prefix)
+  thumbUrl: string | null;
+};
+
 export type TGChat = {
   id: number;
   title: string;
@@ -72,13 +91,8 @@ export type TGChat = {
   userId: number;
   unreadCount: number;
   isPinned: boolean;
-  lastMessagePreview: string;
-  lastMessageSenderName: string | null;
-  lastMessageContentKind: MessageContentKind | null;
-  lastMessageIsForwarded: boolean;
-  lastMessageId: number;
-  lastMessageDate: number;
-  lastMessageStatus: 'none' | 'sent' | 'read';
+  // Last message — structured state, NOT pre-baked preview string
+  lastMessage: TGChatLastMessage | null;
   photoUrl: string | null;
   isMuted: boolean;
   unreadMentionCount: number;
@@ -89,8 +103,8 @@ export type TGChat = {
   isSavedMessages: boolean;
   user: TGUser | null;
   avatarUrl: string | undefined;
-  lastMessageThumbUrl: string | null;
-  typingText: string | null;
+  // Typing — structured, not pre-formatted text
+  typing: TGTypingUser[] | null; // null = nobody typing, array of users+actions
 };
 
 export type TGSearchResult = {

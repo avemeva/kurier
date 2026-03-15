@@ -1,5 +1,5 @@
 import { formatLastSeen } from '../../lib/format';
-import type { Td, TGChatContext, TGMessage, TGSearchResult, TGUser } from '../types';
+import type { Td, TGChatContext, TGMessage, TGSearchResult, TGTypingUser, TGUser } from '../types';
 import { groupAndConvert, hydrateMessage, toTGChat, toTGSearchResult, toTGUser } from '../types';
 import { createSelector } from './create-selector';
 import type { ChatState, HeaderStatus } from './types';
@@ -260,37 +260,25 @@ export const selectHeaderStatus = createSelector(
 // selectChats / selectArchivedChats
 // ---------------------------------------------------------------------------
 
-function formatTypingText(
+function extractTypingUsers(
   chatId: number,
   chatKind: string,
   typingByChat: ChatState['typingByChat'],
   users: Map<number, Td.user>,
-): string | null {
+): TGTypingUser[] | null {
   const chatTyping = typingByChat[chatId];
   if (!chatTyping || Object.keys(chatTyping).length === 0) return null;
 
   const isPrivate = chatKind === 'chatTypePrivate';
   if (isPrivate) {
     const entry = Object.values(chatTyping)[0] as { action: Td.ChatAction; expiresAt: number };
-    return actionLabel(entry.action);
+    return [{ name: '', action: actionLabel(entry.action) }];
   }
 
-  const entries = Object.keys(chatTyping).map((uid) => ({
+  return Object.keys(chatTyping).map((uid) => ({
     name: users.get(Number(uid))?.first_name ?? 'Someone',
-    label: actionLabel(chatTyping[Number(uid)].action),
+    action: actionLabel(chatTyping[Number(uid)].action),
   }));
-  const byLabel = new Map<string, string[]>();
-  for (const e of entries) {
-    const arr = byLabel.get(e.label);
-    if (arr) arr.push(e.name);
-    else byLabel.set(e.label, [e.name]);
-  }
-  const parts: string[] = [];
-  for (const [label, names] of byLabel) {
-    const verb = names.length === 1 ? 'is' : 'are';
-    parts.push(`${names.join(', ')} ${verb} ${label}`);
-  }
-  return parts.join(', ');
 }
 
 function chatContext(c: Td.chat, state: ChatState): TGChatContext {
@@ -305,7 +293,7 @@ function chatContext(c: Td.chat, state: ChatState): TGChatContext {
     users: state.users,
     avatarUrl: state.profilePhotos[c.id],
     lastMessageThumbUrl: lastMsgId ? (state.thumbUrls[thumbKey] ?? null) : null,
-    typingText: formatTypingText(c.id, c.type._, state.typingByChat, state.users),
+    typing: extractTypingUsers(c.id, c.type._, state.typingByChat, state.users),
   };
 }
 

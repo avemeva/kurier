@@ -7,13 +7,18 @@
       "userId": 0,
       "unreadCount": 0,
       "isPinned": false,
-      "lastMessagePreview": "Check this article",
-      "lastMessageSenderName": "Alice",
-      "lastMessageContentKind": "text",
-      "lastMessageIsForwarded": true,
-      "lastMessageId": 900001,
-      "lastMessageDate": 1772464607,
-      "lastMessageStatus": "none",
+      "lastMessage": {
+        "id": 900001,
+        "date": 1772464607,
+        "contentKind": "text",
+        "text": "Check this article",
+        "isOutgoing": false,
+        "isForwarded": true,
+        "status": "none",
+        "senderName": "Alice",
+        "isOwnMessage": false,
+        "thumbUrl": null
+      },
       "photoUrl": null,
       "isMuted": false,
       "unreadMentionCount": 0,
@@ -23,8 +28,7 @@
       "isOnline": false,
       "isSavedMessages": false,
       "user": null,
-      "lastMessageThumbUrl": null,
-      "typingText": null
+      "typing": null
     }
   ],
   "chatKind": "sidebar"

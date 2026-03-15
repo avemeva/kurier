@@ -1409,6 +1409,22 @@ function chatId() {
   return nextChatId++;
 }
 
+function lastMsg(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 900001,
+    date: BASE_DATE,
+    contentKind: 'text',
+    text: 'Hey, how are you?',
+    isOutgoing: false,
+    isForwarded: false,
+    status: 'none',
+    senderName: null,
+    isOwnMessage: false,
+    thumbUrl: null,
+    ...overrides,
+  };
+}
+
 function baseChat(overrides: Record<string, unknown>) {
   return {
     id: chatId(),
@@ -1417,13 +1433,7 @@ function baseChat(overrides: Record<string, unknown>) {
     userId: 6098406782,
     unreadCount: 0,
     isPinned: false,
-    lastMessagePreview: 'Hey, how are you?',
-    lastMessageSenderName: null,
-    lastMessageContentKind: 'text',
-    lastMessageIsForwarded: false,
-    lastMessageId: 900001,
-    lastMessageDate: BASE_DATE,
-    lastMessageStatus: 'none',
+    lastMessage: lastMsg(),
     photoUrl: '/dev/photos/6098406782.jpg',
     isMuted: false,
     unreadMentionCount: 0,
@@ -1434,8 +1444,7 @@ function baseChat(overrides: Record<string, unknown>) {
     isSavedMessages: false,
     user: null,
     avatarUrl: undefined,
-    lastMessageThumbUrl: null,
-    typingText: null,
+    typing: null,
     ...overrides,
   };
 }
@@ -1454,7 +1463,7 @@ const sidebarFixtures: SidebarFixture[] = [
     name: 'sidebar-private-read',
     description: 'Private chat, all read',
     contentKind: 'sidebar-private',
-    chat: baseChat({ title: 'Bob', lastMessageStatus: 'read' }),
+    chat: baseChat({ title: 'Bob', lastMessage: lastMsg({ status: 'read' }) }),
   },
   {
     name: 'sidebar-private-online',
@@ -1474,8 +1483,7 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-private',
     chat: baseChat({
       title: 'Eve',
-      lastMessagePreview: 'Photo',
-      lastMessageContentKind: 'photo',
+      lastMessage: lastMsg({ text: null, contentKind: 'photo' }),
     }),
   },
   {
@@ -1484,9 +1492,11 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-private',
     chat: baseChat({
       title: 'Frank',
-      lastMessagePreview: 'Look at this view!',
-      lastMessageContentKind: 'photo',
-      lastMessageThumbUrl: '/dev/media/sunset-mountain.jpg',
+      lastMessage: lastMsg({
+        text: 'Look at this view!',
+        contentKind: 'photo',
+        thumbUrl: '/dev/media/sunset-mountain.jpg',
+      }),
     }),
   },
   {
@@ -1495,8 +1505,7 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-private',
     chat: baseChat({
       title: 'Grace',
-      lastMessagePreview: 'Voice message',
-      lastMessageContentKind: 'voice',
+      lastMessage: lastMsg({ text: null, contentKind: 'voice' }),
     }),
   },
   {
@@ -1505,8 +1514,7 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-private',
     chat: baseChat({
       title: 'Hank',
-      lastMessagePreview: 'Video',
-      lastMessageContentKind: 'video',
+      lastMessage: lastMsg({ text: null, contentKind: 'video' }),
     }),
   },
   {
@@ -1515,8 +1523,7 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-private',
     chat: baseChat({
       title: 'Ivy',
-      lastMessagePreview: '\u{1F60A}',
-      lastMessageContentKind: 'sticker',
+      lastMessage: lastMsg({ text: '\u{1F60A}', contentKind: 'sticker' }),
     }),
   },
   {
@@ -1525,8 +1532,7 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-private',
     chat: baseChat({
       title: 'Jake',
-      lastMessagePreview: 'Breaking: TypeScript 6.0 released',
-      lastMessageIsForwarded: true,
+      lastMessage: lastMsg({ text: 'Breaking: TypeScript 6.0 released', isForwarded: true }),
     }),
   },
   {
@@ -1535,8 +1541,7 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-private',
     chat: baseChat({
       title: 'Karen',
-      lastMessagePreview: 'quarterly-report.pdf',
-      lastMessageContentKind: 'document',
+      lastMessage: lastMsg({ text: 'quarterly-report.pdf', contentKind: 'document' }),
     }),
   },
   {
@@ -1559,7 +1564,7 @@ const sidebarFixtures: SidebarFixture[] = [
       title: 'QuizBot',
       isBot: true,
       photoUrl: '/dev/photos/226578990.jpg',
-      lastMessagePreview: 'What language do you prefer?',
+      lastMessage: lastMsg({ text: 'What language do you prefer?' }),
     }),
   },
 
@@ -1574,8 +1579,10 @@ const sidebarFixtures: SidebarFixture[] = [
       title: 'Weekend Trip Planning',
       kind: 'supergroup',
       userId: 0,
-      lastMessageSenderName: 'Charlie',
-      lastMessagePreview: 'Has anyone tried the new coffee place?',
+      lastMessage: lastMsg({
+        text: 'Has anyone tried the new coffee place?',
+        senderName: 'Charlie',
+      }),
       photoUrl: null,
     }),
   },
@@ -1587,9 +1594,12 @@ const sidebarFixtures: SidebarFixture[] = [
       title: 'Project Alpha',
       kind: 'supergroup',
       userId: 0,
-      lastMessageSenderName: 'You',
-      lastMessagePreview: 'I pushed the fix, check CI',
-      lastMessageStatus: 'sent',
+      lastMessage: lastMsg({
+        text: 'I pushed the fix, check CI',
+        isOwnMessage: true,
+        isOutgoing: true,
+        status: 'sent',
+      }),
       photoUrl: null,
     }),
   },
@@ -1601,7 +1611,7 @@ const sidebarFixtures: SidebarFixture[] = [
       title: 'Design Team',
       kind: 'supergroup',
       userId: 0,
-      typingText: 'Alice is typing...',
+      typing: [{ name: 'Alice', action: 'typing' }],
       photoUrl: null,
     }),
   },
@@ -1613,7 +1623,10 @@ const sidebarFixtures: SidebarFixture[] = [
       title: 'Dev Chat',
       kind: 'supergroup',
       userId: 0,
-      typingText: 'Alice and Bob are typing...',
+      typing: [
+        { name: 'Alice', action: 'typing' },
+        { name: 'Bob', action: 'typing' },
+      ],
       photoUrl: null,
     }),
   },
@@ -1677,8 +1690,7 @@ const sidebarFixtures: SidebarFixture[] = [
       title: 'Rust Enthusiasts',
       kind: 'supergroup',
       userId: 0,
-      lastMessageSenderName: 'Bob',
-      lastMessagePreview: 'Just shipped v0.2!',
+      lastMessage: lastMsg({ text: 'Just shipped v0.2!', senderName: 'Bob' }),
       photoUrl: null,
     }),
   },
@@ -1694,7 +1706,7 @@ const sidebarFixtures: SidebarFixture[] = [
       title: 'Tech News',
       kind: 'channel',
       userId: 0,
-      lastMessagePreview: 'Version 2.4 available. Update your apps.',
+      lastMessage: lastMsg({ text: 'Version 2.4 available. Update your apps.' }),
       photoUrl: '/dev/photos/1042690371.jpg',
     }),
   },
@@ -1706,8 +1718,7 @@ const sidebarFixtures: SidebarFixture[] = [
       title: 'Crypto Daily',
       kind: 'channel',
       userId: 0,
-      lastMessagePreview: 'BTC hits new ATH',
-      lastMessageIsForwarded: true,
+      lastMessage: lastMsg({ text: 'BTC hits new ATH', isForwarded: true }),
       photoUrl: null,
     }),
   },
@@ -1719,9 +1730,11 @@ const sidebarFixtures: SidebarFixture[] = [
       title: 'Travel Photography',
       kind: 'channel',
       userId: 0,
-      lastMessagePreview: 'Sunset in Santorini',
-      lastMessageContentKind: 'photo',
-      lastMessageThumbUrl: '/dev/media/sunset-mountain.jpg',
+      lastMessage: lastMsg({
+        text: 'Sunset in Santorini',
+        contentKind: 'photo',
+        thumbUrl: '/dev/media/sunset-mountain.jpg',
+      }),
       photoUrl: null,
     }),
   },
@@ -1736,7 +1749,7 @@ const sidebarFixtures: SidebarFixture[] = [
     chat: baseChat({
       title: 'Saved Messages',
       isSavedMessages: true,
-      lastMessagePreview: 'Remember to buy groceries',
+      lastMessage: lastMsg({ text: 'Remember to buy groceries' }),
     }),
   },
   {
@@ -1793,8 +1806,9 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-special',
     chat: baseChat({
       title: 'Verbose Friend',
-      lastMessagePreview:
-        'So about this weekend I was thinking we could finally do that day trip to the coast because the weather forecast looks perfect and there is a seafood place on the pier',
+      lastMessage: lastMsg({
+        text: 'So about this weekend I was thinking we could finally do that day trip to the coast because the weather forecast looks perfect and there is a seafood place on the pier',
+      }),
     }),
   },
   {
@@ -1803,10 +1817,7 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-special',
     chat: baseChat({
       title: 'New Chat',
-      lastMessagePreview: '',
-      lastMessageDate: 0,
-      lastMessageId: 0,
-      lastMessageContentKind: null,
+      lastMessage: null,
     }),
   },
   {
@@ -1823,19 +1834,25 @@ const sidebarFixtures: SidebarFixture[] = [
     name: 'sidebar-status-sent',
     description: 'Message with sent checkmark',
     contentKind: 'sidebar-status',
-    chat: baseChat({ title: 'Sent Example', lastMessageStatus: 'sent' }),
+    chat: baseChat({
+      title: 'Sent Example',
+      lastMessage: lastMsg({ status: 'sent', isOutgoing: true, isOwnMessage: true }),
+    }),
   },
   {
     name: 'sidebar-status-read',
     description: 'Message with read double checkmark',
     contentKind: 'sidebar-status',
-    chat: baseChat({ title: 'Read Example', lastMessageStatus: 'read' }),
+    chat: baseChat({
+      title: 'Read Example',
+      lastMessage: lastMsg({ status: 'read', isOutgoing: true, isOwnMessage: true }),
+    }),
   },
   {
     name: 'sidebar-status-none',
     description: 'Incoming message (no checkmark)',
     contentKind: 'sidebar-status',
-    chat: baseChat({ title: 'Incoming Example', lastMessageStatus: 'none' }),
+    chat: baseChat({ title: 'Incoming Example', lastMessage: lastMsg({ status: 'none' }) }),
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1847,8 +1864,7 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-icons',
     chat: baseChat({
       title: 'Photo Sender',
-      lastMessagePreview: 'Photo',
-      lastMessageContentKind: 'photo',
+      lastMessage: lastMsg({ text: null, contentKind: 'photo' }),
     }),
   },
   {
@@ -1857,8 +1873,7 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-icons',
     chat: baseChat({
       title: 'Video Sender',
-      lastMessagePreview: 'Video',
-      lastMessageContentKind: 'video',
+      lastMessage: lastMsg({ text: null, contentKind: 'video' }),
     }),
   },
   {
@@ -1867,8 +1882,7 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-icons',
     chat: baseChat({
       title: 'Voice Sender',
-      lastMessagePreview: 'Voice message',
-      lastMessageContentKind: 'voice',
+      lastMessage: lastMsg({ text: null, contentKind: 'voice' }),
     }),
   },
   {
@@ -1877,8 +1891,7 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-icons',
     chat: baseChat({
       title: 'Doc Sender',
-      lastMessagePreview: 'report.pdf',
-      lastMessageContentKind: 'document',
+      lastMessage: lastMsg({ text: 'report.pdf', contentKind: 'document' }),
     }),
   },
   {
@@ -1887,9 +1900,11 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-icons',
     chat: baseChat({
       title: 'Thumb Override',
-      lastMessagePreview: 'Check this sunset!',
-      lastMessageContentKind: 'photo',
-      lastMessageThumbUrl: '/dev/media/sunset-mountain.jpg',
+      lastMessage: lastMsg({
+        text: 'Check this sunset!',
+        contentKind: 'photo',
+        thumbUrl: '/dev/media/sunset-mountain.jpg',
+      }),
     }),
   },
 
@@ -1908,10 +1923,12 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-edge-cases',
     chat: baseChat({
       title: 'Fwd + Thumb',
-      lastMessagePreview: 'Amazing photo from the trip',
-      lastMessageIsForwarded: true,
-      lastMessageContentKind: 'photo',
-      lastMessageThumbUrl: '/dev/media/food-plate.jpg',
+      lastMessage: lastMsg({
+        text: 'Amazing photo from the trip',
+        isForwarded: true,
+        contentKind: 'photo',
+        thumbUrl: '/dev/media/food-plate.jpg',
+      }),
     }),
   },
   {
@@ -1922,9 +1939,7 @@ const sidebarFixtures: SidebarFixture[] = [
       title: 'Group Fwd',
       kind: 'supergroup',
       userId: 0,
-      lastMessageSenderName: 'Alice',
-      lastMessagePreview: 'Check this article',
-      lastMessageIsForwarded: true,
+      lastMessage: lastMsg({ text: 'Check this article', senderName: 'Alice', isForwarded: true }),
       photoUrl: null,
     }),
   },
@@ -1935,8 +1950,8 @@ const sidebarFixtures: SidebarFixture[] = [
     chat: baseChat({
       title: 'Draft Priority',
       draftText: 'Actually, let me rephrase...',
-      typingText: 'Someone is typing...',
-      lastMessagePreview: 'Original message here',
+      typing: [{ name: '', action: 'typing' }],
+      lastMessage: lastMsg({ text: 'Original message here' }),
     }),
   },
   {
@@ -1945,8 +1960,8 @@ const sidebarFixtures: SidebarFixture[] = [
     contentKind: 'sidebar-edge-cases',
     chat: baseChat({
       title: 'Typing Priority',
-      typingText: 'typing...',
-      lastMessagePreview: 'This should not be visible',
+      typing: [{ name: '', action: 'typing' }],
+      lastMessage: lastMsg({ text: 'This should not be visible' }),
     }),
   },
 ];

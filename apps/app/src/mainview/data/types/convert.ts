@@ -9,6 +9,7 @@ import type {
   TGAlbumItem,
   TGCaption,
   TGChat,
+  TGChatLastMessage,
   TGContent,
   TGForward,
   TGKeyboardRow,
@@ -23,6 +24,7 @@ import type {
   TGServiceAction,
   TGServiceMessage,
   TGTextEntity,
+  TGTypingUser,
   TGUser,
   TGWebPreview,
 } from './tg';
@@ -205,20 +207,6 @@ export function extractMessagePreview(msg: Td.message | undefined): string {
   return extractMediaLabel(msg.content);
 }
 
-function extractLastMessageSenderName(
-  msg: Td.message | undefined,
-  chatKind: ChatKind,
-  ctx: TGChatContext,
-): string | null {
-  if (!msg) return null;
-  // Only show sender in groups (not private chats or channels)
-  if (chatKind !== 'basicGroup' && chatKind !== 'supergroup') return null;
-  if (msg.is_outgoing) return 'You';
-  if (!ctx.users || msg.sender_id._ !== 'messageSenderUser') return null;
-  const user = ctx.users.get(msg.sender_id.user_id);
-  return user?.first_name ?? null;
-}
-
 // --- Sender ---
 
 function resolveSenderName(sender: Td.MessageSender, users: Map<number, Td.user>): string {
@@ -391,7 +379,7 @@ export type TGChatContext = {
   users?: Map<number, Td.user>;
   avatarUrl?: string | undefined;
   lastMessageThumbUrl?: string | null;
-  typingText?: string | null;
+  typing?: TGTypingUser[] | null;
 };
 
 export function toTGChat(chat: Td.chat, ctx: TGChatContext): TGChat {
@@ -399,10 +387,37 @@ export function toTGChat(chat: Td.chat, ctx: TGChatContext): TGChat {
   const draftText = draftInput?._ === 'inputMessageText' ? draftInput.text.text || null : null;
   const kind = toChatKind(chat.type);
   const isPrivate = kind === 'private';
+  const isGroup = kind === 'basicGroup' || kind === 'supergroup';
   const lastMsg = chat.last_message;
   const isDeletedUser =
     isPrivate && (ctx.user?.type?._ === 'userTypeDeleted' || (!chat.title && !ctx.user));
   const title = chat.title || (isDeletedUser ? 'Deleted Account' : '');
+
+  const lastMessage: TGChatLastMessage | null = lastMsg
+    ? {
+        id: lastMsg.id,
+        date: lastMsg.date,
+        contentKind: toContentKind(lastMsg.content),
+        text: extractText(lastMsg.content) || null,
+        isOutgoing: lastMsg.is_outgoing,
+        isForwarded: !!lastMsg.forward_info,
+        status: !lastMsg.is_outgoing
+          ? 'none'
+          : lastMsg.id <= chat.last_read_outbox_message_id
+            ? 'read'
+            : 'sent',
+        senderName:
+          isGroup &&
+          !lastMsg.is_outgoing &&
+          ctx.users &&
+          lastMsg.sender_id._ === 'messageSenderUser'
+            ? (ctx.users.get(lastMsg.sender_id.user_id)?.first_name ?? null)
+            : null,
+        isOwnMessage: lastMsg.is_outgoing,
+        thumbUrl: ctx.lastMessageThumbUrl ?? null,
+      }
+    : null;
+
   return {
     id: chat.id,
     title,
@@ -410,17 +425,7 @@ export function toTGChat(chat: Td.chat, ctx: TGChatContext): TGChat {
     userId: chat.type._ === 'chatTypePrivate' ? chat.type.user_id : 0,
     unreadCount: chat.unread_count,
     isPinned: chat.positions.some((p) => p.is_pinned),
-    lastMessagePreview: extractMessagePreview(lastMsg),
-    lastMessageSenderName: extractLastMessageSenderName(lastMsg, kind, ctx),
-    lastMessageContentKind: lastMsg ? toContentKind(lastMsg.content) : null,
-    lastMessageIsForwarded: !!lastMsg?.forward_info,
-    lastMessageId: lastMsg?.id ?? 0,
-    lastMessageDate: lastMsg?.date ?? 0,
-    lastMessageStatus: !lastMsg?.is_outgoing
-      ? 'none'
-      : lastMsg.id <= chat.last_read_outbox_message_id
-        ? 'read'
-        : 'sent',
+    lastMessage,
     photoUrl: ctx.photoUrl,
     isMuted: chat.notification_settings.mute_for > 0,
     unreadMentionCount: chat.unread_mention_count,
@@ -435,8 +440,7 @@ export function toTGChat(chat: Td.chat, ctx: TGChatContext): TGChat {
       chat.type.user_id === ctx.myUserId,
     user: ctx.user ? toTGUser(ctx.user) : null,
     avatarUrl: ctx.avatarUrl,
-    lastMessageThumbUrl: ctx.lastMessageThumbUrl ?? null,
-    typingText: ctx.typingText ?? null,
+    typing: ctx.typing ?? null,
   };
 }
 
