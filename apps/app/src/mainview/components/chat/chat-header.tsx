@@ -41,11 +41,12 @@ export function ChatHeader() {
           className="flex items-center gap-1 text-sm font-medium text-text-primary"
         >
           {selectedChat.isSavedMessages ? 'Saved Messages' : selectedChat.title}
-          {user?.emojiStatusId ? (
-            <EmojiStatusBadge documentId={user.emojiStatusId} />
-          ) : (
-            user?.isPremium && <Star size={12} className="shrink-0 fill-unread text-unread" />
-          )}
+          {!selectedChat.isSavedMessages &&
+            (user?.emojiStatusId ? (
+              <EmojiStatusBadge documentId={user.emojiStatusId} />
+            ) : (
+              user?.isPremium && <Star size={12} className="shrink-0 fill-unread text-unread" />
+            ))}
         </h2>
         <PureStatusText status={headerStatus} />
       </div>

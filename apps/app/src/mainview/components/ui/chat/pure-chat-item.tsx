@@ -194,13 +194,14 @@ export function PureChatItem({ chat, isSelected, onClick }: PureChatItemProps) {
             )}
             {chat.isBot && <Bot size={14} className="shrink-0 text-text-tertiary" />}
             <span className="truncate">{chat.isSavedMessages ? 'Saved Messages' : chat.title}</span>
-            {chat.user?.emojiStatusId ? (
-              <EmojiStatusBadge documentId={chat.user.emojiStatusId} />
-            ) : (
-              chat.user?.isPremium && (
-                <Star size={12} className="shrink-0 fill-unread text-unread" />
-              )
-            )}
+            {!chat.isSavedMessages &&
+              (chat.user?.emojiStatusId ? (
+                <EmojiStatusBadge documentId={chat.user.emojiStatusId} />
+              ) : (
+                chat.user?.isPremium && (
+                  <Star size={12} className="shrink-0 fill-unread text-unread" />
+                )
+              ))}
           </span>
           {chat.lastMessage && chat.lastMessage.date > 0 && (
             <span className="flex shrink-0 items-center gap-0.5 text-xs text-text-quaternary">
