@@ -1,0 +1,36 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718812,
+      "chatId": 6098406782,
+      "date": 1772464607,
+      "isOutgoing": false,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 6098406782,
+        "name": "Alice",
+        "photoUrl": "/dev/photos/6098406782.jpg"
+      },
+      "reactions": [],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": {
+        "messageId": 718786,
+        "senderName": "Alice",
+        "mediaLabel": "Voice message",
+        "quoteText": ""
+      },
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "text",
+        "text": "Sorry, I can’t listen right now. Can you type it out?",
+        "entities": [],
+        "customEmojiUrls": {},
+        "webPreview": null
+      }
+    }
+  ],
+  "chatKind": "private"
+}

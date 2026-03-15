@@ -1,0 +1,62 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718823,
+      "chatId": 6098406782,
+      "date": 1772464607,
+      "isOutgoing": false,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 6098406782,
+        "name": "Alice",
+        "photoUrl": "/dev/photos/6098406782.jpg"
+      },
+      "reactions": [
+        {
+          "emoji": "😍",
+          "count": 15,
+          "chosen": true
+        },
+        {
+          "emoji": "❤️",
+          "count": 8,
+          "chosen": false
+        },
+        {
+          "emoji": "🔥",
+          "count": 4,
+          "chosen": false
+        }
+      ],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "album",
+        "items": [
+          {
+            "messageId": 719100,
+            "contentKind": "photo",
+            "url": "/dev/media/sunset-mountain.jpg",
+            "width": 800,
+            "height": 533,
+            "minithumbnail": null
+          },
+          {
+            "messageId": 719101,
+            "contentKind": "photo",
+            "url": "/dev/media/city-street.jpg",
+            "width": 800,
+            "height": 1035,
+            "minithumbnail": null
+          }
+        ],
+        "caption": null
+      }
+    }
+  ],
+  "chatKind": "private"
+}

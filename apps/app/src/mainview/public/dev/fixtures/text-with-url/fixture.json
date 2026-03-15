@@ -1,0 +1,37 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718807,
+      "chatId": 6098406782,
+      "date": 1772464607,
+      "isOutgoing": false,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 6098406782,
+        "name": "Alice",
+        "photoUrl": "/dev/photos/6098406782.jpg"
+      },
+      "reactions": [],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "text",
+        "text": "Found the menu: https://example.com/menu",
+        "entities": [
+          {
+            "offset": 16,
+            "length": 25,
+            "type": "url"
+          }
+        ],
+        "customEmojiUrls": {},
+        "webPreview": null
+      }
+    }
+  ],
+  "chatKind": "private"
+}

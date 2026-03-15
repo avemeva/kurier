@@ -1,0 +1,18 @@
+{
+  "messages": [
+    {
+      "kind": "service",
+      "id": 718855,
+      "chatId": -1001234567890,
+      "date": 1772464907,
+      "sender": {
+        "userId": 226578990,
+        "name": "QuizBot",
+        "photoUrl": "/dev/photos/226578990.jpg"
+      },
+      "text": "QuizBot left the group",
+      "pinnedMessageId": 0
+    }
+  ],
+  "chatKind": "supergroup"
+}

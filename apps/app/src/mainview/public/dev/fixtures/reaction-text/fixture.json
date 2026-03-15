@@ -1,0 +1,47 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718815,
+      "chatId": 6098406782,
+      "date": 1772464607,
+      "isOutgoing": false,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 6098406782,
+        "name": "Alice",
+        "photoUrl": "/dev/photos/6098406782.jpg"
+      },
+      "reactions": [
+        {
+          "emoji": "👍",
+          "count": 5,
+          "chosen": false
+        },
+        {
+          "emoji": "❤️",
+          "count": 3,
+          "chosen": false
+        },
+        {
+          "emoji": "🔥",
+          "count": 2,
+          "chosen": false
+        }
+      ],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "text",
+        "text": "Just shipped the new release! Everything passed CI on the first try.",
+        "entities": [],
+        "customEmojiUrls": {},
+        "webPreview": null
+      }
+    }
+  ],
+  "chatKind": "private"
+}

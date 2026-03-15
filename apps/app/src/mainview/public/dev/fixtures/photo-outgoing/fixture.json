@@ -1,0 +1,34 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718826,
+      "chatId": 6098406782,
+      "date": 1772464607,
+      "isOutgoing": true,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 91754006,
+        "name": "Bob",
+        "photoUrl": "/dev/photos/91754006.jpg"
+      },
+      "reactions": [],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "photo",
+        "media": {
+          "url": "/dev/media/cat-sleeping.jpg",
+          "width": 800,
+          "height": 836,
+          "minithumbnail": null
+        },
+        "caption": null
+      }
+    }
+  ],
+  "chatKind": "private"
+}

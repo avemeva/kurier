@@ -1,0 +1,18 @@
+{
+  "messages": [
+    {
+      "kind": "service",
+      "id": 718856,
+      "chatId": -1001234567890,
+      "date": 1772464967,
+      "sender": {
+        "userId": 6098406782,
+        "name": "Alice",
+        "photoUrl": "/dev/photos/6098406782.jpg"
+      },
+      "text": "Alice changed the group name to \"Weekend Trip Planning\"",
+      "pinnedMessageId": 0
+    }
+  ],
+  "chatKind": "supergroup"
+}

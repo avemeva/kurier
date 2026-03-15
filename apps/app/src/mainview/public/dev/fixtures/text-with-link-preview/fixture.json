@@ -1,0 +1,46 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718809,
+      "chatId": 6098406782,
+      "date": 1772464607,
+      "isOutgoing": false,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 6098406782,
+        "name": "Alice",
+        "photoUrl": "/dev/photos/6098406782.jpg"
+      },
+      "reactions": [],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "text",
+        "text": "Check this out: https://github.com/nicolo-ribaudo/tc39-proposal-structs",
+        "entities": [
+          {
+            "offset": 16,
+            "length": 56,
+            "type": "url"
+          }
+        ],
+        "customEmojiUrls": {},
+        "webPreview": {
+          "url": "https://github.com/nicolo-ribaudo/tc39-proposal-structs",
+          "siteName": "GitHub",
+          "title": "TC39 Structs Proposal",
+          "description": "Shared memory structs for JavaScript",
+          "minithumbnail": null,
+          "thumbUrl": "/dev/media/sunset-mountain.jpg",
+          "showLargeMedia": false,
+          "showMediaAboveDescription": false
+        }
+      }
+    }
+  ],
+  "chatKind": "private"
+}

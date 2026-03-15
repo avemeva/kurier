@@ -1,0 +1,44 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718829,
+      "chatId": 6098406782,
+      "date": 1772464607,
+      "isOutgoing": false,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 6098406782,
+        "name": "Alice",
+        "photoUrl": "/dev/photos/6098406782.jpg"
+      },
+      "reactions": [],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "photo",
+        "media": {
+          "url": "/dev/media/city-street.jpg",
+          "width": 800,
+          "height": 1035,
+          "minithumbnail": null
+        },
+        "caption": {
+          "text": "Downtown at golden hour — love this city",
+          "entities": [
+            {
+              "offset": 0,
+              "length": 8,
+              "type": "bold"
+            }
+          ],
+          "customEmojiUrls": {}
+        }
+      }
+    }
+  ],
+  "chatKind": "private"
+}

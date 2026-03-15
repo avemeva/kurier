@@ -1,0 +1,33 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718834,
+      "chatId": 6098406782,
+      "date": 1772464607,
+      "isOutgoing": true,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 91754006,
+        "name": "Bob",
+        "photoUrl": "/dev/photos/91754006.jpg"
+      },
+      "reactions": [],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "voice",
+        "url": "/dev/media/sample-voice-long.ogg",
+        "waveform": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+Pw==",
+        "duration": 7,
+        "fileSize": 47474,
+        "speechStatus": "none",
+        "speechText": ""
+      }
+    }
+  ],
+  "chatKind": "private"
+}

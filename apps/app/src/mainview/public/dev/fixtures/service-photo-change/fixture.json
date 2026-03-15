@@ -1,0 +1,18 @@
+{
+  "messages": [
+    {
+      "kind": "service",
+      "id": 718857,
+      "chatId": -1001234567890,
+      "date": 1772465027,
+      "sender": {
+        "userId": 346928206,
+        "name": "Charlie",
+        "photoUrl": "/dev/photos/346928206.jpg"
+      },
+      "text": "Charlie changed the group photo",
+      "pinnedMessageId": 0
+    }
+  ],
+  "chatKind": "supergroup"
+}

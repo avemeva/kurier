@@ -2,14 +2,11 @@ import { AtSign, Heart } from 'lucide-react';
 import { useCallback, useRef } from 'react';
 import { PureCornerButton, PureCornerButtonStack } from '@/components/ui/chat/corner-buttons';
 import { PureMessageInput } from '@/components/ui/chat/message-input';
-import type { GroupPosition } from '@/components/ui/chat/pure-message-row';
-import { PureMessageRow } from '@/components/ui/chat/pure-message-row';
+import { PureChatView } from '@/components/ui/chat/pure-chat-view';
 import type { ScrollContainerHandle } from '@/components/ui/chat/scroll-container';
 import { ScrollContainer } from '@/components/ui/chat/scroll-container';
-import type { TGMessage } from '@/data';
 import { selectChatMessages, selectSelectedChat, useChatMessageLoader, useChatStore } from '@/data';
 import { useVisibleMessages } from '@/hooks/use-visible-messages';
-import { cn } from '@/lib/utils';
 import { ComposeSearchBottomBar } from './compose-search';
 
 const ArrowDownIcon = () => (
@@ -115,42 +112,6 @@ export function ChatView() {
     send(selectedChat.id, text);
   }
 
-  const isGroup = selectedChat.kind === 'basicGroup' || selectedChat.kind === 'supergroup';
-  const showSender = isGroup;
-
-  function getKey(msg: TGMessage): string | number {
-    if (msg.kind === 'pending') return msg.localId;
-    return msg.id;
-  }
-
-  function getIsOutgoing(msg: TGMessage): boolean {
-    if (selectedChat?.kind === 'channel') return false;
-    if (msg.kind === 'pending') return true;
-    if (msg.kind === 'service') return false;
-    return msg.isOutgoing;
-  }
-
-  function getSenderId(msg: TGMessage): number | string {
-    if (msg.kind === 'pending') return `pending-${msg.localId}`;
-    if (msg.kind === 'service') return msg.sender.userId;
-    return msg.sender.userId;
-  }
-
-  function getGroupPosition(index: number): GroupPosition {
-    const cur = getSenderId(messages[index]);
-    const curOut = getIsOutgoing(messages[index]);
-    const prev = index > 0 ? getSenderId(messages[index - 1]) : null;
-    const prevOut = index > 0 ? getIsOutgoing(messages[index - 1]) : null;
-    const next = index < messages.length - 1 ? getSenderId(messages[index + 1]) : null;
-    const nextOut = index < messages.length - 1 ? getIsOutgoing(messages[index + 1]) : null;
-    const samePrev = prev === cur && prevOut === curOut;
-    const sameNext = next === cur && nextOut === curOut;
-    if (samePrev && sameNext) return 'middle';
-    if (samePrev) return 'last';
-    if (sameNext) return 'first';
-    return 'single';
-  }
-
   return (
     <>
       <div className="relative flex-1">
@@ -177,32 +138,13 @@ export function ChatView() {
           {!loadingMessages && messages.length === 0 && (
             <p className="py-8 text-center text-sm text-text-tertiary">No messages</p>
           )}
-          <div className="mx-auto max-w-[720px] space-y-1">
-            {messages.map((msg, index) => {
-              const isOut = getIsOutgoing(msg);
-              const isService = msg.kind === 'service';
-
-              return (
-                <div
-                  key={getKey(msg)}
-                  id={`msg-${getKey(msg)}`}
-                  className={cn(
-                    'flex',
-                    isService ? 'justify-center' : isOut ? 'sm:justify-end' : 'justify-start',
-                  )}
-                >
-                  <PureMessageRow
-                    msg={msg}
-                    showSender={showSender}
-                    groupPosition={getGroupPosition(index)}
-                    onReact={handleReact}
-                    onReplyClick={handleReplyClick}
-                    onTranscribe={handleTranscribe}
-                  />
-                </div>
-              );
-            })}
-          </div>
+          <PureChatView
+            messages={messages}
+            chatKind={selectedChat.kind}
+            onReact={handleReact}
+            onReplyClick={handleReplyClick}
+            onTranscribe={handleTranscribe}
+          />
           <div />
         </ScrollContainer>
         <PureCornerButtonStack>

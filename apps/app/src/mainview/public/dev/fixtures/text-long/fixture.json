@@ -1,0 +1,31 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718804,
+      "chatId": 6098406782,
+      "date": 1772464607,
+      "isOutgoing": false,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 6098406782,
+        "name": "Alice",
+        "photoUrl": "/dev/photos/6098406782.jpg"
+      },
+      "reactions": [],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "text",
+        "text": "So about this weekend — I was thinking we could finally do that day trip to the coast. The weather forecast looks perfect, sunny with a light breeze.\n\nWe could leave around 8am, grab breakfast on the way, and be at the beach by 10. There’s a seafood place right on the pier that does amazing fish tacos.\n\nLet me know if Saturday or Sunday works better for you. I’m flexible either day.",
+        "entities": [],
+        "customEmojiUrls": {},
+        "webPreview": null
+      }
+    }
+  ],
+  "chatKind": "private"
+}

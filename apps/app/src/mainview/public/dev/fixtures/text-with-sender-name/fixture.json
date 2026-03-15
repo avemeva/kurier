@@ -1,0 +1,31 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718846,
+      "chatId": -1001234567890,
+      "date": 1772464607,
+      "isOutgoing": false,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 346928206,
+        "name": "Charlie",
+        "photoUrl": "/dev/photos/346928206.jpg"
+      },
+      "reactions": [],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "text",
+        "text": "Has anyone tried the new coffee place?",
+        "entities": [],
+        "customEmojiUrls": {},
+        "webPreview": null
+      }
+    }
+  ],
+  "chatKind": "supergroup"
+}

@@ -46,5 +46,10 @@ export default defineConfig({
       testMatch: 'perf/load.test.ts',
       use: { baseURL: detectBaseURL(), browserName: 'chromium', headless: true },
     },
+    {
+      name: 'dev',
+      testMatch: 'dev/harness.test.ts',
+      use: { baseURL: detectBaseURL(), browserName: 'chromium', headless: true },
+    },
   ],
 });

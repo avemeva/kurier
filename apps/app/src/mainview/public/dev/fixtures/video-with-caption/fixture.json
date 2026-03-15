@@ -1,0 +1,39 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718831,
+      "chatId": 6098406782,
+      "date": 1772464607,
+      "isOutgoing": false,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 6098406782,
+        "name": "Alice",
+        "photoUrl": "/dev/photos/6098406782.jpg"
+      },
+      "reactions": [],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "video",
+        "media": {
+          "url": "/dev/media/sample-video-portrait.mp4",
+          "width": 360,
+          "height": 640,
+          "minithumbnail": null
+        },
+        "isGif": false,
+        "caption": {
+          "text": "Evening walk downtown",
+          "entities": [],
+          "customEmojiUrls": {}
+        }
+      }
+    }
+  ],
+  "chatKind": "private"
+}

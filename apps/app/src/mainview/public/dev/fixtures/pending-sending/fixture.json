@@ -1,0 +1,13 @@
+{
+  "messages": [
+    {
+      "kind": "pending",
+      "localId": "pending-001",
+      "chatId": 6098406782,
+      "text": "I'll send you the files once the upload finishes, should be a few more minutes.",
+      "date": 1772464607,
+      "status": "sending"
+    }
+  ],
+  "chatKind": "private"
+}

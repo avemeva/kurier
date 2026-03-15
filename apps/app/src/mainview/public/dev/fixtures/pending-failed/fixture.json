@@ -1,0 +1,13 @@
+{
+  "messages": [
+    {
+      "kind": "pending",
+      "localId": "pending-002",
+      "chatId": 6098406782,
+      "text": "This message failed to send due to a network error. Please try again later.",
+      "date": 1772464607,
+      "status": "failed"
+    }
+  ],
+  "chatKind": "private"
+}

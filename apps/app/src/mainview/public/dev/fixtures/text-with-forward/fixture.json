@@ -1,0 +1,36 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718814,
+      "chatId": 6098406782,
+      "date": 1772464607,
+      "isOutgoing": false,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 6098406782,
+        "name": "Alice",
+        "photoUrl": "/dev/photos/6098406782.jpg"
+      },
+      "reactions": [],
+      "viewCount": 0,
+      "forward": {
+        "fromName": "Tech News Channel",
+        "photoId": 1042690371,
+        "photoUrl": "/dev/photos/1042690371.jpg",
+        "date": 1772461007
+      },
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "text",
+        "text": "Breaking: TypeScript 6.0 announced with full dependent types support",
+        "entities": [],
+        "customEmojiUrls": {},
+        "webPreview": null
+      }
+    }
+  ],
+  "chatKind": "private"
+}

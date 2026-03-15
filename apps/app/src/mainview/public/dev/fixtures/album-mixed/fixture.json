@@ -1,0 +1,46 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718844,
+      "chatId": 6098406782,
+      "date": 1772464607,
+      "isOutgoing": false,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 6098406782,
+        "name": "Alice",
+        "photoUrl": "/dev/photos/6098406782.jpg"
+      },
+      "reactions": [],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "album",
+        "items": [
+          {
+            "messageId": 718920,
+            "contentKind": "photo",
+            "url": "/dev/media/sunset-mountain.jpg",
+            "width": 800,
+            "height": 533,
+            "minithumbnail": null
+          },
+          {
+            "messageId": 718921,
+            "contentKind": "video",
+            "url": "/dev/media/sample-video-landscape.mp4",
+            "width": 640,
+            "height": 360,
+            "minithumbnail": null
+          }
+        ],
+        "caption": null
+      }
+    }
+  ],
+  "chatKind": "private"
+}

@@ -1,0 +1,327 @@
+[
+  {
+    "name": "text-incoming",
+    "description": "Incoming text in private chat",
+    "contentKind": "private-text"
+  },
+  {
+    "name": "text-outgoing",
+    "description": "Outgoing text, read double checkmark",
+    "contentKind": "private-text"
+  },
+  {
+    "name": "text-outgoing-unread",
+    "description": "Outgoing text, sent but unread (single check)",
+    "contentKind": "private-text"
+  },
+  {
+    "name": "text-outgoing-edited",
+    "description": "Outgoing text, edited label",
+    "contentKind": "private-text"
+  },
+  {
+    "name": "text-long",
+    "description": "Multi-paragraph long text with line breaks",
+    "contentKind": "private-text"
+  },
+  {
+    "name": "text-with-bold-italic",
+    "description": "Text with bold and italic entities",
+    "contentKind": "text-formatting"
+  },
+  {
+    "name": "text-with-code",
+    "description": "Text with inline code entity",
+    "contentKind": "text-formatting"
+  },
+  {
+    "name": "text-with-url",
+    "description": "Text with clickable URL",
+    "contentKind": "text-formatting"
+  },
+  {
+    "name": "text-with-spoiler",
+    "description": "Text with spoiler entity",
+    "contentKind": "text-formatting"
+  },
+  {
+    "name": "text-with-link-preview",
+    "description": "Text with a link preview card",
+    "contentKind": "text-formatting"
+  },
+  {
+    "name": "reply-to-text",
+    "description": "Replying to a text message",
+    "contentKind": "replies"
+  },
+  {
+    "name": "reply-to-photo",
+    "description": "Replying to a photo (thumbnail in reply header)",
+    "contentKind": "replies"
+  },
+  {
+    "name": "reply-to-voice",
+    "description": "Replying to a voice message",
+    "contentKind": "replies"
+  },
+  {
+    "name": "reply-to-video",
+    "description": "Replying to a video",
+    "contentKind": "replies"
+  },
+  {
+    "name": "text-with-forward",
+    "description": "Forwarded from Tech News Channel",
+    "contentKind": "forward"
+  },
+  {
+    "name": "reaction-text",
+    "description": "Text message with reactions",
+    "contentKind": "reactions"
+  },
+  {
+    "name": "reaction-text-chosen",
+    "description": "Text with reactions user has chosen",
+    "contentKind": "reactions"
+  },
+  {
+    "name": "reaction-photo",
+    "description": "Photo with reactions",
+    "contentKind": "reactions"
+  },
+  {
+    "name": "reaction-photo-caption",
+    "description": "Photo with caption and reactions",
+    "contentKind": "reactions"
+  },
+  {
+    "name": "reaction-video",
+    "description": "Video with reactions",
+    "contentKind": "reactions"
+  },
+  {
+    "name": "reaction-voice",
+    "description": "Voice message with reactions",
+    "contentKind": "reactions"
+  },
+  {
+    "name": "reaction-sticker",
+    "description": "Sticker with reactions",
+    "contentKind": "reactions"
+  },
+  {
+    "name": "reaction-animation",
+    "description": "GIF/animation with reactions",
+    "contentKind": "reactions"
+  },
+  {
+    "name": "reaction-album",
+    "description": "Album with reactions",
+    "contentKind": "reactions"
+  },
+  {
+    "name": "photo-single",
+    "description": "Sunset photo, no caption",
+    "contentKind": "photo"
+  },
+  {
+    "name": "photo-with-caption",
+    "description": "Food photo with caption",
+    "contentKind": "photo"
+  },
+  {
+    "name": "photo-outgoing",
+    "description": "Outgoing cat photo",
+    "contentKind": "photo"
+  },
+  {
+    "name": "photo-with-reply",
+    "description": "Photo replying to \"How’s the show?\"",
+    "contentKind": "photo"
+  },
+  {
+    "name": "photo-with-forward",
+    "description": "Photo forwarded from Travel Photography",
+    "contentKind": "photo"
+  },
+  {
+    "name": "photo-with-caption-entities",
+    "description": "Photo with formatted caption",
+    "contentKind": "photo"
+  },
+  {
+    "name": "video-single",
+    "description": "Landscape video, no caption",
+    "contentKind": "video"
+  },
+  {
+    "name": "video-with-caption",
+    "description": "City video with caption",
+    "contentKind": "video"
+  },
+  {
+    "name": "video-outgoing",
+    "description": "Outgoing video",
+    "contentKind": "video"
+  },
+  {
+    "name": "voice-incoming",
+    "description": "Incoming voice with waveform",
+    "contentKind": "voice"
+  },
+  {
+    "name": "voice-outgoing",
+    "description": "Outgoing voice",
+    "contentKind": "voice"
+  },
+  {
+    "name": "voice-with-speech",
+    "description": "Voice with transcription",
+    "contentKind": "voice"
+  },
+  {
+    "name": "animation-gif",
+    "description": "Looping animation, no caption",
+    "contentKind": "animation"
+  },
+  {
+    "name": "animation-with-caption",
+    "description": "Animation with caption",
+    "contentKind": "animation"
+  },
+  {
+    "name": "video-note-incoming",
+    "description": "Round video incoming",
+    "contentKind": "videoNote"
+  },
+  {
+    "name": "sticker-webp",
+    "description": "Static webp sticker",
+    "contentKind": "sticker"
+  },
+  {
+    "name": "sticker-tgs",
+    "description": "Animated Lottie sticker (no url, shows fallback)",
+    "contentKind": "sticker"
+  },
+  {
+    "name": "sticker-webm",
+    "description": "Video sticker (no url, shows fallback)",
+    "contentKind": "sticker"
+  },
+  {
+    "name": "album-photos",
+    "description": "3 travel photos (sunset, city, food)",
+    "contentKind": "album"
+  },
+  {
+    "name": "album-with-caption",
+    "description": "2 food photos with caption",
+    "contentKind": "album"
+  },
+  {
+    "name": "album-mixed",
+    "description": "Sunset photo + sunset video in one album",
+    "contentKind": "album"
+  },
+  {
+    "name": "document-file",
+    "description": "Document file attachment",
+    "contentKind": "document"
+  },
+  {
+    "name": "text-with-sender-name",
+    "description": "Group message with sender name and avatar",
+    "contentKind": "group-chat"
+  },
+  {
+    "name": "text-with-mention",
+    "description": "Group message with @mention and hashtag",
+    "contentKind": "group-chat"
+  },
+  {
+    "name": "text-with-inline-keyboard",
+    "description": "Bot message with inline keyboard buttons",
+    "contentKind": "group-chat"
+  },
+  {
+    "name": "text-channel-post",
+    "description": "Channel post with view count",
+    "contentKind": "channel"
+  },
+  {
+    "name": "service-pin-text",
+    "description": "Pinned a text message",
+    "contentKind": "service"
+  },
+  {
+    "name": "service-pin-photo",
+    "description": "Pinned a photo",
+    "contentKind": "service"
+  },
+  {
+    "name": "service-pin-video",
+    "description": "Pinned a video",
+    "contentKind": "service"
+  },
+  {
+    "name": "service-pin-voice",
+    "description": "Pinned a voice message",
+    "contentKind": "service"
+  },
+  {
+    "name": "service-join",
+    "description": "User joined the group",
+    "contentKind": "service"
+  },
+  {
+    "name": "service-left",
+    "description": "User left the group",
+    "contentKind": "service"
+  },
+  {
+    "name": "service-title-change",
+    "description": "Group title changed",
+    "contentKind": "service"
+  },
+  {
+    "name": "service-photo-change",
+    "description": "Group photo changed",
+    "contentKind": "service"
+  },
+  {
+    "name": "text-group-first",
+    "description": "First in sequence",
+    "contentKind": "grouping"
+  },
+  {
+    "name": "text-group-middle",
+    "description": "Middle in sequence",
+    "contentKind": "grouping"
+  },
+  {
+    "name": "text-group-last",
+    "description": "Last in sequence",
+    "contentKind": "grouping"
+  },
+  {
+    "name": "pending-sending",
+    "description": "Message being sent",
+    "contentKind": "pending"
+  },
+  {
+    "name": "pending-failed",
+    "description": "Message failed to send",
+    "contentKind": "pending"
+  },
+  {
+    "name": "captured-104614330368-2026-03-15-14-01-24",
+    "description": "Captured: captured-104614330368-2026-03-15-14-01-24",
+    "contentKind": "unknown"
+  },
+  {
+    "name": "captured-104446558208-2026-03-15-14-01-55",
+    "description": "Captured: captured-104446558208-2026-03-15-14-01-55",
+    "contentKind": "unknown"
+  }
+]

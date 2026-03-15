@@ -6,8 +6,17 @@ import { initialize, isAuthorized, logout } from '@/data/telegram';
 
 type Screen = 'loading' | 'auth' | 'chat';
 
+let captureInitialized = false;
+
 function App() {
   const [screen, setScreen] = useState<Screen>('loading');
+
+  useEffect(() => {
+    if (import.meta.env.DEV && !captureInitialized) {
+      captureInitialized = true;
+      import('./dev/capture').then(({ initCapture }) => initCapture());
+    }
+  }, []);
 
   useEffect(() => {
     async function boot() {

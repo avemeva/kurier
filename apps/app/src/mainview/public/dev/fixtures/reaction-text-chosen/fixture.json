@@ -1,0 +1,47 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718816,
+      "chatId": 6098406782,
+      "date": 1772464607,
+      "isOutgoing": false,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 6098406782,
+        "name": "Alice",
+        "photoUrl": "/dev/photos/6098406782.jpg"
+      },
+      "reactions": [
+        {
+          "emoji": "👍",
+          "count": 8,
+          "chosen": true
+        },
+        {
+          "emoji": "🎉",
+          "count": 4,
+          "chosen": false
+        },
+        {
+          "emoji": "💯",
+          "count": 2,
+          "chosen": true
+        }
+      ],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "text",
+        "text": "We hit 10,000 daily active users today!",
+        "entities": [],
+        "customEmojiUrls": {},
+        "webPreview": null
+      }
+    }
+  ],
+  "chatKind": "private"
+}

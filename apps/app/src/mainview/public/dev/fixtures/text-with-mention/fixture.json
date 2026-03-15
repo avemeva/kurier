@@ -1,0 +1,42 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 718847,
+      "chatId": -1001234567890,
+      "date": 1772464607,
+      "isOutgoing": false,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 6098406782,
+        "name": "Alice",
+        "photoUrl": "/dev/photos/6098406782.jpg"
+      },
+      "reactions": [],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "text",
+        "text": "@bob check this out #design",
+        "entities": [
+          {
+            "offset": 0,
+            "length": 4,
+            "type": "mention"
+          },
+          {
+            "offset": 20,
+            "length": 7,
+            "type": "hashtag"
+          }
+        ],
+        "customEmojiUrls": {},
+        "webPreview": null
+      }
+    }
+  ],
+  "chatKind": "supergroup"
+}
