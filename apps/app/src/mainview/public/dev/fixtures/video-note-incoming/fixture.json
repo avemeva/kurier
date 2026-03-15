@@ -3,15 +3,15 @@
     {
       "kind": "message",
       "id": 718838,
-      "chatId": 6098406782,
-      "date": 1772464607,
+      "chatId": 346928206,
+      "date": 1773512279,
       "isOutgoing": false,
-      "isRead": true,
+      "isRead": false,
       "editDate": 0,
       "sender": {
-        "userId": 6098406782,
-        "name": "Alice",
-        "photoUrl": "/dev/photos/6098406782.jpg"
+        "userId": 346928206,
+        "name": "Маруся",
+        "photoUrl": "/dev/fixtures/video-note-incoming/media/1490045299286190009.jpg"
       },
       "reactions": [],
       "viewCount": 0,
@@ -21,11 +21,14 @@
       "content": {
         "kind": "videoNote",
         "media": {
-          "url": "/dev/media/sample-videonote.mp4",
-          "width": 384,
-          "height": 384,
+          "url": "/dev/fixtures/video-note-incoming/media/5310156445033997119.mp4",
+          "width": 400,
+          "height": 400,
           "minithumbnail": null
-        }
+        },
+        "duration": 8,
+        "speechStatus": "none",
+        "speechText": ""
       }
     }
   ],

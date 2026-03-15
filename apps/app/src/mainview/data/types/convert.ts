@@ -600,6 +600,9 @@ export function toTGContent(content: Td.MessageContent): TGContent {
           height: content.video_note.length,
           minithumbnail: null,
         },
+        duration: content.video_note.duration ?? 0,
+        speechStatus: 'none',
+        speechText: '',
       };
     }
     case 'messageSticker': {

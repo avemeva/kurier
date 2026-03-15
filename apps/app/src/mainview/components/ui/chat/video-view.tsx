@@ -1,6 +1,7 @@
 import { Maximize, Minimize, Pause, Play } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { PureVideoNotePlayer } from './video-note-player';
 
 /** Format seconds as m:ss */
 function formatTime(seconds: number): string {
@@ -285,6 +286,10 @@ export function PureVideoView({
   width,
   height,
   minithumbnail,
+  senderPhotoUrl,
+  speechStatus,
+  speechText,
+  onTranscribe,
   className,
 }: {
   url: string | null;
@@ -296,11 +301,15 @@ export function PureVideoView({
   width?: number;
   height?: number;
   minithumbnail?: string | null;
+  senderPhotoUrl?: string;
+  speechStatus?: 'none' | 'pending' | 'done' | 'error';
+  speechText?: string;
+  onTranscribe?: () => void;
   className?: string;
 }) {
   const hasDimensions = width != null && height != null && !isCircle && !cover;
 
-  // Circle path — unchanged
+  // Circle path — video note player
   if (isCircle) {
     if (loading) {
       return <div className={cn('size-[200px] animate-pulse rounded-full bg-muted', className)} />;
@@ -320,9 +329,14 @@ export function PureVideoView({
       );
     }
     return (
-      <div className={cn('size-[200px] overflow-hidden rounded-full', className)}>
-        <video src={url} className="h-full w-full object-cover" autoPlay muted loop playsInline />
-      </div>
+      <PureVideoNotePlayer
+        url={url}
+        senderPhotoUrl={senderPhotoUrl}
+        speechStatus={speechStatus}
+        speechText={speechText}
+        onTranscribe={onTranscribe}
+        className={className}
+      />
     );
   }
 

@@ -1,28 +1,42 @@
 // Rendering logic for messages — pure functions, no store dependency.
-// Lives alongside the consumer (PureMessageRow) instead of in @/data.
+// Computes EVERYTHING the renderer needs: layout, typed content, extracted text,
+// display dimensions. Layouts receive fully resolved state — no casts needed.
 
-import type { TGContent, TGMessage, TGMessageBase, TGServiceAction } from '@/data';
+import type {
+  TGAlbumItem,
+  TGAnimationContent,
+  TGCaption,
+  TGMedia,
+  TGMessage,
+  TGMessageBase,
+  TGPhotoContent,
+  TGServiceAction,
+  TGTextEntity,
+  TGVideoContent,
+  TGVideoNoteContent,
+  TGVoiceContent,
+  TGWebPreview,
+} from '@/data';
+import type { CustomEmojiInfo } from '@/data/telegram';
 import { computeMediaSize, MAX_MEDIA_SIZE, MIN_MEDIA_SIZE } from '@/lib/media-sizing';
 
-// --- Info display type (shared with MessageTime) ---
+// ─── Shared types ────────────────────────────────────────
 
 export type InfoDisplayType = 'default' | 'image' | 'background';
-
-// --- Media state ---
-
-export type MediaState = {
-  url: string | null;
-  loading: boolean;
-  retry: (() => void) | undefined;
-};
-
-// --- Context from parent ---
 
 export type MessageContext = {
   showSender: boolean;
 };
 
-// --- Render state ---
+// ─── Extracted text fields (shared shape) ────────────────
+
+type ExtractedText = {
+  text: string;
+  entities: TGTextEntity[];
+  customEmojiUrls: Record<string, CustomEmojiInfo | null>;
+};
+
+// ─── Render states ───────────────────────────────────────
 
 export type ServiceRenderState = {
   layout: 'service';
@@ -41,12 +55,42 @@ export type PendingRenderState = {
 export type StickerRenderState = {
   layout: 'sticker';
   msg: TGMessageBase & { kind: 'message' };
-  stickerUrl: string | undefined;
-  stickerFormat: 'webp' | 'tgs' | 'webm';
-  stickerEmoji: string;
+  url: string | undefined;
+  format: 'webp' | 'tgs' | 'webm';
+  emoji: string;
+  showAvatar: boolean;
+};
+
+export type MediaRenderState = {
+  layout: 'media';
+  msg: TGMessageBase & { kind: 'message' };
+  bubbleVariant: 'media' | 'framed';
+  showAvatar: boolean;
+  showSenderName: boolean;
+  isMediaOnly: boolean;
+  // Pre-narrowed content
+  contentKind: 'photo' | 'video' | 'animation' | 'videoNote';
+  media: TGMedia;
   displayWidth: number;
   displayHeight: number;
+  // Caption (null for videoNote)
+  caption: ExtractedText | null;
+  // Video note specific
+  videoNote: {
+    duration: number;
+    speechStatus: TGVideoNoteContent['speechStatus'];
+    speechText: string;
+  } | null;
+};
+
+export type AlbumRenderState = {
+  layout: 'album';
+  msg: TGMessageBase & { kind: 'message' };
+  bubbleVariant: 'media' | 'framed';
   showAvatar: boolean;
+  showSenderName: boolean;
+  items: TGAlbumItem[];
+  caption: ExtractedText | null;
 };
 
 export type BubbleRenderState = {
@@ -56,26 +100,10 @@ export type BubbleRenderState = {
   showAvatar: boolean;
   showSenderName: boolean;
   onTranscribe?: (chatId: number, msgId: number) => void;
-};
-
-export type MediaRenderState = {
-  layout: 'media';
-  msg: TGMessageBase & { kind: 'message' };
-  bubbleVariant: 'media' | 'framed';
-  displayWidth: number;
-  displayHeight: number;
-  showAvatar: boolean;
-  showSenderName: boolean;
-  displayType: InfoDisplayType;
-  isMediaOnly: boolean;
-};
-
-export type AlbumRenderState = {
-  layout: 'album';
-  msg: TGMessageBase & { kind: 'message' };
-  bubbleVariant: 'media' | 'framed';
-  showAvatar: boolean;
-  showSenderName: boolean;
+  // Pre-narrowed content — exactly one of these is non-null
+  textContent: (ExtractedText & { webPreview: TGWebPreview | null }) | null;
+  voiceContent: TGVoiceContent | null;
+  documentLabel: string;
 };
 
 export type MessageRenderState =
@@ -86,37 +114,25 @@ export type MessageRenderState =
   | BubbleRenderState
   | AlbumRenderState;
 
-// --- Display type logic ---
+// ─── Helpers ─────────────────────────────────────────────
 
-function getDisplayType(content: TGContent, hasText: boolean): InfoDisplayType {
-  if (content.kind === 'sticker') return 'background';
-  if (
-    content.kind === 'photo' ||
-    content.kind === 'video' ||
-    content.kind === 'videoNote' ||
-    content.kind === 'animation'
-  ) {
-    if (hasText) return 'default';
-    return 'image';
-  }
-  return 'default';
+function extractCaption(caption: TGCaption | null): ExtractedText | null {
+  if (!caption || !caption.text) return null;
+  return {
+    text: caption.text,
+    entities: caption.entities,
+    customEmojiUrls: caption.customEmojiUrls,
+  };
 }
 
-function getContentText(content: TGContent): string {
-  switch (content.kind) {
-    case 'text':
-      return content.text;
-    case 'photo':
-    case 'video':
-    case 'animation':
-    case 'album':
-      return content.caption?.text ?? '';
-    default:
-      return '';
+function computeDisplaySize(media: TGMedia): { width: number; height: number } {
+  if (media.width > 0 && media.height > 0) {
+    return computeMediaSize(media.width, media.height, MAX_MEDIA_SIZE, MIN_MEDIA_SIZE);
   }
+  return { width: MAX_MEDIA_SIZE, height: Math.round((MAX_MEDIA_SIZE * 9) / 16) };
 }
 
-// --- computeMessageState ---
+// ─── computeMessageState ─────────────────────────────────
 
 export function computeMessageState(
   msg: TGMessage,
@@ -143,102 +159,102 @@ export function computeMessageState(
     };
   }
 
-  // Regular message (kind === 'message')
   const content = msg.content;
-  const text = getContentText(content);
+  const showAvatar = ctx.showSender && !msg.isOutgoing;
+  const showSenderName = ctx.showSender && !msg.isOutgoing;
 
   // Sticker
   if (content.kind === 'sticker') {
-    const STICKER_MAX_SIZE = 224;
-    let stickerW: number;
-    let stickerH: number;
-    if (content.width > 0 && content.height > 0) {
-      const sized = computeMediaSize(
-        content.width,
-        content.height,
-        STICKER_MAX_SIZE,
-        MIN_MEDIA_SIZE,
-      );
-      stickerW = sized.width;
-      stickerH = sized.height;
-    } else {
-      stickerW = STICKER_MAX_SIZE;
-      stickerH = STICKER_MAX_SIZE;
-    }
     return {
       layout: 'sticker',
       msg,
-      stickerUrl: content.url,
-      stickerFormat: content.format,
-      stickerEmoji: content.emoji,
-      displayWidth: stickerW,
-      displayHeight: stickerH,
-      showAvatar: ctx.showSender && !msg.isOutgoing,
+      url: content.url,
+      format: content.format,
+      emoji: content.emoji,
+      showAvatar,
     };
   }
 
   // Album
   if (content.kind === 'album') {
-    const showAvatar = ctx.showSender && !msg.isOutgoing;
-    const showSenderName = ctx.showSender && !msg.isOutgoing;
-    const needsBubble = !!text || !!msg.replyTo || !!msg.forward || showSenderName;
+    const caption = extractCaption(content.caption);
+    const needsBubble = !!caption || !!msg.replyTo || !!msg.forward || showSenderName;
     return {
       layout: 'album',
       msg,
       bubbleVariant: needsBubble ? 'framed' : 'media',
       showAvatar,
       showSenderName,
+      items: content.items,
+      caption,
     };
   }
 
-  // Media layout (photos, videos, animations, video notes)
+  // Media (photo, video, animation, videoNote)
   if (
     content.kind === 'photo' ||
     content.kind === 'video' ||
     content.kind === 'animation' ||
     content.kind === 'videoNote'
   ) {
-    const showAvatar = ctx.showSender && !msg.isOutgoing;
-    const showSenderName = ctx.showSender && !msg.isOutgoing;
-    const needsBubble = !!text || !!msg.replyTo || !!msg.forward || showSenderName;
-    const bubbleVariant = needsBubble ? 'framed' : 'media';
-
-    let displayWidth: number;
-    let displayHeight: number;
-    if (content.media.width > 0 && content.media.height > 0) {
-      const sized = computeMediaSize(
-        content.media.width,
-        content.media.height,
-        MAX_MEDIA_SIZE,
-        MIN_MEDIA_SIZE,
-      );
-      displayWidth = sized.width;
-      displayHeight = sized.height;
-    } else {
-      displayWidth = MAX_MEDIA_SIZE;
-      displayHeight = Math.round((MAX_MEDIA_SIZE * 9) / 16);
-    }
+    const isVideoNote = content.kind === 'videoNote';
+    const caption = isVideoNote
+      ? null
+      : extractCaption((content as TGPhotoContent | TGVideoContent | TGAnimationContent).caption);
+    const needsBubble = !!caption || !!msg.replyTo || !!msg.forward || showSenderName;
+    const { width: displayWidth, height: displayHeight } = computeDisplaySize(content.media);
 
     return {
       layout: 'media',
       msg,
-      bubbleVariant,
-      displayWidth,
-      displayHeight,
+      bubbleVariant: needsBubble ? 'framed' : 'media',
       showAvatar,
       showSenderName,
-      displayType: text ? 'default' : 'image',
-      isMediaOnly: !text,
+      isMediaOnly: !caption,
+      contentKind: content.kind,
+      media: content.media,
+      displayWidth,
+      displayHeight,
+      caption,
+      videoNote: isVideoNote
+        ? {
+            duration: content.duration,
+            speechStatus: content.speechStatus,
+            speechText: content.speechText,
+          }
+        : null,
     };
   }
 
-  // Regular bubble (text, voice, videoNote, document, unsupported)
+  // Bubble (text, voice, document, unsupported)
+  const textContent =
+    content.kind === 'text'
+      ? {
+          text: content.text,
+          entities: content.entities,
+          customEmojiUrls: content.customEmojiUrls,
+          webPreview: content.webPreview,
+        }
+      : null;
+
+  const voiceContent = content.kind === 'voice' ? content : null;
+
+  const documentLabel =
+    content.kind === 'document'
+      ? content.label
+      : content.kind === 'unsupported'
+        ? content.label
+        : '';
+
   return {
     layout: 'bubble',
     msg,
-    displayType: getDisplayType(content, !!text),
-    showAvatar: ctx.showSender && !msg.isOutgoing,
-    showSenderName: ctx.showSender && !msg.isOutgoing,
+    displayType: 'default' as InfoDisplayType,
+    showAvatar,
+    showSenderName,
     onTranscribe,
+    textContent,
+    voiceContent,
+    documentLabel,
   };
 }

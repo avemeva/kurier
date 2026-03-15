@@ -229,6 +229,9 @@ export type TGVoiceContent = {
 export type TGVideoNoteContent = {
   kind: 'videoNote';
   media: TGMedia;
+  duration: number;
+  speechStatus: 'none' | 'pending' | 'done' | 'error';
+  speechText: string;
 };
 
 export type TGStickerContent = {
