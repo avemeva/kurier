@@ -175,7 +175,6 @@ export function PureVideoNotePlayer({
         </div>
 
         {/* SVG progress ring */}
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: progress ring is a drag-seek handle */}
         <svg
           className="absolute inset-0"
           width={SIZE}
