@@ -80,6 +80,10 @@ bun run scripts/symbols.ts .
 
 This outputs every exported type, interface, class, function, and const per file (~1s). Use it to orient before touching code.
 
+## Browser Automation
+
+Use `agent-browser` skill, never `mcp__claude-in-chrome__*` tools.
+
 ## Local CLAUDE.md
 
 Before editing files in a directory, check for a `CLAUDE.md` in that directory and read it first.
