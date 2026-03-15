@@ -548,5 +548,10 @@
     "name": "sidebar-edge-typing-overrides",
     "description": "Typing indicator overrides preview",
     "contentKind": "sidebar-edge-cases"
+  },
+  {
+    "name": "channel-example-too-many emojies",
+    "description": "Captured: channel-example-too-many emojies",
+    "contentKind": "unknown"
   }
 ]

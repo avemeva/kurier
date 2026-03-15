@@ -1,0 +1,70 @@
+{
+  "messages": [
+    {
+      "kind": "message",
+      "id": 38797312,
+      "chatId": -1002960636933,
+      "date": 1771964717,
+      "isOutgoing": true,
+      "isRead": true,
+      "editDate": 1773310910,
+      "sender": {
+        "userId": 0,
+        "name": "Unknown"
+      },
+      "reactions": [
+        {
+          "emoji": "",
+          "count": 1,
+          "chosen": false
+        },
+        {
+          "emoji": "🔥",
+          "count": 7,
+          "chosen": false
+        },
+        {
+          "emoji": "❤",
+          "count": 5,
+          "chosen": false
+        },
+        {
+          "emoji": "👍",
+          "count": 4,
+          "chosen": false
+        }
+      ],
+      "viewCount": 49,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "photo",
+        "media": {
+          "url": "/dev/fixtures/channel-example-too-many emojies/media/5256215319863300054_121.jpg",
+          "width": 960,
+          "height": 1280,
+          "minithumbnail": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDACgcHiMeGSgjISMtKygwPGRBPDc3PHtYXUlkkYCZlo+AjIqgtObDoKrarYqMyP/L2u71////m8H////6/+b9//j/2wBDASstLTw1PHZBQXb4pYyl+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj4+Pj/wAARCAAoAB4DASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwBC0R/j/SkMeR6gnAPrUKqrrlXDY9KuwuHj2ADIIOTVcz6DuVWh54FVmILHAyK0bhXVC5wAB1FZsq7GwGDcdQaTb6jvpoLavGgKncGbv2q7BxuMcgz9M1lcqfeniRgQQaSEaU8reWUcoSfTiqEzsoG04FT73eMEnP1qvLzjAx3pyTjuCXYjYZo/CiigqxKk2F2kfSmyHBx1wMUUUpNvcNj/2Q=="
+        },
+        "caption": {
+          "text": "Мало кто об этом говорит, но когда делаешь небольшой проект вроде Math AI или думаешь про инди-хакинг, постоянно ловишь мысль, что это что-то несерьёзное.\n\nВторой момент: цифры в Stripe остаются просто цифрами, пока не почувствуешь, что они реально повлияли на твою жизнь. И это напрямую влияет на мотивацию и отношение к проекту.\n\nЯ считаю, что необходимо потратить первые деньги с проекта и зафиксировать несколько моментов у себя в голове: а) проект реальный, б) он влияет на мою жизнь, в) вот эти деньги — я их трачу, я получаю что-то, это не просто цифры.\n\nПоэтому я решил собрать новый сетап на часть денег от Math AI (пк, стол, освещение, стул и прочее), чтобы каждый день видеть и ощущать его реальный эффект.\n\nИнтересно, что как только деньги дошли до меня и я зафиксировал это у себя в голове, я начал воспринимать проект иначе. Даже в мелочах, вроде экономии на подписках с корпоративной карты.\n\nВот тут про мой ПК (HappyPC):\nhttps://youtu.be/1KSPWIIuYlc?is=nPdvRkR8bHOoA6Q1",
+          "entities": [
+            {
+              "offset": 66,
+              "length": 7,
+              "type": "textUrl",
+              "url": "https://chromewebstore.google.com/detail/math-ai/dioapkekjoidbacpmfpnphhlobnneadd"
+            },
+            {
+              "offset": 937,
+              "length": 48,
+              "type": "url"
+            }
+          ],
+          "customEmojiUrls": {}
+        }
+      }
+    }
+  ],
+  "chatKind": "channel"
+}
