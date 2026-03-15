@@ -348,11 +348,21 @@ export function toTGTextEntities(entities: Td.textEntity[]): TGTextEntity[] {
   });
 }
 
+/** Telegram sends some emoji without the variation selector (e.g. U+2764 instead of U+2764 U+FE0F).
+ *  Browsers render bare BMP codepoints in text presentation (thin/outlined).
+ *  Appending U+FE0F forces full-color emoji presentation.
+ *  Only BMP codepoints (emoji.length === 1) need this — surrogate pair emoji (🔥, 👍, etc.)
+ *  already have emoji presentation by default. */
+function normalizeEmoji(emoji: string): string {
+  if (emoji.length !== 1) return emoji;
+  return emoji + '\uFE0F';
+}
+
 export function toTGReactions(info: Td.messageInteractionInfo | undefined): TGReaction[] {
   const reactions = info?.reactions?.reactions;
   if (!reactions) return [];
   return reactions.map((r) => ({
-    emoji: r.type._ === 'reactionTypeEmoji' ? r.type.emoji : '',
+    emoji: r.type._ === 'reactionTypeEmoji' ? normalizeEmoji(r.type.emoji) : '',
     count: r.total_count,
     chosen: r.is_chosen,
   }));
