@@ -489,6 +489,21 @@ export function downloadMedia(chatId: number, messageId: number): Promise<string
   return promise;
 }
 
+/** Open a downloaded media file in the system default application. */
+export async function openFile(mediaUrl: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mediaUrl }),
+    });
+    const data = (await res.json()) as { ok: boolean };
+    return data.ok;
+  } catch {
+    return false;
+  }
+}
+
 function getFileFromContent(content: Td.MessageContent): Td.file | null {
   switch (content._) {
     case 'messagePhoto': {

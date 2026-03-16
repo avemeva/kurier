@@ -230,6 +230,7 @@ export function FixtureIndex({ navigate }: Props) {
                     onReact={noop}
                     onReplyClick={noop}
                     onTranscribe={noop}
+                    onOpenDocument={noop}
                   />
                 </div>
               </section>

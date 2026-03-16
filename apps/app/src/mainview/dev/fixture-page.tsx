@@ -162,6 +162,7 @@ export function FixturePage({ name, navigate }: Props) {
             onReact={noop}
             onReplyClick={noop}
             onTranscribe={noop}
+            onOpenDocument={noop}
           />
         </div>
       </ResizableChat>

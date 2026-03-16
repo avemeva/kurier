@@ -260,6 +260,48 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
     });
   }
 
+  // --- 6b. Open file in system ---
+
+  async function handleOpenFile(req: Request): Promise<Response> {
+    try {
+      const body = (await req.json()) as { mediaUrl?: string };
+      const mediaUrl = body.mediaUrl;
+      if (!mediaUrl || typeof mediaUrl !== 'string') {
+        return Response.json(
+          { ok: false, error: 'Missing mediaUrl' },
+          { status: 400, headers: CORS },
+        );
+      }
+      const relPath = mediaUrl.replace(/^\/api\/media\//, '');
+      // Resolve to absolute path — try filesDir first, then dbDir
+      let filePath = path.resolve(path.join(filesDir, relPath));
+      if (!filePath.startsWith(filesDir)) {
+        return Response.json({ ok: false, error: 'Forbidden' }, { status: 403, headers: CORS });
+      }
+      let file = Bun.file(filePath);
+      if (!file.size) {
+        filePath = path.resolve(path.join(dbDir, relPath));
+        if (!filePath.startsWith(dbDir)) {
+          return Response.json({ ok: false, error: 'Forbidden' }, { status: 403, headers: CORS });
+        }
+        file = Bun.file(filePath);
+        if (!file.size) {
+          return Response.json(
+            { ok: false, error: 'File not found' },
+            { status: 404, headers: CORS },
+          );
+        }
+      }
+      Bun.spawn(['open', filePath]);
+      return Response.json({ ok: true }, { headers: CORS });
+    } catch {
+      return Response.json(
+        { ok: false, error: 'Failed to open file' },
+        { status: 500, headers: CORS },
+      );
+    }
+  }
+
   // --- 7. Route handlers ---
 
   async function handleInvoke(req: Request): Promise<Response> {
@@ -559,6 +601,9 @@ export async function startProxy(options: ProxyOptions): Promise<ProxyHandle> {
       if (url.pathname.startsWith('/api/media/') && req.method === 'GET') {
         const relPath = url.pathname.replace(/^\/api\/media\//, '');
         return serveMediaFile(relPath);
+      }
+      if (url.pathname === '/api/open' && req.method === 'POST') {
+        return handleOpenFile(req);
       }
       if (url.pathname === '/health' && req.method === 'GET') {
         return handleHealth();

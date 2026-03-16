@@ -21,6 +21,7 @@ import {
   loadMoreDialogs,
   markAsRead,
   onUpdate,
+  openFile,
   openTdChat,
   searchContacts,
   searchGlobal,
@@ -1028,6 +1029,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     downloadMedia(chatId, messageId).then((url) => {
       set((s) => ({ mediaUrls: { ...s.mediaUrls, [key]: url } }));
     });
+  },
+
+  openDocument: (chatId: number, messageId: number) => {
+    const key = `${chatId}_${messageId}`;
+    const url = get().mediaUrls[key];
+    if (url) {
+      openFile(url);
+    }
   },
 
   clearMediaUrl: (chatId: number, messageId: number) => {

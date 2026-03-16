@@ -1,37 +1,40 @@
 import { ArrowDown, FileText } from 'lucide-react';
 import { formatFileSize } from '@/lib/format';
+import { cn } from '@/lib/utils';
 
 export function PureDocumentView({
   fileName,
   fileSize,
-  url,
+  downloaded,
+  onClick,
 }: {
   fileName: string;
   fileSize: number;
-  url?: string;
+  downloaded: boolean;
+  onClick?: () => void;
 }) {
-  const inner = (
-    <div
+  return (
+    <button
+      type="button"
       data-testid="document-view"
-      className={`flex items-center gap-3 py-1${url ? ' cursor-pointer' : ''}`}
+      className={cn(
+        'flex w-full items-center gap-3 rounded-lg py-1 text-left',
+        onClick && 'cursor-pointer',
+      )}
+      onClick={onClick}
     >
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-accent-brand/10 text-accent-brand">
-        {url ? <ArrowDown size={20} /> : <FileText size={20} />}
+      <div
+        className={cn(
+          'flex size-10 shrink-0 items-center justify-center rounded-full',
+          downloaded ? 'bg-accent-brand text-white' : 'bg-accent-brand/10 text-accent-brand',
+        )}
+      >
+        {downloaded ? <FileText size={20} /> : <ArrowDown size={20} />}
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-text-primary">{fileName}</p>
         <p className="text-xs text-text-tertiary">{formatFileSize(fileSize)}</p>
       </div>
-    </div>
+    </button>
   );
-
-  if (url) {
-    return (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="no-underline">
-        {inner}
-      </a>
-    );
-  }
-
-  return inner;
 }

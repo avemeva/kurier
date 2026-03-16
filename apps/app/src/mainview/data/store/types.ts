@@ -105,6 +105,7 @@ export interface ChatState {
   clearFileUrl: (fileId: number) => void;
   loadCustomEmojiUrl: (documentId: string) => void;
   recognizeSpeech: (chatId: number, messageId: number) => void;
+  openDocument: (chatId: number, messageId: number) => void;
   loadReplyThumb: (chatId: number, messageId: number) => void;
   resolveReplyPreview: (chatId: number, messageId: number) => void;
   resolvePinnedPreview: (chatId: number, messageId: number) => void;
@@ -157,6 +158,7 @@ export const INITIAL_STATE: Omit<
   | 'clearFileUrl'
   | 'loadCustomEmojiUrl'
   | 'recognizeSpeech'
+  | 'openDocument'
   | 'loadReplyThumb'
   | 'resolveReplyPreview'
   | 'resolvePinnedPreview'

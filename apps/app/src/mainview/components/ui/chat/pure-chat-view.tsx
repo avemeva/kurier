@@ -12,6 +12,7 @@ export type PureChatViewProps = {
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
   onReplyClick?: (messageId: number) => void;
   onTranscribe?: (chatId: number, msgId: number) => void;
+  onOpenDocument?: (chatId: number, msgId: number) => void;
 };
 
 function getKey(msg: TGMessage): string | number {
@@ -53,6 +54,7 @@ export function PureChatView({
   onReact,
   onReplyClick,
   onTranscribe,
+  onOpenDocument,
 }: PureChatViewProps) {
   const isGroup = chatKind === 'basicGroup' || chatKind === 'supergroup';
   const showSender = isGroup || chatKind === 'channel';
@@ -104,6 +106,7 @@ export function PureChatView({
               onReact={onReact}
               onReplyClick={onReplyClick}
               onTranscribe={onTranscribe}
+              onOpenDocument={onOpenDocument}
             />
           </div>
         );

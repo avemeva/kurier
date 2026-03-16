@@ -55,6 +55,7 @@ export function ChatView() {
   const react = useChatStore((s) => s.react);
   const searchMode = useChatStore((s) => s.searchMode);
   const recognizeSpeech = useChatStore((s) => s.recognizeSpeech);
+  const openDocument = useChatStore((s) => s.openDocument);
   const goToNextUnreadMention = useChatStore((s) => s.goToNextUnreadMention);
   const goToNextUnreadReaction = useChatStore((s) => s.goToNextUnreadReaction);
 
@@ -97,6 +98,13 @@ export function ChatView() {
       recognizeSpeech(chatId, msgId);
     },
     [recognizeSpeech],
+  );
+
+  const handleOpenDocument = useCallback(
+    (chatId: number, msgId: number) => {
+      openDocument(chatId, msgId);
+    },
+    [openDocument],
   );
 
   if (!selectedChat) {
@@ -144,6 +152,7 @@ export function ChatView() {
             onReact={handleReact}
             onReplyClick={handleReplyClick}
             onTranscribe={handleTranscribe}
+            onOpenDocument={handleOpenDocument}
           />
           <div />
         </ScrollContainer>

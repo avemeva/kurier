@@ -44,6 +44,7 @@ export type MessageProps = {
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
   onReplyClick?: (messageId: number) => void;
   onTranscribe?: (chatId: number, msgId: number) => void;
+  onOpenDocument?: (chatId: number, msgId: number) => void;
 };
 
 // ─── PureMessageRow ──────────────────────────────────────
@@ -56,8 +57,9 @@ function PureMessageRowInner({
   onReact,
   onReplyClick,
   onTranscribe,
+  onOpenDocument,
 }: MessageProps) {
-  const state = computeMessageState(msg, { showSender }, onTranscribe);
+  const state = computeMessageState(msg, { showSender }, onTranscribe, onOpenDocument);
 
   switch (state.layout) {
     case 'service':
@@ -212,7 +214,8 @@ function PureMessageRowInner({
             <PureDocumentView
               fileName={state.documentContent.fileName}
               fileSize={state.documentContent.fileSize}
-              url={state.documentContent.url}
+              downloaded={state.documentContent.downloaded}
+              onClick={state.documentContent.onOpen}
             />
           )}
           {/* Text */}

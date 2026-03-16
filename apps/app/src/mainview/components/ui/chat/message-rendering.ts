@@ -103,7 +103,12 @@ export type BubbleRenderState = {
   // Pre-narrowed content — exactly one of these is non-null
   textContent: (ExtractedText & { webPreview: TGWebPreview | null }) | null;
   voiceContent: TGVoiceContent | null;
-  documentContent: { fileName: string; fileSize: number; url: string | undefined } | null;
+  documentContent: {
+    fileName: string;
+    fileSize: number;
+    downloaded: boolean;
+    onOpen?: () => void;
+  } | null;
 };
 
 export type MessageRenderState =
@@ -138,6 +143,7 @@ export function computeMessageState(
   msg: TGMessage,
   ctx: MessageContext,
   onTranscribe?: (chatId: number, msgId: number) => void,
+  onOpenDocument?: (chatId: number, msgId: number) => void,
 ): MessageRenderState {
   // Pending
   if (msg.kind === 'pending') {
@@ -248,7 +254,12 @@ export function computeMessageState(
 
   const documentContent =
     content.kind === 'document'
-      ? { fileName: content.fileName, fileSize: content.fileSize, url: content.url }
+      ? {
+          fileName: content.fileName,
+          fileSize: content.fileSize,
+          downloaded: content.url !== undefined,
+          onOpen: onOpenDocument ? () => onOpenDocument(msg.chatId, msg.id) : undefined,
+        }
       : null;
 
   return {

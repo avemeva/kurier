@@ -275,6 +275,7 @@ export default defineConfig({
     proxy: {
       '/api/tg': 'http://localhost:7312',
       '/api/media': 'http://localhost:7312',
+      '/api/open': 'http://localhost:7312',
     },
   },
 });
