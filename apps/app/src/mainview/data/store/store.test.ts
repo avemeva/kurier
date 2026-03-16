@@ -28,6 +28,7 @@ vi.mock('../telegram', () => ({
   openTdChat: vi.fn(() => Promise.resolve()),
   closeTdChat: vi.fn(() => Promise.resolve()),
   onUpdate: vi.fn(() => () => {}),
+  onReconnect: vi.fn(() => () => {}),
   formatLastSeen: vi.fn((ts: number) => `last seen at ${ts}`),
   extractMessagePreview: vi.fn((msg: Td.message | undefined) => {
     if (!msg) return '';
@@ -175,6 +176,23 @@ function textContent(text: string): Td.messageText {
   };
 }
 
+/** Helper: build chatCache + mainChatIds + archivedChatIds from arrays. */
+function stateFromChats(mainChats: Td.chat[], archivedChats: Td.chat[] = []) {
+  const chatCache = new Map<number, Td.chat>();
+  for (const c of mainChats) chatCache.set(c.id, c);
+  for (const c of archivedChats) chatCache.set(c.id, c);
+  return {
+    chatCache,
+    mainChatIds: mainChats.map((c) => c.id),
+    archivedChatIds: archivedChats.map((c) => c.id),
+  };
+}
+
+/** Helper: get a chat from the store cache. */
+function getChatFromStore(chatId: number): Td.chat | undefined {
+  return useChatStore.getState().chatCache.get(chatId);
+}
+
 beforeEach(() => {
   _resetForTests();
   vi.clearAllMocks();
@@ -194,8 +212,7 @@ describe('loadDialogs', () => {
 
     await useChatStore.getState().loadDialogs();
     const s = useChatStore.getState();
-    expect(s.chats).toHaveLength(1);
-    expect(s.archivedChats).toHaveLength(1);
+    expect(s.chatCache.size).toBe(2);
     expect(s.loadingDialogs).toBe(false);
   });
 
@@ -226,11 +243,11 @@ describe('openChat', () => {
 
   it('clears unread count', async () => {
     const chat = makeChat({ id: 42, unread_count: 5 });
-    useChatStore.setState({ chats: [chat], archivedChats: [] });
+    useChatStore.setState(stateFromChats([chat]));
     vi.mocked(getMessages).mockResolvedValueOnce({ messages: [], hasMore: false });
 
     await useChatStore.getState().openChat(chat);
-    expect(useChatStore.getState().chats[0].unread_count).toBe(0);
+    expect(getChatFromStore(42)!.unread_count).toBe(0);
   });
 
   it('sets isAtLatest=true, hasNewer=false on fresh load', async () => {
@@ -263,8 +280,7 @@ describe('send', () => {
   it('creates pending, then resolves', async () => {
     const chat = makeChat({ id: 42 });
     useChatStore.setState({
-      chats: [chat],
-      archivedChats: [],
+      ...stateFromChats([chat]),
       messagesByChat: { 42: [] },
     });
 
@@ -286,8 +302,7 @@ describe('send', () => {
   it('marks pending as failed on error', async () => {
     const chat = makeChat({ id: 42 });
     useChatStore.setState({
-      chats: [chat],
-      archivedChats: [],
+      ...stateFromChats([chat]),
       messagesByChat: { 42: [] },
     });
 
@@ -330,8 +345,7 @@ describe('handleUpdate', () => {
     it('appends message to existing chat', () => {
       const chat = makeChat({ id: 42 });
       useChatStore.setState({
-        chats: [chat],
-        archivedChats: [],
+        ...stateFromChats([chat]),
         messagesByChat: { 42: [makeMessage({ id: 1 })] },
       });
 
@@ -347,8 +361,7 @@ describe('handleUpdate', () => {
     it('replaces existing message with same id', () => {
       const chat = makeChat({ id: 42 });
       useChatStore.setState({
-        chats: [chat],
-        archivedChats: [],
+        ...stateFromChats([chat]),
         messagesByChat: {
           42: [makeMessage({ id: 5, content: textContent('old') })],
         },
@@ -368,8 +381,7 @@ describe('handleUpdate', () => {
     it('increments unread for non-selected chat', () => {
       const chat = makeChat({ id: 42, unread_count: 0 });
       useChatStore.setState({
-        chats: [chat],
-        archivedChats: [],
+        ...stateFromChats([chat]),
         selectedChatId: 99,
       });
 
@@ -379,14 +391,13 @@ describe('handleUpdate', () => {
         message: makeMessage({ id: 2, is_outgoing: false }),
       });
 
-      expect(useChatStore.getState().chats[0].unread_count).toBe(1);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.unread_count).toBe(1);
     });
 
     it('does not increment unread for selected chat', () => {
       const chat = makeChat({ id: 42, unread_count: 0 });
       useChatStore.setState({
-        chats: [chat],
-        archivedChats: [],
+        ...stateFromChats([chat]),
         selectedChatId: 42,
       });
 
@@ -396,13 +407,12 @@ describe('handleUpdate', () => {
         message: makeMessage({ id: 2, is_outgoing: false }),
       });
 
-      expect(useChatStore.getState().chats[0].unread_count).toBe(0);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.unread_count).toBe(0);
     });
 
     it('clears matching pending', () => {
       useChatStore.setState({
-        chats: [makeChat({ id: 42 })],
-        archivedChats: [],
+        ...stateFromChats([makeChat({ id: 42 })]),
         messagesByChat: { 42: [] },
         pendingByChat: {
           42: [
@@ -433,8 +443,7 @@ describe('handleUpdate', () => {
     it('does NOT append to messagesByChat when isAtLatest is false', () => {
       const chat = makeChat({ id: 42 });
       useChatStore.setState({
-        chats: [chat],
-        archivedChats: [],
+        ...stateFromChats([chat]),
         messagesByChat: { 42: [makeMessage({ id: 1 })] },
         isAtLatest: { 42: false },
       });
@@ -453,8 +462,7 @@ describe('handleUpdate', () => {
       const chat = makeChat({ id: 42 });
       const newMsg = makeMessage({ id: 2, chat_id: 42, content: textContent('new') });
       useChatStore.setState({
-        chats: [chat],
-        archivedChats: [],
+        ...stateFromChats([chat]),
         messagesByChat: { 42: [makeMessage({ id: 1 })] },
         isAtLatest: { 42: false },
       });
@@ -465,7 +473,9 @@ describe('handleUpdate', () => {
         message: newMsg,
       });
 
-      expect(useChatStore.getState().chats[0].last_message).toEqual(newMsg);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.last_message).toEqual(
+        newMsg,
+      );
     });
   });
 
@@ -511,7 +521,7 @@ describe('handleUpdate', () => {
   describe('read_outbox', () => {
     it('updates last_read_outbox_message_id on chat', () => {
       const chat = makeChat({ id: 42, last_read_outbox_message_id: 10 });
-      useChatStore.setState({ chats: [chat], archivedChats: [] });
+      useChatStore.setState(stateFromChats([chat], []));
 
       useChatStore.getState().handleUpdate({
         type: 'read_outbox',
@@ -519,7 +529,9 @@ describe('handleUpdate', () => {
         last_read_outbox_message_id: 50,
       });
 
-      expect(useChatStore.getState().chats[0].last_read_outbox_message_id).toBe(50);
+      expect(
+        getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.last_read_outbox_message_id,
+      ).toBe(50);
     });
   });
 
@@ -617,7 +629,7 @@ describe('handleUpdate', () => {
   describe('chat_read_inbox', () => {
     it('updates unread count and last_read_inbox_message_id on matching chat', () => {
       useChatStore.setState({
-        chats: [makeChat({ id: 10, unread_count: 5, last_read_inbox_message_id: 100 })],
+        ...stateFromChats([makeChat({ id: 10, unread_count: 5, last_read_inbox_message_id: 100 })]),
       });
       useChatStore.getState().handleUpdate({
         type: 'chat_read_inbox',
@@ -625,60 +637,86 @@ describe('handleUpdate', () => {
         last_read_inbox_message_id: 200,
         unread_count: 0,
       });
-      const chat = useChatStore.getState().chats[0];
+      const chat = getChatFromStore(useChatStore.getState().mainChatIds[0]!)!;
       expect(chat.unread_count).toBe(0);
       expect(chat.last_read_inbox_message_id).toBe(200);
     });
 
     it('updates archived chats too', () => {
-      useChatStore.setState({ archivedChats: [makeChat({ id: 10, unread_count: 3 })] });
+      useChatStore.setState(stateFromChats([], [makeChat({ id: 10, unread_count: 3 })]));
       useChatStore.getState().handleUpdate({
         type: 'chat_read_inbox',
         chat_id: 10,
         last_read_inbox_message_id: 50,
         unread_count: 0,
       });
-      expect(useChatStore.getState().archivedChats[0].unread_count).toBe(0);
+      expect(getChatFromStore(useChatStore.getState().archivedChatIds[0]!)!.unread_count).toBe(0);
     });
 
     it('ignores unknown chat id', () => {
-      useChatStore.setState({ chats: [makeChat({ id: 10, unread_count: 5 })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10, unread_count: 5 })]));
       useChatStore.getState().handleUpdate({
         type: 'chat_read_inbox',
         chat_id: 999,
         last_read_inbox_message_id: 200,
         unread_count: 0,
       });
-      expect(useChatStore.getState().chats[0].unread_count).toBe(5);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.unread_count).toBe(5);
     });
   });
 
   describe('new_chat', () => {
-    it('adds new chat to the beginning of the list', () => {
-      useChatStore.setState({ chats: [makeChat({ id: 1 })] });
+    it('adds chat to mainChatIds when it has a main position with order > 0', () => {
+      useChatStore.setState({ ...stateFromChats([makeChat({ id: 1 })]), loadingDialogs: false });
+      const newChat = makeChat({
+        id: 2,
+        title: 'New Chat',
+        positions: [
+          {
+            _: 'chatPosition',
+            list: { _: 'chatListMain' },
+            order: '5000000000000000',
+            is_pinned: false,
+            source: undefined,
+          },
+        ],
+      });
+      useChatStore.getState().handleUpdate({ type: 'new_chat', chat: newChat });
+      expect(useChatStore.getState().mainChatIds).toHaveLength(2);
+      // Chat is always cached
+      expect(useChatStore.getState().chatCache.get(2)).toBeDefined();
+    });
+
+    it('caches chat but does not add to mainChatIds when positions are empty', () => {
+      useChatStore.setState({ ...stateFromChats([makeChat({ id: 1 })]), loadingDialogs: false });
       const newChat = makeChat({ id: 2, title: 'New Chat' });
       useChatStore.getState().handleUpdate({ type: 'new_chat', chat: newChat });
-      const { chats } = useChatStore.getState();
-      expect(chats).toHaveLength(2);
-      expect(chats[0].id).toBe(2);
+      // Cached but not in sorted list (no positions)
+      expect(useChatStore.getState().chatCache.get(2)).toBeDefined();
+      expect(useChatStore.getState().mainChatIds).toHaveLength(1);
     });
 
-    it('does not add duplicate chat', () => {
-      useChatStore.setState({ chats: [makeChat({ id: 1 })] });
+    it('updates existing chat in cache without duplicating in lists', () => {
+      useChatStore.setState({ ...stateFromChats([makeChat({ id: 1 })]), loadingDialogs: false });
+      useChatStore
+        .getState()
+        .handleUpdate({ type: 'new_chat', chat: makeChat({ id: 1, title: 'Updated' }) });
+      expect(useChatStore.getState().chatCache.get(1)?.title).toBe('Updated');
+      expect(useChatStore.getState().mainChatIds).toHaveLength(1);
+    });
+
+    it('always caches even while loadingDialogs is true', () => {
+      useChatStore.setState({ ...stateFromChats([]), loadingDialogs: true });
       useChatStore.getState().handleUpdate({ type: 'new_chat', chat: makeChat({ id: 1 }) });
-      expect(useChatStore.getState().chats).toHaveLength(1);
-    });
-
-    it('does not add if exists in archived', () => {
-      useChatStore.setState({ chats: [], archivedChats: [makeChat({ id: 5 })] });
-      useChatStore.getState().handleUpdate({ type: 'new_chat', chat: makeChat({ id: 5 }) });
-      expect(useChatStore.getState().chats).toHaveLength(0);
+      expect(useChatStore.getState().chatCache.get(1)).toBeDefined();
+      // No positions, so not in mainChatIds
+      expect(useChatStore.getState().mainChatIds).toHaveLength(0);
     });
   });
 
   describe('chat_last_message', () => {
     it('updates last_message on matching chat', () => {
-      useChatStore.setState({ chats: [makeChat({ id: 10 })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10 })]));
       const msg = makeMessage({ id: 50, chat_id: 10 });
       useChatStore.getState().handleUpdate({
         type: 'chat_last_message',
@@ -686,23 +724,25 @@ describe('handleUpdate', () => {
         last_message: msg,
         positions: [],
       });
-      expect(useChatStore.getState().chats[0].last_message).toEqual(msg);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.last_message).toEqual(msg);
     });
 
     it('clears last_message when undefined', () => {
       const msg = makeMessage({ id: 50 });
-      useChatStore.setState({ chats: [makeChat({ id: 10, last_message: msg })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10, last_message: msg })]));
       useChatStore.getState().handleUpdate({
         type: 'chat_last_message',
         chat_id: 10,
         last_message: undefined,
         positions: [],
       });
-      expect(useChatStore.getState().chats[0].last_message).toBeUndefined();
+      expect(
+        getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.last_message,
+      ).toBeUndefined();
     });
 
     it('updates positions when provided', () => {
-      useChatStore.setState({ chats: [makeChat({ id: 10 })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10 })]));
       const positions = [
         {
           _: 'chatPosition' as const,
@@ -718,13 +758,15 @@ describe('handleUpdate', () => {
         last_message: makeMessage({ id: 1 }),
         positions,
       });
-      expect(useChatStore.getState().chats[0].positions).toEqual(positions);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.positions).toEqual(
+        positions,
+      );
     });
   });
 
   describe('chat_position', () => {
     it('adds new position to chat', () => {
-      useChatStore.setState({ chats: [makeChat({ id: 10, positions: [] })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10, positions: [] })]));
       const pos = {
         _: 'chatPosition' as const,
         list: { _: 'chatListMain' as const },
@@ -733,8 +775,10 @@ describe('handleUpdate', () => {
         source: undefined,
       } as Td.chatPosition;
       useChatStore.getState().handleUpdate({ type: 'chat_position', chat_id: 10, position: pos });
-      expect(useChatStore.getState().chats[0].positions).toHaveLength(1);
-      expect(useChatStore.getState().chats[0].positions[0].is_pinned).toBe(true);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.positions).toHaveLength(1);
+      expect(
+        getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.positions[0].is_pinned,
+      ).toBe(true);
     });
 
     it('removes position when order is zero', () => {
@@ -745,7 +789,7 @@ describe('handleUpdate', () => {
         is_pinned: false,
         source: undefined,
       } as Td.chatPosition;
-      useChatStore.setState({ chats: [makeChat({ id: 10, positions: [existing] })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10, positions: [existing] })]));
       const pos = {
         _: 'chatPosition' as const,
         list: { _: 'chatListMain' as const },
@@ -754,7 +798,9 @@ describe('handleUpdate', () => {
         source: undefined,
       } as Td.chatPosition;
       useChatStore.getState().handleUpdate({ type: 'chat_position', chat_id: 10, position: pos });
-      expect(useChatStore.getState().chats[0].positions).toHaveLength(0);
+      // Chat removed from mainChatIds (order '0') but still in cache with empty positions
+      expect(useChatStore.getState().mainChatIds).toHaveLength(0);
+      expect(getChatFromStore(10)!.positions).toHaveLength(0);
     });
   });
 
@@ -793,21 +839,21 @@ describe('handleUpdate', () => {
 
   describe('chat_title', () => {
     it('updates title on matching chat', () => {
-      useChatStore.setState({ chats: [makeChat({ id: 10, title: 'Old Title' })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10, title: 'Old Title' })]));
       useChatStore.getState().handleUpdate({ type: 'chat_title', chat_id: 10, title: 'New Title' });
-      expect(useChatStore.getState().chats[0].title).toBe('New Title');
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.title).toBe('New Title');
     });
 
     it('updates archived chats too', () => {
-      useChatStore.setState({ archivedChats: [makeChat({ id: 10, title: 'Old' })] });
+      useChatStore.setState(stateFromChats([], [makeChat({ id: 10, title: 'Old' })]));
       useChatStore.getState().handleUpdate({ type: 'chat_title', chat_id: 10, title: 'New' });
-      expect(useChatStore.getState().archivedChats[0].title).toBe('New');
+      expect(getChatFromStore(useChatStore.getState().archivedChatIds[0]!)!.title).toBe('New');
     });
   });
 
   describe('chat_photo', () => {
     it('updates photo on matching chat', () => {
-      useChatStore.setState({ chats: [makeChat({ id: 10 })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10 })]));
       const photo = {
         _: 'chatPhotoInfo',
         small: {},
@@ -816,19 +862,19 @@ describe('handleUpdate', () => {
         is_personal: false,
       } as unknown as Td.chatPhotoInfo;
       useChatStore.getState().handleUpdate({ type: 'chat_photo', chat_id: 10, photo });
-      expect(useChatStore.getState().chats[0].photo).toEqual(photo);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.photo).toEqual(photo);
     });
 
     it('clears photo when undefined', () => {
-      useChatStore.setState({ chats: [makeChat({ id: 10 })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10 })]));
       useChatStore.getState().handleUpdate({ type: 'chat_photo', chat_id: 10, photo: undefined });
-      expect(useChatStore.getState().chats[0].photo).toBeUndefined();
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.photo).toBeUndefined();
     });
   });
 
   describe('chat_notification_settings', () => {
     it('updates notification settings on matching chat', () => {
-      useChatStore.setState({ chats: [makeChat({ id: 10 })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10 })]));
       const settings = {
         _: 'chatNotificationSettings',
         mute_for: 3600,
@@ -838,13 +884,15 @@ describe('handleUpdate', () => {
         chat_id: 10,
         notification_settings: settings,
       });
-      expect(useChatStore.getState().chats[0].notification_settings).toEqual(settings);
+      expect(
+        getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.notification_settings,
+      ).toEqual(settings);
     });
   });
 
   describe('chat_draft_message', () => {
     it('sets draft message on matching chat', () => {
-      useChatStore.setState({ chats: [makeChat({ id: 10 })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10 })]));
       const draft = {
         _: 'draftMessage',
         date: 1000,
@@ -857,19 +905,23 @@ describe('handleUpdate', () => {
         draft_message: draft,
         positions: [],
       });
-      expect(useChatStore.getState().chats[0].draft_message).toEqual(draft);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.draft_message).toEqual(
+        draft,
+      );
     });
 
     it('clears draft message when undefined', () => {
       const draft = { _: 'draftMessage' } as unknown as Td.draftMessage;
-      useChatStore.setState({ chats: [makeChat({ id: 10, draft_message: draft })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10, draft_message: draft })]));
       useChatStore.getState().handleUpdate({
         type: 'chat_draft_message',
         chat_id: 10,
         draft_message: undefined,
         positions: [],
       });
-      expect(useChatStore.getState().chats[0].draft_message).toBeUndefined();
+      expect(
+        getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.draft_message,
+      ).toBeUndefined();
     });
   });
 
@@ -893,35 +945,41 @@ describe('handleUpdate', () => {
 
   describe('chat_is_marked_as_unread', () => {
     it('marks chat as unread', () => {
-      useChatStore.setState({ chats: [makeChat({ id: 10, is_marked_as_unread: false })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10, is_marked_as_unread: false })]));
       useChatStore.getState().handleUpdate({
         type: 'chat_is_marked_as_unread',
         chat_id: 10,
         is_marked_as_unread: true,
       });
-      expect(useChatStore.getState().chats[0].is_marked_as_unread).toBe(true);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.is_marked_as_unread).toBe(
+        true,
+      );
     });
 
     it('unmarks chat as unread', () => {
-      useChatStore.setState({ chats: [makeChat({ id: 10, is_marked_as_unread: true })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10, is_marked_as_unread: true })]));
       useChatStore.getState().handleUpdate({
         type: 'chat_is_marked_as_unread',
         chat_id: 10,
         is_marked_as_unread: false,
       });
-      expect(useChatStore.getState().chats[0].is_marked_as_unread).toBe(false);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.is_marked_as_unread).toBe(
+        false,
+      );
     });
   });
 
   describe('chat_unread_mention_count', () => {
     it('updates unread mention count', () => {
-      useChatStore.setState({ chats: [makeChat({ id: 10, unread_mention_count: 0 })] });
+      useChatStore.setState(stateFromChats([makeChat({ id: 10, unread_mention_count: 0 })]));
       useChatStore.getState().handleUpdate({
         type: 'chat_unread_mention_count',
         chat_id: 10,
         unread_mention_count: 3,
       });
-      expect(useChatStore.getState().chats[0].unread_mention_count).toBe(3);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.unread_mention_count).toBe(
+        3,
+      );
     });
   });
 
@@ -1003,14 +1061,14 @@ describe('selectSelectedChat', () => {
 
   it('finds chat in chats list', () => {
     const chat = makeChat({ id: 42 });
-    useChatStore.setState({ chats: [chat], selectedChatId: 42 });
+    useChatStore.setState({ ...stateFromChats([chat]), selectedChatId: 42 });
     const result = selectSelectedChat(useChatStore.getState());
     expect(result?.id).toBe(42);
   });
 
   it('falls back to archivedChats', () => {
     const chat = makeChat({ id: 42 });
-    useChatStore.setState({ archivedChats: [chat], selectedChatId: 42 });
+    useChatStore.setState({ ...stateFromChats([], [chat]), selectedChatId: 42 });
     const result = selectSelectedChat(useChatStore.getState());
     expect(result?.id).toBe(42);
   });
@@ -1024,7 +1082,7 @@ describe('selectHeaderStatus', () => {
   it('returns online for private chat with online status', () => {
     const chat = makeChat({ id: 42, type: { _: 'chatTypePrivate', user_id: 42 } });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       userStatuses: {
         42: { _: 'userStatusOnline', expires: Math.floor(Date.now() / 1000) + 300 },
@@ -1036,7 +1094,7 @@ describe('selectHeaderStatus', () => {
   it('returns typing for private chat', () => {
     const chat = makeChat({ id: 42, type: { _: 'chatTypePrivate', user_id: 42 } });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       typingByChat: {
         42: { 99: { action: { _: 'chatActionTyping' }, expiresAt: Date.now() + 5000 } },
@@ -1053,7 +1111,7 @@ describe('selectHeaderStatus', () => {
       id: 42,
       type: { _: 'chatTypeBasicGroup', basic_group_id: 42 },
     });
-    useChatStore.setState({ chats: [chat], selectedChatId: 42 });
+    useChatStore.setState({ ...stateFromChats([chat]), selectedChatId: 42 });
     expect(selectHeaderStatus(useChatStore.getState())).toBeNull();
   });
 
@@ -1062,7 +1120,7 @@ describe('selectHeaderStatus', () => {
       id: 42,
       type: { _: 'chatTypeSupergroup', supergroup_id: 42, is_channel: true },
     });
-    useChatStore.setState({ chats: [chat], selectedChatId: 42 });
+    useChatStore.setState({ ...stateFromChats([chat]), selectedChatId: 42 });
     expect(selectHeaderStatus(useChatStore.getState())).toBeNull();
   });
 
@@ -1072,7 +1130,7 @@ describe('selectHeaderStatus', () => {
       type: { _: 'chatTypeBasicGroup', basic_group_id: 42 },
     });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       chatInfoCache: { 42: { memberCount: 150, isChannel: false } },
     });
@@ -1088,7 +1146,7 @@ describe('selectHeaderStatus', () => {
       type: { _: 'chatTypeBasicGroup', basic_group_id: 42 },
     });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       chatInfoCache: { 42: { memberCount: 150, isChannel: false } },
       chatOnlineCounts: { 42: 12 },
@@ -1105,7 +1163,7 @@ describe('selectHeaderStatus', () => {
       type: { _: 'chatTypeSupergroup', supergroup_id: 42, is_channel: true },
     });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       chatInfoCache: { 42: { memberCount: 5000, isChannel: true } },
     });
@@ -1121,7 +1179,7 @@ describe('selectHeaderStatus', () => {
       type: { _: 'chatTypePrivate', user_id: 42 },
     });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       chatInfoCache: { 42: { memberCount: 0, isChannel: false, botActiveUsers: 2500000 } },
     });
@@ -1137,7 +1195,7 @@ describe('selectHeaderStatus', () => {
       type: { _: 'chatTypePrivate', user_id: 42 },
     });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       chatInfoCache: { 42: { memberCount: 0, isChannel: false, botActiveUsers: 0 } },
     });
@@ -1396,7 +1454,7 @@ describe('loadLatestMessages', () => {
 describe('openChatById', () => {
   it('delegates to openChat when chat found in main list', async () => {
     const chat = makeChat({ id: 42 });
-    useChatStore.setState({ chats: [chat], messagesByChat: { 42: [makeMessage()] } });
+    useChatStore.setState({ ...stateFromChats([chat]), messagesByChat: { 42: [makeMessage()] } });
     await useChatStore.getState().openChatById(42);
     expect(useChatStore.getState().selectedChatId).toBe(42);
     // Should use cached messages, no fetch
@@ -1405,7 +1463,10 @@ describe('openChatById', () => {
 
   it('delegates to openChat when chat found in archived', async () => {
     const chat = makeChat({ id: 42 });
-    useChatStore.setState({ archivedChats: [chat], messagesByChat: { 42: [makeMessage()] } });
+    useChatStore.setState({
+      ...stateFromChats([], [chat]),
+      messagesByChat: { 42: [makeMessage()] },
+    });
     await useChatStore.getState().openChatById(42);
     expect(useChatStore.getState().selectedChatId).toBe(42);
   });
@@ -1546,28 +1607,26 @@ describe('send (additional)', () => {
       last_message: makeMessage({ id: 1, chat_id: 42 }),
     });
     useChatStore.setState({
-      chats: [chat],
-      archivedChats: [],
+      ...stateFromChats([chat]),
       messagesByChat: { 42: [] },
     });
     vi.mocked(sendMessage).mockResolvedValueOnce(makeMessage({ id: 999 }));
 
     useChatStore.getState().send(42, 'preview text');
-    const updated = useChatStore.getState().chats[0];
+    const updated = getChatFromStore(useChatStore.getState().mainChatIds[0]!)!;
     expect((updated.last_message?.content as Td.messageText).text.text).toBe('preview text');
   });
 
   it('handles chat without last_message (fakeLastMsg is undefined)', () => {
     const chat = makeChat({ id: 42, last_message: undefined });
     useChatStore.setState({
-      chats: [chat],
-      archivedChats: [],
+      ...stateFromChats([chat]),
       messagesByChat: { 42: [] },
     });
     vi.mocked(sendMessage).mockResolvedValueOnce(makeMessage({ id: 999 }));
 
     useChatStore.getState().send(42, 'hi');
-    const updated = useChatStore.getState().chats[0];
+    const updated = getChatFromStore(useChatStore.getState().mainChatIds[0]!)!;
     expect(updated.last_message).toBeUndefined();
   });
 });
@@ -1858,7 +1917,7 @@ describe('handleUpdate (additional)', () => {
           } as Td.chatPosition,
         ],
       });
-      useChatStore.setState({ chats: [chat1, chat2], archivedChats: [] });
+      useChatStore.setState(stateFromChats([chat1, chat2], []));
 
       // Give chat2 a higher order via chat_last_message
       useChatStore.getState().handleUpdate({
@@ -1876,7 +1935,7 @@ describe('handleUpdate (additional)', () => {
         ],
       });
 
-      expect(useChatStore.getState().chats[0].id).toBe(2);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.id).toBe(2);
     });
   });
 
@@ -1906,7 +1965,7 @@ describe('handleUpdate (additional)', () => {
           } as Td.chatPosition,
         ],
       });
-      useChatStore.setState({ chats: [chat1, chat2], archivedChats: [] });
+      useChatStore.setState(stateFromChats([chat1, chat2], []));
 
       useChatStore.getState().handleUpdate({
         type: 'chat_draft_message',
@@ -1923,7 +1982,7 @@ describe('handleUpdate (additional)', () => {
         ],
       });
 
-      expect(useChatStore.getState().chats[0].id).toBe(2);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.id).toBe(2);
     });
   });
 
@@ -1953,7 +2012,7 @@ describe('handleUpdate (additional)', () => {
           } as Td.chatPosition,
         ],
       });
-      useChatStore.setState({ chats: [chat1, chat2], archivedChats: [] });
+      useChatStore.setState(stateFromChats([chat1, chat2], []));
 
       useChatStore.getState().handleUpdate({
         type: 'chat_position',
@@ -1967,7 +2026,7 @@ describe('handleUpdate (additional)', () => {
         } as Td.chatPosition,
       });
 
-      expect(useChatStore.getState().chats[0].id).toBe(2);
+      expect(getChatFromStore(useChatStore.getState().mainChatIds[0]!)!.id).toBe(2);
     });
   });
 
@@ -1975,8 +2034,7 @@ describe('handleUpdate (additional)', () => {
     it('clears typing indicator for message sender', () => {
       const chat = makeChat({ id: 42 });
       useChatStore.setState({
-        chats: [chat],
-        archivedChats: [],
+        ...stateFromChats([chat]),
         messagesByChat: { 42: [] },
         typingByChat: {
           42: { 99: { action: { _: 'chatActionTyping' }, expiresAt: Date.now() + 5000 } },
@@ -2002,33 +2060,59 @@ describe('handleUpdate (additional)', () => {
 describe('loadMoreChats', () => {
   it('appends chats for non-archived', async () => {
     useChatStore.setState({
-      chats: [makeChat({ id: 1 })],
+      ...stateFromChats([makeChat({ id: 1 })]),
       hasMoreChats: true,
       loadingMoreChats: false,
     });
     vi.mocked(loadMoreDialogs).mockResolvedValueOnce({
-      chats: [makeChat({ id: 2 })],
+      chats: [
+        makeChat({
+          id: 2,
+          positions: [
+            {
+              _: 'chatPosition',
+              list: { _: 'chatListMain' },
+              order: '100',
+              is_pinned: false,
+              source: undefined,
+            } as Td.chatPosition,
+          ],
+        }),
+      ],
       hasMore: false,
     });
 
     await useChatStore.getState().loadMoreChats(false);
-    expect(useChatStore.getState().chats).toHaveLength(2);
+    expect(useChatStore.getState().mainChatIds).toHaveLength(2);
     expect(useChatStore.getState().hasMoreChats).toBe(false);
   });
 
   it('appends chats for archived', async () => {
     useChatStore.setState({
-      archivedChats: [makeChat({ id: 1 })],
+      ...stateFromChats([], [makeChat({ id: 1 })]),
       hasMoreArchivedChats: true,
       loadingMoreArchivedChats: false,
     });
     vi.mocked(loadMoreDialogs).mockResolvedValueOnce({
-      chats: [makeChat({ id: 2 })],
+      chats: [
+        makeChat({
+          id: 2,
+          positions: [
+            {
+              _: 'chatPosition',
+              list: { _: 'chatListArchive' },
+              order: '100',
+              is_pinned: false,
+              source: undefined,
+            } as Td.chatPosition,
+          ],
+        }),
+      ],
       hasMore: true,
     });
 
     await useChatStore.getState().loadMoreChats(true);
-    expect(useChatStore.getState().archivedChats).toHaveLength(2);
+    expect(useChatStore.getState().archivedChatIds).toHaveLength(2);
   });
 
   it('guards when already loading', async () => {
@@ -2045,7 +2129,7 @@ describe('loadMoreChats', () => {
 
   it('sets hasMore=false on empty result', async () => {
     useChatStore.setState({
-      chats: [makeChat({ id: 1 })],
+      ...stateFromChats([makeChat({ id: 1 })]),
       hasMoreChats: true,
       loadingMoreChats: false,
     });
@@ -2057,7 +2141,7 @@ describe('loadMoreChats', () => {
 
   it('handles error gracefully', async () => {
     useChatStore.setState({
-      chats: [],
+      ...stateFromChats([]),
       hasMoreChats: true,
       loadingMoreChats: false,
     });
@@ -2482,7 +2566,7 @@ describe('selectHeaderStatus (additional)', () => {
   it('returns last_seen recently', () => {
     const chat = makeChat({ id: 42, type: { _: 'chatTypePrivate', user_id: 42 } });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       chatInfoCache: {},
       userStatuses: { 42: { _: 'userStatusRecently', by_my_privacy_settings: false } },
@@ -2496,7 +2580,7 @@ describe('selectHeaderStatus (additional)', () => {
   it('returns last_seen within a week', () => {
     const chat = makeChat({ id: 42, type: { _: 'chatTypePrivate', user_id: 42 } });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       chatInfoCache: {},
       userStatuses: { 42: { _: 'userStatusLastWeek', by_my_privacy_settings: false } },
@@ -2510,7 +2594,7 @@ describe('selectHeaderStatus (additional)', () => {
   it('returns last_seen within a month', () => {
     const chat = makeChat({ id: 42, type: { _: 'chatTypePrivate', user_id: 42 } });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       chatInfoCache: {},
       userStatuses: { 42: { _: 'userStatusLastMonth', by_my_privacy_settings: false } },
@@ -2524,7 +2608,7 @@ describe('selectHeaderStatus (additional)', () => {
   it('returns last_seen for offline user', () => {
     const chat = makeChat({ id: 42, type: { _: 'chatTypePrivate', user_id: 42 } });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       chatInfoCache: {},
       userStatuses: { 42: { _: 'userStatusOffline', was_online: 1700000000 } },
@@ -2542,7 +2626,7 @@ describe('selectHeaderStatus (additional)', () => {
     users.set(99, { id: 99, first_name: 'Bob' } as Td.user);
     users.set(100, { id: 100, first_name: 'Alice' } as Td.user);
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       users,
       typingByChat: {
@@ -2565,7 +2649,7 @@ describe('selectHeaderStatus (additional)', () => {
     const users = new Map<number, Td.user>();
     users.set(99, { id: 99, first_name: 'Bob' } as Td.user);
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       users,
       typingByChat: {
@@ -2585,7 +2669,7 @@ describe('selectHeaderStatus (additional)', () => {
       type: { _: 'chatTypeSupergroup', supergroup_id: 42, is_channel: false },
     });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       chatInfoCache: { 42: { memberCount: 500, isChannel: false } },
       chatOnlineCounts: {},
@@ -2595,14 +2679,14 @@ describe('selectHeaderStatus (additional)', () => {
   });
 
   it('returns null when chat not found', () => {
-    useChatStore.setState({ chats: [], archivedChats: [], selectedChatId: 999 });
+    useChatStore.setState({ ...stateFromChats([], []), selectedChatId: 999 });
     expect(selectHeaderStatus(useChatStore.getState())).toBeNull();
   });
 
   it('memoizes and returns same reference for unchanged inputs', () => {
     const chat = makeChat({ id: 42, type: { _: 'chatTypePrivate', user_id: 42 } });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 42,
       userStatuses: { 42: { _: 'userStatusOnline', expires: Math.floor(Date.now() / 1000) + 300 } },
     });
@@ -2643,14 +2727,14 @@ describe('actionLabel', () => {
 describe('selectChats', () => {
   it('returns TGChat array from chats', () => {
     useChatStore.setState({
-      chats: [makeChat({ id: 1 }), makeChat({ id: 2 })],
+      ...stateFromChats([makeChat({ id: 1 }), makeChat({ id: 2 })]),
     });
     const result = selectChats(useChatStore.getState());
     expect(result).toHaveLength(2);
   });
 
   it('memoizes when inputs unchanged', () => {
-    useChatStore.setState({ chats: [makeChat({ id: 1 })] });
+    useChatStore.setState(stateFromChats([makeChat({ id: 1 })]));
     const r1 = selectChats(useChatStore.getState());
     const r2 = selectChats(useChatStore.getState());
     expect(r1).toBe(r2);
@@ -2660,14 +2744,14 @@ describe('selectChats', () => {
 describe('selectArchivedChats', () => {
   it('returns TGChat array from archivedChats', () => {
     useChatStore.setState({
-      archivedChats: [makeChat({ id: 1 })],
+      ...stateFromChats([], [makeChat({ id: 1 })]),
     });
     const result = selectArchivedChats(useChatStore.getState());
     expect(result).toHaveLength(1);
   });
 
   it('memoizes when inputs unchanged', () => {
-    useChatStore.setState({ archivedChats: [makeChat({ id: 1 })] });
+    useChatStore.setState(stateFromChats([], [makeChat({ id: 1 })]));
     const r1 = selectArchivedChats(useChatStore.getState());
     const r2 = selectArchivedChats(useChatStore.getState());
     expect(r1).toBe(r2);
@@ -2709,13 +2793,13 @@ describe('selectTGUser', () => {
 
 describe('selectSelectedChat (additional)', () => {
   it('returns null when chat not found in lists', () => {
-    useChatStore.setState({ chats: [], archivedChats: [], selectedChatId: 999 });
+    useChatStore.setState({ ...stateFromChats([], []), selectedChatId: 999 });
     expect(selectSelectedChat(useChatStore.getState())).toBeNull();
   });
 
   it('memoizes for same inputs', () => {
     const chat = makeChat({ id: 42 });
-    useChatStore.setState({ chats: [chat], selectedChatId: 42 });
+    useChatStore.setState({ ...stateFromChats([chat]), selectedChatId: 42 });
     const r1 = selectSelectedChat(useChatStore.getState());
     const r2 = selectSelectedChat(useChatStore.getState());
     expect(r1).toBe(r2);
@@ -2744,10 +2828,10 @@ describe('openChat (additional)', () => {
 
   it('clears unread in archived chats too', async () => {
     const chat = makeChat({ id: 42, unread_count: 3 });
-    useChatStore.setState({ chats: [], archivedChats: [chat] });
+    useChatStore.setState(stateFromChats([], [chat]));
     vi.mocked(getMessages).mockResolvedValueOnce({ messages: [], hasMore: false });
     await useChatStore.getState().openChat(chat);
-    expect(useChatStore.getState().archivedChats[0].unread_count).toBe(0);
+    expect(getChatFromStore(useChatStore.getState().archivedChatIds[0]!)!.unread_count).toBe(0);
   });
 });
 
@@ -2771,7 +2855,7 @@ describe('loadMessagesAround (additional)', () => {
 // --- loadDialogs (additional) ---
 
 describe('loadDialogs (additional)', () => {
-  it('filters pinned chats from archived list', async () => {
+  it('pinned archive chats appear in archivedChatIds (positions are source of truth)', async () => {
     const pinnedChat = makeChat({
       id: 1,
       positions: [
@@ -2790,8 +2874,9 @@ describe('loadDialogs (additional)', () => {
       .mockResolvedValueOnce([pinnedChat, normalChat]);
 
     await useChatStore.getState().loadDialogs();
-    // Pinned should be filtered from archived
-    expect(useChatStore.getState().archivedChats.find((c) => c.id === 1)).toBeUndefined();
+    // Pinned archive chats ARE in cache and in archivedChatIds
+    expect(useChatStore.getState().chatCache.get(1)).toBeDefined();
+    expect(useChatStore.getState().archivedChatIds).toContain(1);
   });
 
   it('sets hasMoreChats based on count threshold', async () => {
@@ -2946,8 +3031,7 @@ describe('handleUpdate edge cases', () => {
   describe('new_message for chat not in messagesByChat', () => {
     it('does not crash', () => {
       useChatStore.setState({
-        chats: [makeChat({ id: 42 })],
-        archivedChats: [],
+        ...stateFromChats([makeChat({ id: 42 })]),
         messagesByChat: {},
       });
       useChatStore.getState().handleUpdate({
@@ -2960,8 +3044,8 @@ describe('handleUpdate edge cases', () => {
     });
   });
 
-  describe('new_message for pinned chat stays in place', () => {
-    it('keeps pinned chat at same position', () => {
+  describe('new_message does not reorder chat lists', () => {
+    it('keeps mainChatIds order unchanged (reordering is via chat_position/chat_last_message)', () => {
       const pinnedChat = makeChat({
         id: 1,
         positions: [
@@ -2976,53 +3060,20 @@ describe('handleUpdate edge cases', () => {
       });
       const normalChat = makeChat({ id: 2 });
       useChatStore.setState({
-        chats: [pinnedChat, normalChat],
-        archivedChats: [],
+        ...stateFromChats([pinnedChat, normalChat]),
         messagesByChat: {},
       });
 
       useChatStore.getState().handleUpdate({
         type: 'new_message',
-        chat_id: 1,
-        message: makeMessage({ id: 10, chat_id: 1 }),
+        chat_id: 2,
+        message: makeMessage({ id: 10, chat_id: 2 }),
       });
 
-      expect(useChatStore.getState().chats[0].id).toBe(1);
-    });
-  });
-
-  describe('new_message bumps non-pinned chat above other non-pinned', () => {
-    it('inserts after pinned chats', () => {
-      const pinnedChat = makeChat({
-        id: 1,
-        positions: [
-          {
-            _: 'chatPosition',
-            list: { _: 'chatListMain' },
-            order: '300',
-            is_pinned: true,
-            source: undefined,
-          } as Td.chatPosition,
-        ],
-      });
-      const normalA = makeChat({ id: 2 });
-      const normalB = makeChat({ id: 3 });
-      useChatStore.setState({
-        chats: [pinnedChat, normalA, normalB],
-        archivedChats: [],
-        messagesByChat: {},
-      });
-
-      useChatStore.getState().handleUpdate({
-        type: 'new_message',
-        chat_id: 3,
-        message: makeMessage({ id: 10, chat_id: 3 }),
-      });
-
-      // Chat 3 should be after pinned (pos 0=pinned, pos 1=chat 3)
-      const chats = useChatStore.getState().chats;
-      expect(chats[0].id).toBe(1); // pinned stays
-      expect(chats[1].id).toBe(3); // bumped up
+      // Order stays the same — new_message only updates cache, not sorted IDs
+      const chats = useChatStore.getState().mainChatIds;
+      expect(chats[0]).toBe(1);
+      expect(chats[1]).toBe(2);
     });
   });
 
@@ -3209,8 +3260,7 @@ describe('send edge cases', () => {
   it('handles pending not found in success callback', async () => {
     const chat = makeChat({ id: 42 });
     useChatStore.setState({
-      chats: [chat],
-      archivedChats: [],
+      ...stateFromChats([chat]),
       messagesByChat: { 42: [] },
     });
 
@@ -3235,6 +3285,15 @@ describe('loadDialogs thumbnails', () => {
   it('triggers thumbnail loading for chats with media last messages', async () => {
     const chatWithPhoto = makeChat({
       id: 1,
+      positions: [
+        {
+          _: 'chatPosition',
+          list: { _: 'chatListMain' },
+          order: '100',
+          is_pinned: false,
+          source: undefined,
+        } as Td.chatPosition,
+      ],
       last_message: makeMessage({
         id: 1,
         chat_id: 1,
@@ -3282,6 +3341,15 @@ describe('loadDialogs fetches missing preview users', () => {
     const groupChat = makeChat({
       id: 1,
       type: { _: 'chatTypeBasicGroup', basic_group_id: 1 },
+      positions: [
+        {
+          _: 'chatPosition',
+          list: { _: 'chatListMain' },
+          order: '100',
+          is_pinned: false,
+          source: undefined,
+        } as Td.chatPosition,
+      ],
       last_message: makeMessage({
         id: 5,
         chat_id: 1,
@@ -3368,8 +3436,7 @@ describe('new_message loads thumbnails for media messages', () => {
   it('triggers thumbnail download for photo messages', () => {
     const chat = makeChat({ id: 42 });
     useChatStore.setState({
-      chats: [chat],
-      archivedChats: [],
+      ...stateFromChats([chat]),
       messagesByChat: { 42: [] },
     });
     vi.mocked(downloadThumbnail).mockResolvedValue('/thumb.jpg');
@@ -3390,8 +3457,7 @@ describe('new_message loads thumbnails for media messages', () => {
   it('triggers thumbnail for video messages', () => {
     const chat = makeChat({ id: 42 });
     useChatStore.setState({
-      chats: [chat],
-      archivedChats: [],
+      ...stateFromChats([chat]),
       messagesByChat: { 42: [] },
     });
     vi.mocked(downloadThumbnail).mockResolvedValue('/thumb.jpg');
@@ -3412,8 +3478,7 @@ describe('new_message loads thumbnails for media messages', () => {
   it('triggers thumbnail for text with link_preview', () => {
     const chat = makeChat({ id: 42 });
     useChatStore.setState({
-      chats: [chat],
-      archivedChats: [],
+      ...stateFromChats([chat]),
       messagesByChat: { 42: [] },
     });
     vi.mocked(downloadThumbnail).mockResolvedValue('/thumb.jpg');
@@ -3438,8 +3503,7 @@ describe('new_message loads thumbnails for media messages', () => {
   it('does not trigger thumbnail for plain text', () => {
     const chat = makeChat({ id: 42 });
     useChatStore.setState({
-      chats: [chat],
-      archivedChats: [],
+      ...stateFromChats([chat]),
       messagesByChat: { 42: [] },
     });
     vi.mocked(downloadThumbnail).mockResolvedValue(null);
@@ -3463,7 +3527,7 @@ describe('new_message loads thumbnails for media messages', () => {
 describe('chat_last_message triggers thumbnails', () => {
   it('loads thumbnail for last message with media', () => {
     const chat = makeChat({ id: 10 });
-    useChatStore.setState({ chats: [chat], archivedChats: [] });
+    useChatStore.setState(stateFromChats([chat], []));
     vi.mocked(downloadThumbnail).mockResolvedValue('/thumb.jpg');
 
     useChatStore.getState().handleUpdate({
@@ -3515,6 +3579,15 @@ describe('loadThumbnailsForChats covers link_preview path', () => {
   it('loads thumbnails for text messages with link_preview', async () => {
     const chatWithLink = makeChat({
       id: 7777,
+      positions: [
+        {
+          _: 'chatPosition',
+          list: { _: 'chatListMain' },
+          order: '100',
+          is_pinned: false,
+          source: undefined,
+        } as Td.chatPosition,
+      ],
       last_message: makeMessage({
         id: 8888,
         chat_id: 7777,

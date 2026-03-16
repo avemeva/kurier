@@ -20,8 +20,9 @@ export type { PendingMessage };
 
 export interface ChatState {
   // --- Core TDLib state ---
-  chats: Td.chat[];
-  archivedChats: Td.chat[];
+  chatCache: Map<number, Td.chat>;
+  mainChatIds: number[];
+  archivedChatIds: number[];
   selectedChatId: number | null;
   messagesByChat: Record<number, Td.message[]>;
   pendingByChat: Record<number, PendingMessage[]>;
@@ -187,8 +188,9 @@ export const INITIAL_STATE: Omit<
   | 'goToNextUnreadReaction'
   | 'clearTargetMessage'
 > = {
-  chats: [],
-  archivedChats: [],
+  chatCache: new Map(),
+  mainChatIds: [],
+  archivedChatIds: [],
   selectedChatId: null,
   messagesByChat: {},
   pendingByChat: {},

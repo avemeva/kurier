@@ -381,6 +381,7 @@ export type TGChatContext = {
   avatarUrl?: string | undefined;
   lastMessageThumbUrl?: string | null;
   typing?: TGTypingUser[] | null;
+  isPinnedInList?: boolean;
 };
 
 export function toTGChat(chat: Td.chat, ctx: TGChatContext): TGChat {
@@ -425,7 +426,7 @@ export function toTGChat(chat: Td.chat, ctx: TGChatContext): TGChat {
     kind,
     userId: chat.type._ === 'chatTypePrivate' ? chat.type.user_id : 0,
     unreadCount: chat.unread_count,
-    isPinned: chat.positions.some((p) => p.is_pinned),
+    isPinned: ctx.isPinnedInList ?? chat.positions.some((p) => p.is_pinned),
     lastMessage,
     photoUrl: ctx.photoUrl,
     isMuted: chat.notification_settings.mute_for > 0,

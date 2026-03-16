@@ -20,6 +20,7 @@ import {
   getUser,
   loadMoreDialogs,
   markAsRead,
+  onReconnect,
   onUpdate,
   openFile,
   openTdChat,
@@ -46,16 +47,113 @@ import { INITIAL_STATE } from './types';
 // Helpers (pure, no state)
 // ---------------------------------------------------------------------------
 
-function isChatPinned(chat: Td.chat): boolean {
-  return chat.positions.some((p) => p.is_pinned);
+/** Find the position entry for a specific chat list type. */
+function getPositionForList(
+  chat: Td.chat,
+  listType: 'chatListMain' | 'chatListArchive',
+): Td.chatPosition | undefined {
+  return chat.positions.find((p) => p.list._ === listType);
 }
 
-function getChatOrder(chat: Td.chat): string {
-  return chat.positions[0]?.order ?? '0';
+/** Compare two chats by (order, chatId) descending — the TDLib canonical sort. */
+function compareChatOrder(
+  aId: number,
+  bId: number,
+  cache: Map<number, Td.chat>,
+  listType: 'chatListMain' | 'chatListArchive',
+): number {
+  const aChat = cache.get(aId);
+  const bChat = cache.get(bId);
+  const aOrder = aChat ? (getPositionForList(aChat, listType)?.order ?? '0') : '0';
+  const bOrder = bChat ? (getPositionForList(bChat, listType)?.order ?? '0') : '0';
+  if (aOrder !== bOrder) return bOrder.localeCompare(aOrder);
+  return bId - aId; // higher chatId first when order ties
 }
 
-function sortByOrder(chats: Td.chat[]): Td.chat[] {
-  return [...chats].sort((a, b) => getChatOrder(b).localeCompare(getChatOrder(a)));
+/** Binary-search insert into a sorted ID list. Returns a NEW array. */
+function insertSorted(
+  ids: number[],
+  chatId: number,
+  cache: Map<number, Td.chat>,
+  listType: 'chatListMain' | 'chatListArchive',
+): number[] {
+  const next = ids.filter((id) => id !== chatId); // remove if already present
+  let lo = 0;
+  let hi = next.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    const midId = next[mid] as number;
+    if (compareChatOrder(midId, chatId, cache, listType) > 0) hi = mid;
+    else lo = mid + 1;
+  }
+  next.splice(lo, 0, chatId);
+  return next;
+}
+
+/** Remove a chatId from a sorted list. Returns a NEW array (or same ref if not found). */
+function removeSorted(ids: number[], chatId: number): number[] {
+  const idx = ids.indexOf(chatId);
+  if (idx === -1) return ids;
+  const next = [...ids];
+  next.splice(idx, 1);
+  return next;
+}
+
+/**
+ * The central TDLib pattern: apply a new positions array to a chat.
+ * 1. Remove old entries from sorted ID lists
+ * 2. Update chat.positions in cache
+ * 3. Insert new entries where order > 0
+ */
+function setChatPositions(
+  chatId: number,
+  newPositions: Td.chatPosition[],
+  state: { chatCache: Map<number, Td.chat>; mainChatIds: number[]; archivedChatIds: number[] },
+): { chatCache: Map<number, Td.chat>; mainChatIds: number[]; archivedChatIds: number[] } {
+  const chat = state.chatCache.get(chatId);
+  if (!chat) return state;
+
+  // Step 1: Remove old entries from sorted lists
+  let mainChatIds = state.mainChatIds;
+  let archivedChatIds = state.archivedChatIds;
+
+  for (const oldPos of chat.positions) {
+    if (oldPos.list._ === 'chatListMain') {
+      mainChatIds = removeSorted(mainChatIds, chatId);
+    } else if (oldPos.list._ === 'chatListArchive') {
+      archivedChatIds = removeSorted(archivedChatIds, chatId);
+    }
+  }
+
+  // Step 2: Update chat in cache with new positions
+  const updatedChat = { ...chat, positions: newPositions };
+  const chatCache = new Map(state.chatCache);
+  chatCache.set(chatId, updatedChat);
+
+  // Step 3: Insert into sorted lists where order > 0
+  for (const newPos of newPositions) {
+    if (newPos.order === '0') continue;
+    if (newPos.list._ === 'chatListMain') {
+      mainChatIds = insertSorted(mainChatIds, chatId, chatCache, 'chatListMain');
+    } else if (newPos.list._ === 'chatListArchive') {
+      archivedChatIds = insertSorted(archivedChatIds, chatId, chatCache, 'chatListArchive');
+    }
+  }
+
+  return { chatCache, mainChatIds, archivedChatIds };
+}
+
+/** Update a single chat in the cache. Returns new Map. */
+function updateChatInCache(
+  cache: Map<number, Td.chat>,
+  chatId: number,
+  updater: (chat: Td.chat) => Td.chat,
+): Map<number, Td.chat> {
+  const chat = cache.get(chatId);
+  if (!chat) return cache;
+  const next = new Map(cache);
+  next.set(chatId, updater(chat));
+  return next;
 }
 
 /** Content types that may have a downloadable thumbnail. */
@@ -74,10 +172,13 @@ let tempIdCounter = 0;
 // ---------------------------------------------------------------------------
 
 function loadThumbnailsForChats(
-  chats: Td.chat[],
+  chatIds: number[],
+  cache: Map<number, Td.chat>,
   set: (partial: Partial<ChatState> | ((s: ChatState) => Partial<ChatState>)) => void,
 ): void {
-  for (const chat of chats.slice(0, 30)) {
+  for (const chatId of chatIds.slice(0, 30)) {
+    const chat = cache.get(chatId);
+    if (!chat) continue;
     const msg = chat.last_message;
     if (!msg) continue;
     const hasThumb =
@@ -149,19 +250,24 @@ function fetchMissingUsers(
 }
 
 function fetchMissingChatPreviewUsers(
-  chats: Td.chat[],
+  chatIds: number[],
+  cache: Map<number, Td.chat>,
   get: () => ChatState,
   set: (partial: Partial<ChatState> | ((s: ChatState) => Partial<ChatState>)) => void,
 ): void {
-  const msgs = chats
-    .filter(
-      (c) =>
-        (c.type._ === 'chatTypeBasicGroup' ||
-          (c.type._ === 'chatTypeSupergroup' && !c.type.is_channel)) &&
-        c.last_message &&
-        !c.last_message.is_outgoing,
-    )
-    .map((c) => c.last_message as Td.message);
+  const msgs: Td.message[] = [];
+  for (const chatId of chatIds) {
+    const c = cache.get(chatId);
+    if (!c) continue;
+    if (
+      (c.type._ === 'chatTypeBasicGroup' ||
+        (c.type._ === 'chatTypeSupergroup' && !c.type.is_channel)) &&
+      c.last_message &&
+      !c.last_message.is_outgoing
+    ) {
+      msgs.push(c.last_message);
+    }
+  }
   if (msgs.length > 0) {
     fetchMissingUsers(msgs, get, set);
     loadForwardPhotos(msgs, get().loadProfilePhoto);
@@ -218,6 +324,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // === Dialog loading ===
 
   loadDialogs: async () => {
+    set({ loadingDialogs: true });
     if (!get().myUserId) {
       getMe()
         .then((me) => set({ myUserId: me.id }))
@@ -228,17 +335,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
         getDialogs({ archived: false }),
         getDialogs({ archived: true }),
       ]);
-      const filteredArchived = archived.filter((c) => !isChatPinned(c));
+      // Build the cache from both lists
+      const chatCache = new Map<number, Td.chat>();
+      for (const c of regular) chatCache.set(c.id, c);
+      for (const c of archived) chatCache.set(c.id, c);
+
+      // Build sorted ID lists from positions
+      const mainChatIds: number[] = [];
+      const archivedChatIds: number[] = [];
+
+      for (const c of chatCache.values()) {
+        for (const pos of c.positions) {
+          if (pos.order === '0') continue;
+          if (pos.list._ === 'chatListMain') mainChatIds.push(c.id);
+          else if (pos.list._ === 'chatListArchive') archivedChatIds.push(c.id);
+        }
+      }
+
+      // Sort by (order, chatId) descending
+      mainChatIds.sort((a, b) => compareChatOrder(a, b, chatCache, 'chatListMain'));
+      archivedChatIds.sort((a, b) => compareChatOrder(a, b, chatCache, 'chatListArchive'));
+
       set({
-        chats: regular,
-        archivedChats: filteredArchived,
+        chatCache,
+        mainChatIds,
+        archivedChatIds,
         hasMoreChats: regular.length >= 100,
-        hasMoreArchivedChats: filteredArchived.length >= 100,
+        hasMoreArchivedChats: archived.length >= 100,
       });
-      loadThumbnailsForChats(regular, set);
-      loadThumbnailsForChats(filteredArchived, set);
-      fetchMissingChatPreviewUsers(regular, get, set);
-      fetchMissingChatPreviewUsers(filteredArchived, get, set);
+      loadThumbnailsForChats(mainChatIds, chatCache, set);
+      loadThumbnailsForChats(archivedChatIds, chatCache, set);
+      fetchMissingChatPreviewUsers(mainChatIds, chatCache, get, set);
+      fetchMissingChatPreviewUsers(archivedChatIds, chatCache, get, set);
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) });
     } finally {
@@ -249,17 +377,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
   loadMoreChats: async (archived: boolean) => {
     const loadingKey = archived ? 'loadingMoreArchivedChats' : 'loadingMoreChats';
     const hasMoreKey = archived ? 'hasMoreArchivedChats' : 'hasMoreChats';
-    const chatsKey = archived ? 'archivedChats' : 'chats';
+    const idsKey = archived ? 'archivedChatIds' : 'mainChatIds';
     if (get()[loadingKey] || !get()[hasMoreKey]) return;
     set({ [loadingKey]: true });
     try {
-      const result = await loadMoreDialogs({ archived, currentCount: get()[chatsKey].length });
+      const result = await loadMoreDialogs({ archived, currentCount: get()[idsKey].length });
       if (result.chats.length > 0) {
-        set((s) => ({
-          [chatsKey]: [...s[chatsKey], ...result.chats],
-          [hasMoreKey]: result.hasMore,
-          [loadingKey]: false,
-        }));
+        set((s) => {
+          let state = {
+            chatCache: new Map(s.chatCache),
+            mainChatIds: s.mainChatIds,
+            archivedChatIds: s.archivedChatIds,
+          };
+          for (const c of result.chats) {
+            state.chatCache.set(c.id, c);
+            state = setChatPositions(c.id, c.positions, state);
+          }
+          return {
+            chatCache: state.chatCache,
+            mainChatIds: state.mainChatIds,
+            archivedChatIds: state.archivedChatIds,
+            [hasMoreKey]: result.hasMore,
+            [loadingKey]: false,
+          };
+        });
       } else {
         set({ [hasMoreKey]: false, [loadingKey]: false });
       }
@@ -283,11 +424,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
     }
 
-    // Clear unread
+    // Clear unread — O(1) cache update instead of O(n) array map
     if (chat.unread_count > 0) {
-      const clearUnread = (list: Td.chat[]) =>
-        list.map((c) => (c.id === chat.id ? { ...c, unread_count: 0 } : c));
-      set((s) => ({ chats: clearUnread(s.chats), archivedChats: clearUnread(s.archivedChats) }));
+      set((s) => ({
+        chatCache: updateChatInCache(s.chatCache, chat.id, (c) => ({ ...c, unread_count: 0 })),
+      }));
     }
 
     if (messagesByChat[chat.id]) {
@@ -306,9 +447,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   openChatById: async (chatId: number) => {
-    const { chats, archivedChats } = get();
-    const existingChat =
-      chats.find((c) => c.id === chatId) ?? archivedChats.find((c) => c.id === chatId);
+    const existingChat = get().chatCache.get(chatId);
     if (existingChat) return get().openChat(existingChat);
 
     const { selectedChatId: previousChatId, messagesByChat } = get();
@@ -464,9 +603,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       _pending: 'sending',
       localId,
     };
-    const updatePreview = (list: Td.chat[]) =>
-      list.map((c) => {
-        if (c.id !== chatId) return c;
+    set((s) => ({
+      pendingByChat: {
+        ...s.pendingByChat,
+        [chatId]: [...(s.pendingByChat[chatId] ?? []), pending],
+      },
+      chatCache: updateChatInCache(s.chatCache, chatId, (c) => {
         const fakeLastMsg = c.last_message
           ? {
               ...c.last_message,
@@ -479,14 +621,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             }
           : undefined;
         return { ...c, last_message: fakeLastMsg };
-      });
-    set((s) => ({
-      pendingByChat: {
-        ...s.pendingByChat,
-        [chatId]: [...(s.pendingByChat[chatId] ?? []), pending],
-      },
-      chats: updatePreview(s.chats),
-      archivedChats: updatePreview(s.archivedChats),
+      }),
     }));
     const replyTo = get().replyToMessage;
     const replyToMessageId = replyTo?.messageId;
@@ -640,6 +775,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const msg = event.message;
         const chatId = event.chat_id;
         set((s) => {
+          // Messages
           const chatMsgs = s.messagesByChat[chatId];
           let newMessagesByChat = s.messagesByChat;
           if (chatMsgs) {
@@ -652,6 +788,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
               newMessagesByChat = { ...s.messagesByChat, [chatId]: [...chatMsgs, msg] };
             }
           }
+          // Pending
           let newPendingByChat = s.pendingByChat;
           const chatPending = s.pendingByChat[chatId];
           if (chatPending?.length && msg.is_outgoing) {
@@ -663,29 +800,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
               newPendingByChat = { ...s.pendingByChat, [chatId]: filtered };
             }
           }
-          const updateChatList = (prev: Td.chat[]) => {
-            const idx = prev.findIndex((c) => c.id === chatId);
-            if (idx === -1) return prev;
-            const chat = prev[idx];
-            const pinned = isChatPinned(chat);
-            const updated = {
-              ...chat,
-              last_message: msg,
-              unread_count:
-                !msg.is_outgoing && chatId !== selectedChatId
-                  ? chat.unread_count + 1
-                  : chat.unread_count,
-            };
-            const next = [...prev];
-            next.splice(idx, 1);
-            if (pinned) {
-              next.splice(idx, 0, updated);
-              return next;
-            }
-            const insertIdx = next.findIndex((c) => !isChatPinned(c));
-            next.splice(insertIdx === -1 ? 0 : insertIdx, 0, updated);
-            return next;
-          };
+          // Update chat cache: last_message + unread_count (but NOT positions/ordering)
+          const chatCache = updateChatInCache(s.chatCache, chatId, (c) => ({
+            ...c,
+            last_message: msg,
+            unread_count:
+              !msg.is_outgoing && chatId !== selectedChatId ? c.unread_count + 1 : c.unread_count,
+          }));
+          // Clear typing
           let newTypingByChat = s.typingByChat;
           const senderId = getSenderUserId(msg.sender_id);
           if (senderId && s.typingByChat[chatId]?.[senderId]) {
@@ -697,8 +819,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             messagesByChat: newMessagesByChat,
             pendingByChat: newPendingByChat,
             typingByChat: newTypingByChat,
-            chats: updateChatList(s.chats),
-            archivedChats: updateChatList(s.archivedChats),
+            chatCache,
           };
         });
         loadThumbnailForMessage(event.chat_id, event.message, set);
@@ -739,15 +860,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       case 'read_outbox': {
-        const updateReadMax = (list: Td.chat[]) =>
-          list.map((c) =>
-            c.id === event.chat_id
-              ? { ...c, last_read_outbox_message_id: event.last_read_outbox_message_id }
-              : c,
-          );
         set((s) => ({
-          chats: updateReadMax(s.chats),
-          archivedChats: updateReadMax(s.archivedChats),
+          chatCache: updateChatInCache(s.chatCache, event.chat_id, (c) => ({
+            ...c,
+            last_read_outbox_message_id: event.last_read_outbox_message_id,
+          })),
         }));
         break;
       }
@@ -871,49 +988,45 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
 
       case 'chat_read_inbox': {
-        set((s) => {
-          const update = (list: Td.chat[]) =>
-            list.map((c) =>
-              c.id === event.chat_id
-                ? {
-                    ...c,
-                    last_read_inbox_message_id: event.last_read_inbox_message_id,
-                    unread_count: event.unread_count,
-                  }
-                : c,
-            );
-          return { chats: update(s.chats), archivedChats: update(s.archivedChats) };
-        });
+        set((s) => ({
+          chatCache: updateChatInCache(s.chatCache, event.chat_id, (c) => ({
+            ...c,
+            last_read_inbox_message_id: event.last_read_inbox_message_id,
+            unread_count: event.unread_count,
+          })),
+        }));
         break;
       }
 
       case 'new_chat': {
         set((s) => {
-          const exists =
-            s.chats.some((c) => c.id === event.chat.id) ||
-            s.archivedChats.some((c) => c.id === event.chat.id);
-          if (exists) return s;
-          return { chats: [event.chat, ...s.chats] };
+          const chatCache = new Map(s.chatCache);
+          chatCache.set(event.chat.id, event.chat);
+          // Process positions if they have order > 0
+          const result = setChatPositions(event.chat.id, event.chat.positions, {
+            chatCache,
+            mainChatIds: s.mainChatIds,
+            archivedChatIds: s.archivedChatIds,
+          });
+          return result;
         });
         break;
       }
 
       case 'chat_last_message': {
         set((s) => {
-          const update = (list: Td.chat[]) =>
-            list.map((c) =>
-              c.id === event.chat_id
-                ? {
-                    ...c,
-                    last_message: event.last_message,
-                    positions: event.positions.length > 0 ? event.positions : c.positions,
-                  }
-                : c,
-            );
-          return {
-            chats: sortByOrder(update(s.chats)),
-            archivedChats: sortByOrder(update(s.archivedChats)),
-          };
+          const chatCache = updateChatInCache(s.chatCache, event.chat_id, (c) => ({
+            ...c,
+            last_message: event.last_message,
+          }));
+          if (event.positions.length > 0) {
+            return setChatPositions(event.chat_id, event.positions, {
+              chatCache,
+              mainChatIds: s.mainChatIds,
+              archivedChatIds: s.archivedChatIds,
+            });
+          }
+          return { chatCache };
         });
         if (event.last_message) loadThumbnailForMessage(event.chat_id, event.last_message, set);
         break;
@@ -921,62 +1034,64 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
       case 'chat_position': {
         set((s) => {
-          const update = (list: Td.chat[]) =>
-            list.map((c) => {
-              if (c.id !== event.chat_id) return c;
-              const newPositions = c.positions.filter((p) => p.list._ !== event.position.list._);
-              if (event.position.order !== '0') newPositions.push(event.position);
-              return { ...c, positions: newPositions };
-            });
-          return {
-            chats: sortByOrder(update(s.chats)),
-            archivedChats: sortByOrder(update(s.archivedChats)),
-          };
+          const chat = s.chatCache.get(event.chat_id);
+          if (!chat) return s;
+          // Build new positions: remove old entry for this list type, add new if order > 0
+          const newPositions = chat.positions.filter((p) => p.list._ !== event.position.list._);
+          if (event.position.order !== '0') newPositions.push(event.position);
+          return setChatPositions(event.chat_id, newPositions, {
+            chatCache: s.chatCache,
+            mainChatIds: s.mainChatIds,
+            archivedChatIds: s.archivedChatIds,
+          });
         });
         break;
       }
 
       case 'chat_title': {
-        const update = (list: Td.chat[]) =>
-          list.map((c) => (c.id === event.chat_id ? { ...c, title: event.title } : c));
-        set((s) => ({ chats: update(s.chats), archivedChats: update(s.archivedChats) }));
+        set((s) => ({
+          chatCache: updateChatInCache(s.chatCache, event.chat_id, (c) => ({
+            ...c,
+            title: event.title,
+          })),
+        }));
         break;
       }
 
       case 'chat_photo': {
-        const update = (list: Td.chat[]) =>
-          list.map((c) => (c.id === event.chat_id ? { ...c, photo: event.photo } : c));
-        set((s) => ({ chats: update(s.chats), archivedChats: update(s.archivedChats) }));
+        set((s) => ({
+          chatCache: updateChatInCache(s.chatCache, event.chat_id, (c) => ({
+            ...c,
+            photo: event.photo,
+          })),
+        }));
         break;
       }
 
       case 'chat_notification_settings': {
-        const update = (list: Td.chat[]) =>
-          list.map((c) =>
-            c.id === event.chat_id
-              ? { ...c, notification_settings: event.notification_settings }
-              : c,
-          );
-        set((s) => ({ chats: update(s.chats), archivedChats: update(s.archivedChats) }));
+        set((s) => ({
+          chatCache: updateChatInCache(s.chatCache, event.chat_id, (c) => ({
+            ...c,
+            notification_settings: event.notification_settings,
+          })),
+        }));
         break;
       }
 
       case 'chat_draft_message': {
         set((s) => {
-          const update = (list: Td.chat[]) =>
-            list.map((c) =>
-              c.id === event.chat_id
-                ? {
-                    ...c,
-                    draft_message: event.draft_message,
-                    positions: event.positions.length > 0 ? event.positions : c.positions,
-                  }
-                : c,
-            );
-          return {
-            chats: sortByOrder(update(s.chats)),
-            archivedChats: sortByOrder(update(s.archivedChats)),
-          };
+          const chatCache = updateChatInCache(s.chatCache, event.chat_id, (c) => ({
+            ...c,
+            draft_message: event.draft_message,
+          }));
+          if (event.positions.length > 0) {
+            return setChatPositions(event.chat_id, event.positions, {
+              chatCache,
+              mainChatIds: s.mainChatIds,
+              archivedChatIds: s.archivedChatIds,
+            });
+          }
+          return { chatCache };
         });
         break;
       }
@@ -986,31 +1101,32 @@ export const useChatStore = create<ChatState>((set, get) => ({
         break;
 
       case 'chat_is_marked_as_unread': {
-        const update = (list: Td.chat[]) =>
-          list.map((c) =>
-            c.id === event.chat_id ? { ...c, is_marked_as_unread: event.is_marked_as_unread } : c,
-          );
-        set((s) => ({ chats: update(s.chats), archivedChats: update(s.archivedChats) }));
+        set((s) => ({
+          chatCache: updateChatInCache(s.chatCache, event.chat_id, (c) => ({
+            ...c,
+            is_marked_as_unread: event.is_marked_as_unread,
+          })),
+        }));
         break;
       }
 
       case 'chat_unread_mention_count': {
-        const update = (list: Td.chat[]) =>
-          list.map((c) =>
-            c.id === event.chat_id ? { ...c, unread_mention_count: event.unread_mention_count } : c,
-          );
-        set((s) => ({ chats: update(s.chats), archivedChats: update(s.archivedChats) }));
+        set((s) => ({
+          chatCache: updateChatInCache(s.chatCache, event.chat_id, (c) => ({
+            ...c,
+            unread_mention_count: event.unread_mention_count,
+          })),
+        }));
         break;
       }
 
       case 'chat_unread_reaction_count': {
-        const update = (list: Td.chat[]) =>
-          list.map((c) =>
-            c.id === event.chat_id
-              ? { ...c, unread_reaction_count: event.unread_reaction_count }
-              : c,
-          );
-        set((s) => ({ chats: update(s.chats), archivedChats: update(s.archivedChats) }));
+        set((s) => ({
+          chatCache: updateChatInCache(s.chatCache, event.chat_id, (c) => ({
+            ...c,
+            unread_reaction_count: event.unread_reaction_count,
+          })),
+        }));
         break;
       }
 
@@ -1386,6 +1502,41 @@ export const useChatStore = create<ChatState>((set, get) => ({
 // ---------------------------------------------------------------------------
 
 onUpdate((event) => useChatStore.getState().handleUpdate(event));
+
+// Re-fetch dialogs when SSE reconnects (e.g. after daemon restart).
+// Without this, new_chat events from the restarted TDLib accumulate
+// in the store without loadDialogs ever cleaning them up.
+onReconnect(() => {
+  log.info('SSE reconnected — reloading dialogs');
+  useChatStore.getState().loadDialogs();
+});
+
+// Dev store debugging — access via window.$store.chat.get() in console
+if (import.meta.env.DEV) {
+  // biome-ignore lint/suspicious/noExplicitAny: dev-only debug helper
+  const w = window as any;
+  w.$store = w.$store || {};
+  w.$store.chat = {
+    get: () => useChatStore.getState(),
+    set: (state: Partial<ChatState>) => useChatStore.setState(state),
+    // biome-ignore lint/suspicious/noExplicitAny: dev-only debug helper
+    sub: (selector?: (s: ChatState) => any) => {
+      return useChatStore.subscribe((s) => {
+        console.log(
+          '[store]',
+          selector
+            ? selector(s)
+            : {
+                main: s.mainChatIds.length,
+                archive: s.archivedChatIds.length,
+                loading: s.loadingDialogs,
+              },
+        );
+      });
+    },
+    raw: useChatStore,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Test helpers

@@ -147,6 +147,11 @@ export function onUpdate(listener: UpdateListener): () => void {
   return () => updateListeners.delete(listener);
 }
 
+/** Register a callback that fires when the SSE connection reconnects (e.g. after daemon restart). */
+export function onReconnect(handler: () => void): () => void {
+  return client.onReconnect(handler);
+}
+
 function emitUpdate(event: TelegramUpdateEvent) {
   for (const listener of updateListeners) {
     try {

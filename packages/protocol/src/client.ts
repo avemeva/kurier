@@ -13,6 +13,8 @@ export class TelegramClient {
   private handlers = new Set<UpdateHandler>();
   private abortController: AbortController | null = null;
   private sseConnected = false;
+  private sseHasConnectedBefore = false;
+  private reconnectHandlers = new Set<() => void>();
 
   /** Optional signal to abort all non-SSE requests. */
   signal: AbortSignal | undefined;
@@ -123,10 +125,17 @@ export class TelegramClient {
     return json.data;
   }
 
+  /** Register a callback that fires when SSE reconnects (not on initial connect). */
+  onReconnect(handler: () => void): () => void {
+    this.reconnectHandlers.add(handler);
+    return () => this.reconnectHandlers.delete(handler);
+  }
+
   /** Close SSE connection and clean up. */
   close(): void {
     this.disconnectSSE();
     this.handlers.clear();
+    this.reconnectHandlers.clear();
   }
 
   // --- SSE internals ---
@@ -159,6 +168,16 @@ export class TelegramClient {
           this.sseConnected = false;
           return;
         }
+
+        // Fire reconnect callbacks (skip the very first connection)
+        if (this.sseHasConnectedBefore) {
+          for (const handler of this.reconnectHandlers) {
+            try {
+              handler();
+            } catch {}
+          }
+        }
+        this.sseHasConnectedBefore = true;
 
         const reader = res.body.getReader();
         const decoder = new TextDecoder();

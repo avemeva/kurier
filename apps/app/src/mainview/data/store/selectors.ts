@@ -31,12 +31,8 @@ export const selectChatMessages = createSelector(
         null,
         null,
         null,
-        null,
       ] as const;
-    const rawChat =
-      s.chats.find((c: Td.chat) => c.id === chatId) ??
-      s.archivedChats.find((c: Td.chat) => c.id === chatId) ??
-      null;
+    const rawChat = s.chatCache.get(chatId) ?? null;
     return [
       chatId,
       s.messagesByChat[chatId] ?? null,
@@ -45,8 +41,7 @@ export const selectChatMessages = createSelector(
       rawChat?.last_read_outbox_message_id ?? 0,
       s.replyPreviews,
       s.pinnedPreviews,
-      s.chats,
-      s.archivedChats,
+      s.chatCache,
       s.mediaUrls,
       s.thumbUrls,
       s.profilePhotos,
@@ -61,8 +56,7 @@ export const selectChatMessages = createSelector(
     lastReadOutboxId,
     replyPreviews,
     pinnedPreviews,
-    chats,
-    archivedChats,
+    chatCache,
     mediaUrls,
     thumbUrls,
     profilePhotos,
@@ -70,7 +64,7 @@ export const selectChatMessages = createSelector(
   ]) => {
     if (!chatId || !real || !users) return EMPTY_UI_MESSAGES;
 
-    const allChats = [...(chats ?? []), ...(archivedChats ?? [])];
+    const allChats = chatCache ? [...chatCache.values()] : [];
     const messages = groupAndConvert(real, pending ?? [], users, lastReadOutboxId, allChats);
 
     // Hydrate all messages with media URLs
@@ -96,10 +90,7 @@ export const selectSelectedChat = createSelector(
   (s: ChatState) => {
     const chatId = s.selectedChatId;
     if (!chatId) return [null, undefined, undefined, undefined, 0] as const;
-    const rawChat =
-      s.chats.find((c: Td.chat) => c.id === chatId) ??
-      s.archivedChats.find((c: Td.chat) => c.id === chatId) ??
-      null;
+    const rawChat = s.chatCache.get(chatId) ?? null;
     if (!rawChat) return [null, undefined, undefined, undefined, 0] as const;
     const userId = rawChat.type._ === 'chatTypePrivate' ? rawChat.type.user_id : 0;
     return [
@@ -171,11 +162,7 @@ export function actionLabel(action: Td.ChatAction): string {
 export const selectHeaderStatus = createSelector(
   (s: ChatState) => {
     const chatId = s.selectedChatId;
-    const rawChat = chatId
-      ? (s.chats.find((c: Td.chat) => c.id === chatId) ??
-        s.archivedChats.find((c: Td.chat) => c.id === chatId) ??
-        null)
-      : null;
+    const rawChat = chatId ? (s.chatCache.get(chatId) ?? null) : null;
     const id = rawChat?.id ?? null;
     return [
       id,
@@ -281,10 +268,15 @@ function extractTypingUsers(
   }));
 }
 
-function chatContext(c: Td.chat, state: ChatState): TGChatContext {
+function chatContext(
+  c: Td.chat,
+  state: ChatState,
+  listType?: 'chatListMain' | 'chatListArchive',
+): TGChatContext {
   const userId = c.type._ === 'chatTypePrivate' ? c.type.user_id : 0;
   const lastMsgId = c.last_message?.id ?? 0;
   const thumbKey = `${c.id}_${lastMsgId}`;
+  const pos = listType ? c.positions.find((p) => p.list._ === listType) : undefined;
   return {
     photoUrl: state.profilePhotos[c.id] ?? null,
     user: userId ? state.users.get(userId) : undefined,
@@ -294,13 +286,15 @@ function chatContext(c: Td.chat, state: ChatState): TGChatContext {
     avatarUrl: state.profilePhotos[c.id],
     lastMessageThumbUrl: lastMsgId ? (state.thumbUrls[thumbKey] ?? null) : null,
     typing: extractTypingUsers(c.id, c.type._, state.typingByChat, state.users),
+    isPinnedInList: pos?.is_pinned ?? false,
   };
 }
 
 export const selectChats = createSelector(
   (s: ChatState) =>
     [
-      s.chats,
+      s.mainChatIds,
+      s.chatCache,
       s.profilePhotos,
       s.users,
       s.userStatuses,
@@ -308,13 +302,21 @@ export const selectChats = createSelector(
       s.thumbUrls,
       s.typingByChat,
     ] as const,
-  (_deps, state) => state.chats.map((c: Td.chat) => toTGChat(c, chatContext(c, state))),
+  (_deps, state) =>
+    state.mainChatIds
+      .map((id) => {
+        const chat = state.chatCache.get(id);
+        if (!chat) return null;
+        return toTGChat(chat, chatContext(chat, state, 'chatListMain'));
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null),
 );
 
 export const selectArchivedChats = createSelector(
   (s: ChatState) =>
     [
-      s.archivedChats,
+      s.archivedChatIds,
+      s.chatCache,
       s.profilePhotos,
       s.users,
       s.userStatuses,
@@ -322,7 +324,14 @@ export const selectArchivedChats = createSelector(
       s.thumbUrls,
       s.typingByChat,
     ] as const,
-  (_deps, state) => state.archivedChats.map((c: Td.chat) => toTGChat(c, chatContext(c, state))),
+  (_deps, state) =>
+    state.archivedChatIds
+      .map((id) => {
+        const chat = state.chatCache.get(id);
+        if (!chat) return null;
+        return toTGChat(chat, chatContext(chat, state, 'chatListArchive'));
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null),
 );
 
 // ---------------------------------------------------------------------------

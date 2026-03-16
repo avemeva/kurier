@@ -19,6 +19,7 @@ vi.mock('@/data/telegram', () => ({
   sendReaction: vi.fn(),
   markAsRead: vi.fn(),
   onUpdate: vi.fn(() => () => {}),
+  onReconnect: vi.fn(() => () => {}),
   formatTime: vi.fn(() => '12:00'),
   formatLastSeen: vi.fn((ts: number) => `last seen at ${ts}`),
   extractMessagePreview: vi.fn((msg: Td.message | undefined) => {
@@ -146,6 +147,13 @@ function makeMessage(overrides: Partial<Td.message> = {}): Td.message {
   } as Td.message;
 }
 
+/** Helper: build chatCache + mainChatIds from an array of chats. */
+function stateFromChats(chats: Td.chat[]) {
+  const chatCache = new Map<number, Td.chat>();
+  for (const c of chats) chatCache.set(c.id, c);
+  return { chatCache, mainChatIds: chats.map((c) => c.id), archivedChatIds: [] as number[] };
+}
+
 beforeEach(() => {
   _resetForTests();
 });
@@ -158,7 +166,7 @@ describe('ChatLayout UI updates', () => {
       type: { _: 'chatTypePrivate', user_id: 100 },
     });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 100,
       messagesByChat: { 100: [makeMessage()] },
       loadingDialogs: false,
@@ -190,7 +198,7 @@ describe('ChatLayout UI updates', () => {
       type: { _: 'chatTypePrivate', user_id: 100 },
     });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       loadingDialogs: false,
       userStatuses: {},
     });
@@ -215,7 +223,7 @@ describe('ChatLayout UI updates', () => {
   it('shows typing indicator in sidebar when user starts typing', () => {
     const chat = makeChat({ id: 100 });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       loadingDialogs: false,
       typingByChat: {},
     });
@@ -241,7 +249,7 @@ describe('ChatLayout UI updates', () => {
       type: { _: 'chatTypePrivate', user_id: 100 },
     });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 100,
       messagesByChat: { 100: [makeMessage()] },
       loadingDialogs: false,
@@ -267,7 +275,7 @@ describe('ChatLayout UI updates', () => {
   it('updates read checkmarks when read_outbox event arrives', () => {
     const chat = makeChat({ id: 100, last_read_outbox_message_id: 10 });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 100,
       messagesByChat: {
         100: [
@@ -307,7 +315,7 @@ describe('ChatLayout UI updates', () => {
   it('pending message (-1 id) never shows as read even with high maxId', () => {
     const chat = makeChat({ id: 100, last_read_outbox_message_id: 999999 });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 100,
       messagesByChat: {
         100: [
@@ -337,7 +345,7 @@ describe('ChatLayout UI updates', () => {
     const chat = makeChat({ id: 100 });
     const msg = makeMessage({ id: 42 });
     useChatStore.setState({
-      chats: [chat],
+      ...stateFromChats([chat]),
       selectedChatId: 100,
       messagesByChat: { 100: [msg] },
       loadingDialogs: false,
