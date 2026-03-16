@@ -165,7 +165,10 @@ export class TelegramClient {
         });
 
         if (!res.ok || !res.body) {
-          this.sseConnected = false;
+          // Daemon not ready — retry instead of giving up
+          if (this.sseConnected && this.handlers.size > 0) {
+            setTimeout(() => connect(), 2000);
+          }
           return;
         }
 
