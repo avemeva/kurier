@@ -355,7 +355,7 @@ export function toTGTextEntities(entities: Td.textEntity[]): TGTextEntity[] {
  *  already have emoji presentation by default. */
 function normalizeEmoji(emoji: string): string {
   if (emoji.length !== 1) return emoji;
-  return emoji + '\uFE0F';
+  return `${emoji}\uFE0F`;
 }
 
 export function toTGReactions(info: Td.messageInteractionInfo | undefined): TGReaction[] {

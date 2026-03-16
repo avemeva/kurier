@@ -26,6 +26,14 @@
   },
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "files": {
-    "includes": ["**", "!**/node_modules", "!**/dist", "!**/build", "!.claude", "!**/*.d.ts"]
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/build",
+      "!.claude",
+      "!**/*.d.ts",
+      "!worktrees"
+    ]
   }
 }
