@@ -63,6 +63,33 @@
           "customEmojiUrls": {}
         }
       }
+    },
+    {
+      "kind": "message",
+      "id": 718847,
+      "chatId": 6098406782,
+      "date": 1772464800,
+      "isOutgoing": true,
+      "isRead": false,
+      "editDate": 0,
+      "sender": {
+        "userId": 91754006,
+        "name": "Andrey",
+        "photoUrl": "/dev/fixtures/document-file/394080455503227221.jpg"
+      },
+      "reactions": [],
+      "viewCount": 0,
+      "forward": null,
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "document",
+        "fileName": "chris-chung-playbook.md",
+        "fileSize": 22034,
+        "mimeType": "text/x-web-markdown",
+        "url": "/api/media/documents/chris-chung-playbook.md",
+        "caption": null
+      }
     }
   ],
   "chatKind": "private"
