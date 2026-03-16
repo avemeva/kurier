@@ -103,7 +103,7 @@ export type BubbleRenderState = {
   // Pre-narrowed content — exactly one of these is non-null
   textContent: (ExtractedText & { webPreview: TGWebPreview | null }) | null;
   voiceContent: TGVoiceContent | null;
-  documentLabel: string;
+  documentContent: { fileName: string; fileSize: number; url: string | undefined } | null;
 };
 
 export type MessageRenderState =
@@ -235,16 +235,21 @@ export function computeMessageState(
           customEmojiUrls: content.customEmojiUrls,
           webPreview: content.webPreview,
         }
-      : null;
+      : content.kind === 'document' && content.caption
+        ? {
+            text: content.caption.text,
+            entities: content.caption.entities,
+            customEmojiUrls: content.caption.customEmojiUrls,
+            webPreview: null,
+          }
+        : null;
 
   const voiceContent = content.kind === 'voice' ? content : null;
 
-  const documentLabel =
+  const documentContent =
     content.kind === 'document'
-      ? content.label
-      : content.kind === 'unsupported'
-        ? content.label
-        : '';
+      ? { fileName: content.fileName, fileSize: content.fileSize, url: content.url }
+      : null;
 
   return {
     layout: 'bubble',
@@ -255,6 +260,6 @@ export function computeMessageState(
     onTranscribe,
     textContent,
     voiceContent,
-    documentLabel,
+    documentContent,
   };
 }

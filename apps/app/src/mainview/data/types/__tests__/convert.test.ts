@@ -403,24 +403,24 @@ describe('extractForwardName', () => {
     expect(name).toBe('Hidden Sender');
   });
 
-  it('returns null for messageOriginChat', () => {
+  it('returns fallback for messageOriginChat when chat not found', () => {
     const info: Td.messageForwardInfo = {
       _: 'messageForwardInfo',
       origin: { _: 'messageOriginChat', sender_chat_id: 123, author_signature: '' },
       date: 0,
       public_service_announcement_type: '',
     };
-    expect(extractForwardName(info, users)).toBeNull();
+    expect(extractForwardName(info, users)).toBe('Group');
   });
 
-  it('returns null for messageOriginChannel', () => {
+  it('returns fallback for messageOriginChannel when chat not found', () => {
     const info: Td.messageForwardInfo = {
       _: 'messageForwardInfo',
       origin: { _: 'messageOriginChannel', chat_id: 456, message_id: 789, author_signature: '' },
       date: 0,
       public_service_announcement_type: '',
     };
-    expect(extractForwardName(info, users)).toBeNull();
+    expect(extractForwardName(info, users)).toBe('Channel');
   });
 
   it('returns null for undefined info', () => {
@@ -735,12 +735,99 @@ describe('toTGContent', () => {
     }
   });
 
-  it('converts document content', () => {
-    const docContent = { _: 'messageDocument', document: {} } as Td.MessageContent;
+  it('converts document content with caption', () => {
+    const docContent = {
+      _: 'messageDocument',
+      document: {
+        _: 'document',
+        file_name: 'report.pdf',
+        mime_type: 'application/pdf',
+        document: {
+          _: 'file',
+          id: 1,
+          size: 22034,
+          expected_size: 22034,
+          local: {
+            _: 'localFile',
+            path: '',
+            can_be_downloaded: true,
+            can_be_deleted: false,
+            is_downloading_active: false,
+            is_downloading_completed: false,
+            download_offset: 0,
+            downloaded_prefix_size: 0,
+            downloaded_size: 0,
+          },
+          remote: {
+            _: 'remoteFile',
+            id: '',
+            unique_id: '',
+            is_uploading_active: false,
+            is_uploading_completed: true,
+            uploaded_size: 22034,
+          },
+        },
+      },
+      caption: {
+        _: 'formattedText',
+        text: 'Quarterly report',
+        entities: [{ _: 'textEntity', offset: 0, length: 9, type: { _: 'textEntityTypeBold' } }],
+      },
+    } as Td.MessageContent;
     const c = toTGContent(docContent);
     expect(c.kind).toBe('document');
     if (c.kind === 'document') {
-      expect(c.label).toBe('File');
+      expect(c.fileName).toBe('report.pdf');
+      expect(c.fileSize).toBe(22034);
+      expect(c.mimeType).toBe('application/pdf');
+      expect(c.caption).not.toBeNull();
+      expect(c.caption?.text).toBe('Quarterly report');
+      expect(c.caption?.entities.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('converts document content without caption', () => {
+    const docContent = {
+      _: 'messageDocument',
+      document: {
+        _: 'document',
+        file_name: 'notes.txt',
+        mime_type: 'text/plain',
+        document: {
+          _: 'file',
+          id: 2,
+          size: 512,
+          expected_size: 512,
+          local: {
+            _: 'localFile',
+            path: '',
+            can_be_downloaded: true,
+            can_be_deleted: false,
+            is_downloading_active: false,
+            is_downloading_completed: false,
+            download_offset: 0,
+            downloaded_prefix_size: 0,
+            downloaded_size: 0,
+          },
+          remote: {
+            _: 'remoteFile',
+            id: '',
+            unique_id: '',
+            is_uploading_active: false,
+            is_uploading_completed: true,
+            uploaded_size: 512,
+          },
+        },
+      },
+      caption: { _: 'formattedText', text: '', entities: [] },
+    } as Td.MessageContent;
+    const c = toTGContent(docContent);
+    expect(c.kind).toBe('document');
+    if (c.kind === 'document') {
+      expect(c.fileName).toBe('notes.txt');
+      expect(c.fileSize).toBe(512);
+      expect(c.mimeType).toBe('text/plain');
+      expect(c.caption).toBeNull();
     }
   });
 

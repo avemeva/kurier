@@ -55,7 +55,7 @@ export function PureChatView({
   onTranscribe,
 }: PureChatViewProps) {
   const isGroup = chatKind === 'basicGroup' || chatKind === 'supergroup';
-  const showSender = isGroup;
+  const showSender = isGroup || chatKind === 'channel';
 
   return (
     <div className="space-y-1">

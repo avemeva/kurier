@@ -260,7 +260,11 @@ export type TGAlbumContent = {
 
 export type TGDocumentContent = {
   kind: 'document';
-  label: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  url: string | undefined;
+  caption: TGCaption | null;
 };
 
 export type TGUnsupportedContent = {

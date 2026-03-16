@@ -70,6 +70,11 @@ export function loadMessageMedia(msg: TGMessage, store: ChatState): void {
         store.loadMedia(chatId, msgId);
       }
       break;
+    case 'document':
+      if (content.url === undefined) {
+        store.loadMedia(chatId, msgId);
+      }
+      break;
     case 'album':
       for (const item of content.items) {
         if (item.url === undefined) {

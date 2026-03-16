@@ -76,7 +76,7 @@ export function extractMediaLabel(content: Td.MessageContent): string {
     case 'messageSticker':
       return content.sticker.emoji ?? 'Sticker';
     case 'messageDocument':
-      return 'File';
+      return content.document?.file_name || 'File';
     case 'messageAnimation':
       return 'GIF';
     case 'messageAudio':
@@ -235,11 +235,11 @@ export function extractForwardName(
       return origin.sender_name;
     case 'messageOriginChat': {
       const chat = chats?.find((c) => c.id === origin.sender_chat_id);
-      return chat?.title ?? null;
+      return chat?.title ?? 'Group';
     }
     case 'messageOriginChannel': {
       const chat = chats?.find((c) => c.id === origin.chat_id);
-      return chat?.title ?? null;
+      return chat?.title ?? (origin.author_signature || 'Channel');
     }
     default:
       return null;
@@ -640,7 +640,11 @@ export function toTGContent(content: Td.MessageContent): TGContent {
     case 'messageDocument': {
       return {
         kind: 'document',
-        label: 'File',
+        fileName: content.document.file_name ?? '',
+        fileSize: content.document.document.size || content.document.document.expected_size,
+        mimeType: content.document.mime_type ?? '',
+        url: undefined,
+        caption: extractCaptionNew(content),
       };
     }
     default: {
@@ -686,11 +690,24 @@ export function toTGReplyTo(msg: Td.message): TGReplyTo | null {
 
 // --- toTGSender ---
 
-export function toTGSender(senderId: Td.MessageSender, users: Map<number, Td.user>): TGSender {
-  const userId = senderId._ === 'messageSenderUser' ? senderId.user_id : 0;
+export function toTGSender(
+  senderId: Td.MessageSender,
+  users: Map<number, Td.user>,
+  chats?: Td.chat[],
+): TGSender {
+  if (senderId._ === 'messageSenderUser') {
+    const user = users.get(senderId.user_id);
+    return {
+      userId: senderId.user_id,
+      name: user ? [user.first_name, user.last_name].filter(Boolean).join(' ') : 'Unknown',
+      photoUrl: undefined,
+    };
+  }
+  // messageSenderChat
+  const chat = chats?.find((c) => c.id === senderId.chat_id);
   return {
-    userId,
-    name: resolveSenderName(senderId, users),
+    userId: 0,
+    name: chat?.title ?? 'Unknown',
     photoUrl: undefined,
   };
 }
@@ -703,7 +720,7 @@ export function toTGMessage(
   lastReadOutboxId: number,
   chats?: Td.chat[],
 ): (TGMessageBase & { kind: 'message' }) | TGServiceMessage {
-  const sender = toTGSender(msg.sender_id, users);
+  const sender = toTGSender(msg.sender_id, users, chats);
   const action = extractServiceAction(msg.content);
 
   if (action !== null) {
@@ -794,7 +811,8 @@ export function enrichReplyPreviews(messages: TGMessage[]): TGMessage[] {
         ? target.content.text
         : target.content.kind === 'photo' ||
             target.content.kind === 'video' ||
-            target.content.kind === 'animation'
+            target.content.kind === 'animation' ||
+            target.content.kind === 'document'
           ? (target.content.caption?.text ?? '')
           : '';
     const mediaLabel =
@@ -1126,7 +1144,23 @@ function hydrateContent(
       if (!changed) return content;
       return { ...content, webPreview, customEmojiUrls: mergedEmojis };
     }
-    case 'document':
+    case 'document': {
+      let changed = false;
+      let newContent = content;
+      const url = mediaUrls[mediaKey];
+      if (url !== undefined && url !== content.url) {
+        newContent = { ...newContent, url: url ?? undefined };
+        changed = true;
+      }
+      if (content.caption) {
+        const hCap = hydrateCaption(content.caption, customEmojiUrlsMap);
+        if (hCap !== content.caption) {
+          newContent = { ...newContent, caption: hCap };
+          changed = true;
+        }
+      }
+      return changed ? newContent : content;
+    }
     case 'unsupported':
       return content;
   }

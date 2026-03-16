@@ -16,6 +16,13 @@ export function formatTime(timestamp: number): string {
   return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
+export function formatFileSize(bytes: number): string {
+  if (bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function formatLastSeen(timestamp: number): string {
   const date = new Date(timestamp * 1000);
   const now = new Date();

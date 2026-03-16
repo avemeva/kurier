@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { PureBotKeyboard } from './bot-keyboard';
 import type { GroupPosition } from './bubble';
 import { PureBubble } from './bubble';
+import { PureDocumentView } from './document-view';
 import { PureFormattedText } from './formatted-text';
 import { PureForwardHeader } from './forward-header';
 import { PureLinkPreviewCard } from './link-preview-card';
@@ -206,9 +207,13 @@ function PureMessageRowInner({
               onTranscribe={() => state.onTranscribe?.(state.msg.chatId, state.msg.id)}
             />
           )}
-          {/* Document label */}
-          {!state.voiceContent && state.documentLabel && (
-            <p className="text-xs italic text-text-tertiary">{state.documentLabel}</p>
+          {/* Document */}
+          {!state.voiceContent && state.documentContent && (
+            <PureDocumentView
+              fileName={state.documentContent.fileName}
+              fileSize={state.documentContent.fileSize}
+              url={state.documentContent.url}
+            />
           )}
           {/* Text */}
           {state.textContent && (
@@ -250,7 +255,7 @@ function PureMessageRowInner({
             </>
           )}
           {/* Unsupported */}
-          {!state.textContent && !state.documentLabel && !state.voiceContent && (
+          {!state.textContent && !state.documentContent && !state.voiceContent && (
             <p className="tg-text-chat italic text-text-quaternary">Unsupported message</p>
           )}
         </BubbleFrame>

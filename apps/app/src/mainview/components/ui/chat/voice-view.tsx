@@ -1,5 +1,6 @@
 import { ChevronUp, Loader2, Pause, Play } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { formatFileSize } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 /** Match tdesktop: kWaveformSamplesCount=100, msgWaveformBar=2, msgWaveformSkip=1, min=3, max=17 */
@@ -121,14 +122,6 @@ function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-}
-
-/** Format file size in human-readable form */
-function formatFileSize(bytes: number): string {
-  if (bytes <= 0) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function PureVoiceView({

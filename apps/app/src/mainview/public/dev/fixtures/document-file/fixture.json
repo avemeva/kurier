@@ -20,7 +20,48 @@
       "inlineKeyboard": null,
       "content": {
         "kind": "document",
-        "label": "quarterly-report-2024.pdf"
+        "fileName": "quarterly-report-2024.pdf",
+        "fileSize": 22034,
+        "mimeType": "application/pdf",
+        "url": "/dev/fixtures/document-file/sample.pdf",
+        "caption": null
+      }
+    },
+    {
+      "kind": "message",
+      "id": 718846,
+      "chatId": 6098406782,
+      "date": 1772464700,
+      "isOutgoing": false,
+      "isRead": true,
+      "editDate": 0,
+      "sender": {
+        "userId": 6098406782,
+        "name": "Alice",
+        "photoUrl": "/dev/photos/6098406782.jpg"
+      },
+      "reactions": [],
+      "viewCount": 1245,
+      "forward": {
+        "fromName": "Виральный Рост",
+        "photoId": 0,
+        "date": 1772460000
+      },
+      "replyTo": null,
+      "inlineKeyboard": null,
+      "content": {
+        "kind": "document",
+        "fileName": "growth-hacking-checklist.md",
+        "fileSize": 18432,
+        "mimeType": "text/markdown",
+        "caption": {
+          "text": "Чек-лист для запуска вирального контента. Разбор 12 кейсов с метриками и воронками.",
+          "entities": [
+            { "offset": 0, "length": 40, "type": "bold" },
+            { "offset": 49, "length": 9, "type": "italic" }
+          ],
+          "customEmojiUrls": {}
+        }
       }
     }
   ],
