@@ -10,8 +10,15 @@
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Kurier's effective max media size (≈60% of 720px) */
-export const MAX_MEDIA_SIZE = 430;
+/** Read a px-valued CSS theme variable from :root. */
+function themeVar(name: string, fallback: number): number {
+  if (typeof document === 'undefined') return fallback;
+  const val = getComputedStyle(document.documentElement).getPropertyValue(name);
+  return parseInt(val, 10) || fallback;
+}
+
+/** Max message bubble / single-media width. Source: --width-bubble in @theme. */
+export const MAX_MEDIA_SIZE = themeVar('--width-bubble', 468);
 export const MIN_MEDIA_SIZE = 100;
 export const ALBUM_SPACING = 4;
 

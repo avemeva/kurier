@@ -278,7 +278,7 @@ export function PureVideoNotePlayer({
 
       {/* Transcription text (expanded below the circle) */}
       {hasTranscription && expanded && (
-        <p className="mt-2 max-w-[200px] text-sm text-text-primary">{speechText}</p>
+        <p className="mt-2 max-w-video-note-text text-sm text-text-primary">{speechText}</p>
       )}
     </div>
   );

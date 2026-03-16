@@ -69,7 +69,7 @@ export function PureBubble({
         variant !== 'media' && (isOutgoing ? 'bg-message-own' : 'bg-message-peer'),
         variant !== 'filled' && 'overflow-hidden',
         hasReactions && variant === 'filled' && 'pb-5',
-        showAvatar ? 'max-w-[calc(100%-36px)]' : 'max-w-[55%]',
+        showAvatar ? 'max-w-[calc(100%-36px)]' : 'max-w-bubble',
         className,
       )}
     >
@@ -80,7 +80,7 @@ export function PureBubble({
   if (!showAvatar) return bubble;
 
   return (
-    <div className="flex max-w-[55%] items-end gap-2">
+    <div className="flex max-w-bubble items-end gap-2">
       <UserAvatar
         name={senderName ?? ''}
         src={senderPhotoUrl}

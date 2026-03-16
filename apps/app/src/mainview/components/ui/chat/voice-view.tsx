@@ -302,7 +302,7 @@ export function PureVoiceView({
   const isReady = !!url;
 
   return (
-    <div data-testid="voice-message" className={cn('min-h-[54px] w-[280px] py-1', className)}>
+    <div data-testid="voice-message" className={cn('min-h-[54px] w-voice py-1', className)}>
       {/* biome-ignore lint/a11y/useMediaCaption: Telegram voice messages don't have captions */}
       {url && <audio ref={audioRef} src={url} preload="metadata" />}
 

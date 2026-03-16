@@ -140,6 +140,12 @@
   --color-text-tertiary: var(--text-tertiary);
   --color-text-quaternary: var(--text-quaternary);
 
+  /* Message sizing */
+  --width-bubble: 468px;
+  --width-sticker: 224px;
+  --width-voice: 280px;
+  --width-video-note-text: 200px;
+
   /* Radius — derived from theme's --radius */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

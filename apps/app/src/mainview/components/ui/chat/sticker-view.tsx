@@ -97,7 +97,7 @@ export function PureStickerView({
   // Loading state
   if (loading) {
     return (
-      <div className={cn('aspect-square w-full max-w-[224px] animate-pulse bg-muted', className)} />
+      <div className={cn('aspect-square w-full max-w-sticker animate-pulse bg-muted', className)} />
     );
   }
 
@@ -106,7 +106,7 @@ export function PureStickerView({
     return (
       <div
         className={cn(
-          'flex aspect-square w-full max-w-[224px] items-center justify-center',
+          'flex aspect-square w-full max-w-sticker items-center justify-center',
           className,
         )}
       >
@@ -123,7 +123,7 @@ export function PureStickerView({
         type={onRetry ? 'button' : undefined}
         onClick={onRetry}
         className={cn(
-          'aspect-square w-full max-w-[224px] bg-accent',
+          'aspect-square w-full max-w-sticker bg-accent',
           onRetry && 'cursor-pointer transition-colors hover:bg-accent/80',
           className,
         )}
@@ -134,7 +134,7 @@ export function PureStickerView({
   // TGS: Lottie animation
   if (format === 'tgs') {
     return (
-      <div className={cn('aspect-square w-full max-w-[224px]', className)}>
+      <div className={cn('aspect-square w-full max-w-sticker', className)}>
         <TgsPlayer url={url} loop={loop} />
       </div>
     );
@@ -146,7 +146,7 @@ export function PureStickerView({
       <MutedVideo
         src={url}
         loop={loop}
-        className={cn('aspect-square w-full max-w-[224px]', className)}
+        className={cn('aspect-square w-full max-w-sticker', className)}
       />
     );
   }
@@ -155,7 +155,7 @@ export function PureStickerView({
   return (
     <img
       src={url}
-      className={cn('aspect-square w-full max-w-[224px] object-contain', className)}
+      className={cn('aspect-square w-full max-w-sticker object-contain', className)}
       alt={emoji || 'Sticker'}
     />
   );

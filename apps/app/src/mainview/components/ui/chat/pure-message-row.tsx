@@ -1,5 +1,6 @@
 import { memo, type ReactNode } from 'react';
 import type { TGMessage, TGReaction } from '@/data';
+import { MAX_MEDIA_SIZE } from '@/lib/media-sizing';
 import { cn } from '@/lib/utils';
 import { PureBotKeyboard } from './bot-keyboard';
 import type { GroupPosition } from './bubble';
@@ -162,7 +163,7 @@ function PureMessageRowInner({
           onReact={onReact}
           onReplyClick={onReplyClick}
         >
-          <PureAlbumGrid items={state.items} maxWidth={320} />
+          <PureAlbumGrid items={state.items} maxWidth={MAX_MEDIA_SIZE} />
           {state.caption && (
             <div className="px-3 py-1.5">
               <p className="whitespace-pre-wrap break-words tg-text-chat text-text-primary">
