@@ -104,7 +104,7 @@ export const ScrollContainer = forwardRef<ScrollContainerHandle, ScrollContainer
       <div
         ref={combinedRef}
         data-testid="message-panel"
-        className="absolute inset-0 overflow-y-auto px-4 py-3 scrollbar-subtle"
+        className="absolute inset-0 overflow-y-auto px-2 py-3 scrollbar-subtle"
       >
         {children}
       </div>

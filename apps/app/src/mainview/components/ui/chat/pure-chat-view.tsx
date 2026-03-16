@@ -1,5 +1,6 @@
 import type { ChatKind, TGMessage } from '@/data';
 import { cn } from '@/lib/utils';
+import { UserAvatar } from '../user-avatar';
 import type { GroupPosition } from './pure-message-row';
 import { PureMessageRow } from './pure-message-row';
 
@@ -57,12 +58,21 @@ export function PureChatView({
   const showSender = isGroup;
 
   return (
-    <div className="mx-auto max-w-[720px] space-y-1">
+    <div className="space-y-1">
       {messages.map((msg, index) => {
         const isOut = getIsOutgoing(msg, chatKind);
         const isService = msg.kind === 'service';
         const key = getKey(msg);
         const label = messageLabels?.get(key);
+
+        const groupPosition = getGroupPosition(messages, index, chatKind);
+        // Show user avatar on outgoing messages only in wide layout (@5xl)
+        const showOutAvatar =
+          isOut &&
+          !isService &&
+          msg.kind === 'message' &&
+          (groupPosition === 'last' || groupPosition === 'single');
+        const showOutSpacer = isOut && !isService && !showOutAvatar;
 
         return (
           <div
@@ -71,14 +81,26 @@ export function PureChatView({
             data-testid={label ? `msg-${label}` : undefined}
             data-element={label ?? undefined}
             className={cn(
-              'flex',
-              isService ? 'justify-center' : isOut ? 'sm:justify-end' : 'justify-start',
+              'flex items-end gap-2',
+              isService
+                ? 'justify-center'
+                : isOut
+                  ? 'justify-end @5xl:justify-start'
+                  : 'justify-start',
             )}
           >
+            {showOutAvatar && (
+              <UserAvatar
+                name={msg.sender.name}
+                src={msg.sender.photoUrl}
+                className="hidden size-7 shrink-0 text-xs @5xl:block"
+              />
+            )}
+            {showOutSpacer && <div className="hidden size-7 shrink-0 @5xl:block" />}
             <PureMessageRow
               msg={msg}
               showSender={showSender}
-              groupPosition={getGroupPosition(messages, index, chatKind)}
+              groupPosition={groupPosition}
               onReact={onReact}
               onReplyClick={onReplyClick}
               onTranscribe={onTranscribe}

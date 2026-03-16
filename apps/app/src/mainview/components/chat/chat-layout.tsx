@@ -24,11 +24,16 @@ export function ChatLayout({ onLogout }: { onLogout: () => void }) {
 
   return (
     <div data-testid="chat-layout" className="flex h-screen bg-background">
-      <div className={cn('h-full overflow-hidden md:block', selectedChatId ? 'hidden' : 'block')}>
+      <div
+        className={cn(
+          'h-full overflow-hidden md:block md:w-[30%] md:min-w-[280px] md:max-w-[400px]',
+          selectedChatId ? 'hidden' : 'block',
+        )}
+      >
         <ChatSidebar onLogout={onLogout} />
       </div>
 
-      <div className={cn('flex-1 flex-col', selectedChatId ? 'flex' : 'hidden md:flex')}>
+      <div className={cn('@container flex-1 flex-col', selectedChatId ? 'flex' : 'hidden md:flex')}>
         {isChatSearch ? <ComposeSearchTopBar /> : <ChatHeader />}
         <ChatView />
       </div>
