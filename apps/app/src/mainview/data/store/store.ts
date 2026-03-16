@@ -331,42 +331,48 @@ export const useChatStore = create<ChatState>((set, get) => ({
         .catch(() => {});
     }
     try {
-      const [regular, archived] = await Promise.all([
-        getDialogs({ archived: false }),
-        getDialogs({ archived: true }),
-      ]);
-      // Build the cache from both lists
-      const chatCache = new Map<number, Td.chat>();
-      for (const c of regular) chatCache.set(c.id, c);
-      for (const c of archived) chatCache.set(c.id, c);
-
-      // Build sorted ID lists from positions
-      const mainChatIds: number[] = [];
-      const archivedChatIds: number[] = [];
-
-      for (const c of chatCache.values()) {
-        for (const pos of c.positions) {
-          if (pos.order === '0') continue;
-          if (pos.list._ === 'chatListMain') mainChatIds.push(c.id);
-          else if (pos.list._ === 'chatListArchive') archivedChatIds.push(c.id);
+      // Fetch main chats first — display immediately without waiting for archive
+      const regular = await getDialogs({ archived: false });
+      {
+        const chatCache = new Map<number, Td.chat>();
+        const mainChatIds: number[] = [];
+        for (const c of regular) {
+          chatCache.set(c.id, c);
+          for (const pos of c.positions) {
+            if (pos.order !== '0' && pos.list._ === 'chatListMain') mainChatIds.push(c.id);
+          }
         }
+        mainChatIds.sort((a, b) => compareChatOrder(a, b, chatCache, 'chatListMain'));
+        set({
+          chatCache,
+          mainChatIds,
+          hasMoreChats: regular.length >= 100,
+          loadingDialogs: false,
+        });
+        loadThumbnailsForChats(mainChatIds, chatCache, set);
+        fetchMissingChatPreviewUsers(mainChatIds, chatCache, get, set);
       }
 
-      // Sort by (order, chatId) descending
-      mainChatIds.sort((a, b) => compareChatOrder(a, b, chatCache, 'chatListMain'));
-      archivedChatIds.sort((a, b) => compareChatOrder(a, b, chatCache, 'chatListArchive'));
-
-      set({
-        chatCache,
-        mainChatIds,
-        archivedChatIds,
-        hasMoreChats: regular.length >= 100,
-        hasMoreArchivedChats: archived.length >= 100,
-      });
-      loadThumbnailsForChats(mainChatIds, chatCache, set);
-      loadThumbnailsForChats(archivedChatIds, chatCache, set);
-      fetchMissingChatPreviewUsers(mainChatIds, chatCache, get, set);
-      fetchMissingChatPreviewUsers(archivedChatIds, chatCache, get, set);
+      // Then fetch archived — merge into existing cache
+      const archived = await getDialogs({ archived: true });
+      {
+        const chatCache = new Map(get().chatCache);
+        const archivedChatIds: number[] = [];
+        for (const c of archived) {
+          chatCache.set(c.id, c);
+          for (const pos of c.positions) {
+            if (pos.order !== '0' && pos.list._ === 'chatListArchive') archivedChatIds.push(c.id);
+          }
+        }
+        archivedChatIds.sort((a, b) => compareChatOrder(a, b, chatCache, 'chatListArchive'));
+        set({
+          chatCache,
+          archivedChatIds,
+          hasMoreArchivedChats: archived.length >= 100,
+        });
+        loadThumbnailsForChats(archivedChatIds, chatCache, set);
+        fetchMissingChatPreviewUsers(archivedChatIds, chatCache, get, set);
+      }
     } catch (err) {
       set({ error: err instanceof Error ? err.message : String(err) });
     } finally {
