@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import { ContextMenuPage } from './context-menu-page';
 import { FixtureIndex } from './fixture-index';
 import { FixturePage } from './fixture-page';
 
-function parsePath(pathname: string): { page: 'index' } | { page: 'fixture'; name: string } {
+function parsePath(
+  pathname: string,
+): { page: 'index' } | { page: 'fixture'; name: string } | { page: 'context-menu' } {
+  if (pathname === '/dev/context-menu') return { page: 'context-menu' };
   const match = pathname.match(/^\/dev\/fixture\/(.+)$/);
   if (match) return { page: 'fixture', name: match[1] };
   return { page: 'index' };
@@ -26,6 +30,9 @@ export function DevHarness() {
     }
   }, []);
 
+  if (route.page === 'context-menu') {
+    return <ContextMenuPage />;
+  }
   if (route.page === 'fixture') {
     return <FixturePage name={route.name} navigate={navigate} />;
   }

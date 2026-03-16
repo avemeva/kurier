@@ -6,7 +6,7 @@ export type ReactionInfo = {
   chosen: boolean;
 };
 
-export const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢'];
+export const QUICK_REACTIONS = ['❤️', '👍', '🔥', '🤝', '😁', '😈', '😎'];
 
 export function PureReactionBar({
   reactions,

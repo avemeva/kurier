@@ -86,6 +86,9 @@ export interface ChatState {
   // --- Scroll-to-message ---
   targetMessageId: number | null;
 
+  // --- Compose reply ---
+  replyToMessage: { messageId: number; senderName: string; text: string } | null;
+
   // --- Actions ---
   loadDialogs: () => Promise<void>;
   loadMoreChats: (archived: boolean) => Promise<void>;
@@ -96,6 +99,8 @@ export interface ChatState {
   loadMessagesAround: (messageId: number) => Promise<void>;
   loadLatestMessages: () => Promise<void>;
   send: (chatId: number, text: string) => void;
+  setReplyTo: (messageId: number, senderName: string, text: string) => void;
+  clearReplyTo: () => void;
   react: (chatId: number, msgId: number, emoji: string, chosen: boolean) => void;
   handleUpdate: (event: TelegramUpdateEvent) => void;
   loadProfilePhoto: (chatId: number) => void;
@@ -149,6 +154,8 @@ export const INITIAL_STATE: Omit<
   | 'loadMessagesAround'
   | 'loadLatestMessages'
   | 'send'
+  | 'setReplyTo'
+  | 'clearReplyTo'
   | 'react'
   | 'handleUpdate'
   | 'loadProfilePhoto'
@@ -229,4 +236,5 @@ export const INITIAL_STATE: Omit<
   chatSearchHasMore: false,
   chatSearchNextOffsetId: undefined,
   targetMessageId: null,
+  replyToMessage: null,
 };

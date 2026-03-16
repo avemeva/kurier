@@ -35,6 +35,7 @@ import {
 } from '../telegram';
 import type { PendingMessage, Td } from '../types';
 import { buildReplyPreview, extractMediaLabel, extractText } from '../types';
+import { stripVS16 } from '../types/emoji-qualify';
 import * as requests from './request-tracker';
 import { resetSelectors } from './selectors';
 import * as timers from './timer-registry';
@@ -487,7 +488,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
       chats: updatePreview(s.chats),
       archivedChats: updatePreview(s.archivedChats),
     }));
-    sendMessage(chatId, text)
+    const replyTo = get().replyToMessage;
+    const replyToMessageId = replyTo?.messageId;
+    if (replyTo) {
+      set({ replyToMessage: null });
+    }
+    sendMessage(chatId, text, replyToMessageId)
       .then((realMsg) => {
         set((s) => {
           const chatPending = s.pendingByChat[chatId] ?? [];
@@ -517,7 +523,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
       });
   },
 
+  setReplyTo: (messageId: number, senderName: string, text: string) => {
+    set({ replyToMessage: { messageId, senderName, text } });
+  },
+
+  clearReplyTo: () => {
+    set({ replyToMessage: null });
+  },
+
   react: (chatId: number, msgId: number, emoji: string, chosen: boolean) => {
+    // Strip variation selectors so emoji matches raw TDLib format (e.g. ❤ not ❤️).
+    // The display layer adds \uFE0F via qualifyEmoji() in convert.ts; we reverse that here
+    // at the store boundary to keep internal state consistent with TDLib.
+    const rawEmoji = stripVS16(emoji);
     const { messagesByChat } = get();
     const messages = messagesByChat[chatId];
     if (!messages) return;
@@ -531,7 +549,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       };
       const reactions = [...(info.reactions?.reactions ?? [])];
       const idx = reactions.findIndex(
-        (r) => r.type._ === 'reactionTypeEmoji' && r.type.emoji === emoji,
+        (r) => r.type._ === 'reactionTypeEmoji' && r.type.emoji === rawEmoji,
       );
       if (chosen) {
         if (idx !== -1) {
@@ -556,7 +574,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         } else {
           reactions.push({
             _: 'messageReaction',
-            type: { _: 'reactionTypeEmoji', emoji },
+            type: { _: 'reactionTypeEmoji', emoji: rawEmoji },
             total_count: 1,
             is_chosen: true,
             recent_sender_ids: [],
@@ -580,7 +598,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     set((s) => ({ messagesByChat: { ...s.messagesByChat, [chatId]: updatedMessages } }));
     const originalMessages = messages;
-    sendReaction(chatId, msgId, emoji, chosen).catch((err) => {
+    sendReaction(chatId, msgId, rawEmoji, chosen).catch((err) => {
       set((s) => ({
         messagesByChat: { ...s.messagesByChat, [chatId]: originalMessages },
         error: err instanceof Error ? err.message : String(err),

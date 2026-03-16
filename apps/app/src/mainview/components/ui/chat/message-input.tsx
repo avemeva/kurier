@@ -1,13 +1,17 @@
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export function PureMessageInput({
   onSend,
+  replyTo,
+  onCancelReply,
   className,
 }: {
   onSend: (text: string) => Promise<void>;
+  replyTo?: { senderName: string; text: string };
+  onCancelReply?: () => void;
   className?: string;
 }) {
   const [text, setText] = useState('');
@@ -32,10 +36,34 @@ export function PureMessageInput({
       e.preventDefault();
       handleSend();
     }
+    if (e.key === 'Escape' && replyTo && onCancelReply) {
+      e.preventDefault();
+      onCancelReply();
+    }
   }
 
   return (
     <div className={cn('border-t border-border px-4 py-2', className)}>
+      {replyTo && (
+        <div className="mb-1.5 flex items-center gap-2 rounded-lg bg-accent/50 px-3 py-1.5">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-medium text-accent-brand">
+              Replying to {replyTo.senderName}
+            </p>
+            <p className="truncate text-xs text-text-secondary">{replyTo.text}</p>
+          </div>
+          {onCancelReply && (
+            <button
+              type="button"
+              onClick={onCancelReply}
+              className="shrink-0 rounded-full p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              aria-label="Cancel reply"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      )}
       <div className="flex items-end gap-2 rounded-2xl border border-input bg-background transition-shadow has-[textarea:focus-visible]:border-ring has-[textarea:focus-visible]:ring-2 has-[textarea:focus-visible]:ring-ring/20">
         <textarea
           aria-label="Type a message"

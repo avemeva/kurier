@@ -5,6 +5,7 @@ import { PureMessageInput } from '@/components/ui/chat/message-input';
 import { PureChatView } from '@/components/ui/chat/pure-chat-view';
 import type { ScrollContainerHandle } from '@/components/ui/chat/scroll-container';
 import { ScrollContainer } from '@/components/ui/chat/scroll-container';
+import type { TGMessage } from '@/data';
 import { selectChatMessages, selectSelectedChat, useChatMessageLoader, useChatStore } from '@/data';
 import { useVisibleMessages } from '@/hooks/use-visible-messages';
 import { ComposeSearchBottomBar } from './compose-search';
@@ -53,6 +54,9 @@ export function ChatView() {
   const loadMessagesAround = useChatStore((s) => s.loadMessagesAround);
   const send = useChatStore((s) => s.send);
   const react = useChatStore((s) => s.react);
+  const replyToMessage = useChatStore((s) => s.replyToMessage);
+  const setReplyTo = useChatStore((s) => s.setReplyTo);
+  const clearReplyTo = useChatStore((s) => s.clearReplyTo);
   const searchMode = useChatStore((s) => s.searchMode);
   const recognizeSpeech = useChatStore((s) => s.recognizeSpeech);
   const openDocument = useChatStore((s) => s.openDocument);
@@ -107,6 +111,38 @@ export function ChatView() {
     [openDocument],
   );
 
+  const handleCopyText = useCallback((msg: TGMessage) => {
+    if (msg.kind !== 'message') return;
+    const c = msg.content;
+    let text: string | null = null;
+    if (c.kind === 'text') text = c.text;
+    else if ('caption' in c && c.caption) text = c.caption.text;
+    if (text) navigator.clipboard.writeText(text);
+  }, []);
+
+  const handleCopyLink = useCallback(
+    (msg: TGMessage) => {
+      if (!selectedChat || msg.kind === 'pending') return;
+      const chatId = String(selectedChat.id).replace(/^-100/, '');
+      const link = `https://t.me/c/${chatId}/${msg.id}`;
+      navigator.clipboard.writeText(link);
+    },
+    [selectedChat],
+  );
+
+  const handleReply = useCallback(
+    (msg: TGMessage) => {
+      if (msg.kind !== 'message') return;
+      const c = msg.content;
+      let textPreview: string;
+      if (c.kind === 'text') textPreview = c.text;
+      else if ('caption' in c && c.caption) textPreview = c.caption.text;
+      else textPreview = c.kind;
+      setReplyTo(msg.id, msg.sender.name, textPreview);
+    },
+    [setReplyTo],
+  );
+
   if (!selectedChat) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -151,8 +187,11 @@ export function ChatView() {
             chatKind={selectedChat.kind}
             onReact={handleReact}
             onReplyClick={handleReplyClick}
+            onReply={handleReply}
             onTranscribe={handleTranscribe}
             onOpenDocument={handleOpenDocument}
+            onCopyText={handleCopyText}
+            onCopyLink={handleCopyLink}
           />
           <div />
         </ScrollContainer>
@@ -180,7 +219,15 @@ export function ChatView() {
       {searchMode === 'chat' ? (
         <ComposeSearchBottomBar />
       ) : (
-        <PureMessageInput onSend={handleSend} />
+        <PureMessageInput
+          onSend={handleSend}
+          replyTo={
+            replyToMessage
+              ? { senderName: replyToMessage.senderName, text: replyToMessage.text }
+              : undefined
+          }
+          onCancelReply={clearReplyTo}
+        />
       )}
     </>
   );

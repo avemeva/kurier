@@ -1,6 +1,7 @@
 import type { ChatKind, TGMessage } from '@/data';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '../user-avatar';
+import { MessageContextMenu } from './message-context-menu';
 import type { GroupPosition } from './pure-message-row';
 import { PureMessageRow } from './pure-message-row';
 
@@ -11,8 +12,12 @@ export type PureChatViewProps = {
   messageLabels?: Map<string | number, string>;
   onReact: (messageId: number, emoticon: string, chosen: boolean) => void;
   onReplyClick?: (messageId: number) => void;
+  /** Triggered from context menu "Reply" — sets compose reply state. */
+  onReply?: (msg: TGMessage) => void;
   onTranscribe?: (chatId: number, msgId: number) => void;
   onOpenDocument?: (chatId: number, msgId: number) => void;
+  onCopyText?: (msg: TGMessage) => void;
+  onCopyLink?: (msg: TGMessage) => void;
 };
 
 function getKey(msg: TGMessage): string | number {
@@ -53,8 +58,11 @@ export function PureChatView({
   messageLabels,
   onReact,
   onReplyClick,
+  onReply,
   onTranscribe,
   onOpenDocument,
+  onCopyText,
+  onCopyLink,
 }: PureChatViewProps) {
   const isGroup = chatKind === 'basicGroup' || chatKind === 'supergroup';
   const showSender = isGroup || chatKind === 'channel';
@@ -66,6 +74,7 @@ export function PureChatView({
         const isService = msg.kind === 'service';
         const key = getKey(msg);
         const label = messageLabels?.get(key);
+        const msgId = msg.kind !== 'pending' ? msg.id : 0;
 
         const groupPosition = getGroupPosition(messages, index, chatKind);
         // Show user avatar on outgoing messages only in wide layout (@5xl)
@@ -76,7 +85,7 @@ export function PureChatView({
           (groupPosition === 'last' || groupPosition === 'single');
         const showOutSpacer = isOut && !isService && !showOutAvatar;
 
-        return (
+        const row = (
           <div
             key={key}
             id={`msg-${label ?? key}`}
@@ -109,6 +118,21 @@ export function PureChatView({
               onOpenDocument={onOpenDocument}
             />
           </div>
+        );
+
+        if (isService || msg.kind === 'pending') return row;
+
+        return (
+          <MessageContextMenu
+            key={key}
+            msg={msg}
+            onReact={(emoji, chosen) => onReact(msgId, emoji, chosen)}
+            onReply={onReply ? () => onReply(msg) : undefined}
+            onCopyText={onCopyText ? () => onCopyText(msg) : undefined}
+            onCopyLink={onCopyLink ? () => onCopyLink(msg) : undefined}
+          >
+            {row}
+          </MessageContextMenu>
         );
       })}
     </div>

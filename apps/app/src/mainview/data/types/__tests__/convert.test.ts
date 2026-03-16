@@ -286,7 +286,7 @@ describe('toTGReactions', () => {
     const result = toTGReactions(info);
     expect(result).toEqual([
       { emoji: '🔥', count: 7, chosen: true },
-      { emoji: '👎', count: 1, chosen: false },
+      { emoji: '👎\uFE0F', count: 1, chosen: false },
     ]);
   });
 
@@ -719,7 +719,7 @@ describe('toTGContent', () => {
     expect(c.kind).toBe('sticker');
     if (c.kind === 'sticker') {
       expect(c.format).toBe('webp');
-      expect(c.emoji).toBe('⭐');
+      expect(c.emoji).toBe('⭐\uFE0F');
       expect(c.width).toBe(512);
       expect(c.height).toBe(512);
       expect(c.url).toBeUndefined();

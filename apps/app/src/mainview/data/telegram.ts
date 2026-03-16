@@ -306,10 +306,17 @@ export async function getMessagesAroundMessage(
 
 // --- Send ---
 
-export async function sendMessage(chatId: number, text: string): Promise<Td.message> {
+export async function sendMessage(
+  chatId: number,
+  text: string,
+  replyToMessageId?: number,
+): Promise<Td.message> {
   const result = await client.invoke({
     _: 'sendMessage',
     chat_id: chatId,
+    reply_to: replyToMessageId
+      ? { _: 'inputMessageReplyToMessage', message_id: replyToMessageId }
+      : undefined,
     input_message_content: {
       _: 'inputMessageText',
       text: { _: 'formattedText', text, entities: [] },
