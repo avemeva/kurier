@@ -140,11 +140,13 @@
   --color-text-tertiary: var(--text-tertiary);
   --color-text-quaternary: var(--text-quaternary);
 
-  /* Message sizing */
-  --width-bubble: 468px;
-  --width-sticker: 224px;
-  --width-voice: 280px;
-  --width-video-note-text: 200px;
+  /* Message sizing — values live on :root so JS (themeVar) can read them */
+  --width-bubble: var(--msg-max-bubble);
+  --max-width-bubble: var(--msg-max-bubble);
+  --width-sticker: var(--msg-max-sticker);
+  --max-width-sticker: var(--msg-max-sticker);
+  --width-voice: var(--msg-max-voice);
+  --width-video-note-text: var(--msg-max-video-note-text);
 
   /* Radius — derived from theme's --radius */
   --radius-sm: calc(var(--radius) - 4px);
@@ -154,6 +156,14 @@
   --radius-2xl: var(--theme-radius-2xl);
   --radius-3xl: var(--theme-radius-3xl);
   --radius-4xl: var(--theme-radius-4xl);
+}
+
+/* Message sizing constants — on :root so both CSS utilities and JS themeVar() read them */
+:root {
+  --msg-max-bubble: 420px;
+  --msg-max-sticker: 224px;
+  --msg-max-voice: 280px;
+  --msg-max-video-note-text: 200px;
 }
 
 /* Telegram-specific text styles (tg- prefix) */

@@ -222,7 +222,7 @@ export function FixtureIndex({ navigate }: Props) {
                     </a>
                   ))}
                 </div>
-                <div className="rounded-lg border border-border-primary bg-chat-bg px-4 py-4">
+                <div className="resize-x overflow-auto rounded-lg border border-border-primary bg-chat-bg px-4 py-4">
                   <PureChatView
                     messages={allMessages}
                     chatKind={chatKind}

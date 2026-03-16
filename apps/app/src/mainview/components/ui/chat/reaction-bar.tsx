@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 export type ReactionInfo = {
@@ -39,52 +38,6 @@ export function PureReactionBar({
         </button>
       ))}
       {children && <span className="ml-auto">{children}</span>}
-    </div>
-  );
-}
-
-export function PureReactionPicker({
-  onReact,
-  className,
-}: {
-  onReact: (emoticon: string, chosen: boolean) => void;
-  className?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={cn(
-          'absolute -right-1 -top-3 hidden rounded-full bg-card px-1 py-0.5 text-xs shadow group-hover/bubble:block',
-          className,
-        )}
-      >
-        +
-      </button>
-    );
-  }
-  return (
-    <div
-      className={cn(
-        'absolute -top-8 right-0 z-10 flex gap-0.5 rounded-full bg-popover px-1 py-0.5 shadow-md',
-        className,
-      )}
-    >
-      {QUICK_REACTIONS.map((e) => (
-        <button
-          key={e}
-          type="button"
-          onClick={() => {
-            onReact(e, false);
-            setOpen(false);
-          }}
-          className="rounded p-0.5 text-sm transition-transform hover:scale-125"
-        >
-          {e}
-        </button>
-      ))}
     </div>
   );
 }

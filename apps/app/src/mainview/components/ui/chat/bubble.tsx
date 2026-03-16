@@ -68,7 +68,7 @@ export function PureBubble({
         variant === 'filled' && 'px-3 py-1.5',
         variant !== 'media' && (isOutgoing ? 'bg-message-own' : 'bg-message-peer'),
         variant !== 'filled' && 'overflow-hidden',
-        hasReactions && variant === 'filled' && 'pb-5',
+        hasReactions && variant === 'filled' && 'pb-1.5',
         showAvatar ? 'max-w-[calc(100%-36px)]' : 'max-w-bubble',
         className,
       )}

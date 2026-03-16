@@ -19,7 +19,7 @@ import { computeMessageState } from './message-rendering';
 import { PureMessageTime } from './message-time';
 import { PurePhotoView } from './photo-view';
 import { PureAlbumGrid } from './pure-album-grid';
-import { PureReactionBar, PureReactionPicker } from './reaction-bar';
+import { PureReactionBar } from './reaction-bar';
 import { PureReplyHeader } from './reply-header';
 import { PureServiceMessage } from './service-message';
 import { PureStickerView } from './sticker-view';
@@ -332,7 +332,6 @@ function StickerFrame({
       senderPhotoUrl={msg.sender.photoUrl}
       hasReactions={hasReactions}
     >
-      <PureReactionPicker onReact={(e, c) => onReact(msg.id, e, c)} />
       {children}
       {hasReactions ? (
         <PureReactionBar
@@ -396,7 +395,6 @@ function MediaFrame({
       senderPhotoUrl={msg.sender.photoUrl}
       hasReactions={hasReactions}
     >
-      <PureReactionPicker onReact={(e, c) => onReact(msg.id, e, c)} />
       {bubbleVariant === 'framed' && state.showSenderName && (
         <div className="px-3 pt-1.5">
           <p className="mb-0.5 text-xs font-medium text-accent-brand">{msg.sender.name}</p>
@@ -504,7 +502,6 @@ function BubbleFrame({
       senderPhotoUrl={msg.sender.photoUrl}
       hasReactions={hasReactions}
     >
-      <PureReactionPicker onReact={(e, c) => onReact(msg.id, e, c)} />
       {state.showSenderName && (
         <p className="mb-0.5 text-xs font-medium text-accent-brand">{msg.sender.name}</p>
       )}

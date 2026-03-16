@@ -17,8 +17,8 @@ function themeVar(name: string, fallback: number): number {
   return parseInt(val, 10) || fallback;
 }
 
-/** Max message bubble / single-media width. Source: --width-bubble in @theme. */
-export const MAX_MEDIA_SIZE = themeVar('--width-bubble', 468);
+/** Max message bubble / single-media width. Source: --msg-max-bubble on :root. */
+export const MAX_MEDIA_SIZE = themeVar('--msg-max-bubble', 420);
 export const MIN_MEDIA_SIZE = 100;
 export const ALBUM_SPACING = 4;
 

@@ -69,10 +69,6 @@ export function PureReplyHeader({
       )}
       onClick={onClick}
     >
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-semibold text-accent-brand">{senderName}</p>
-        <p className="truncate text-xs text-text-secondary">{label}</p>
-      </div>
       {mediaUrl && hasVisualThumb(mediaType) && (
         <div className="relative size-8 shrink-0">
           <img src={mediaUrl} alt="" className="size-8 rounded object-cover" />
@@ -93,6 +89,10 @@ export function PureReplyHeader({
           {mediaType === 'GIF' ? 'GIF' : (MEDIA_ICONS[mediaType] ?? mediaType.charAt(0))}
         </div>
       )}
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-semibold text-accent-brand">{senderName}</p>
+        <p className="truncate text-xs text-text-secondary">{label}</p>
+      </div>
     </Tag>
   );
 }
